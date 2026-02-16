@@ -77,7 +77,16 @@
   function showError(field, message) {
     const el = field === 'name' ? nameError : genderError;
     const input = field === 'name' ? nameInput : genderSelect;
-    el.textContent = message;
+    el.innerHTML = '';
+    const text = document.createElement('span');
+    text.textContent = message;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'form__error-close';
+    closeBtn.setAttribute('aria-label', 'Dismiss error');
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => clearError(field));
+    el.appendChild(text);
+    el.appendChild(closeBtn);
     input.classList.add(field === 'name' ? 'form__input--error' : 'form__select--error');
 
     // Clear any existing timer for this field
@@ -88,7 +97,7 @@
   function clearError(field) {
     const el = field === 'name' ? nameError : genderError;
     const input = field === 'name' ? nameInput : genderSelect;
-    el.textContent = '';
+    el.innerHTML = '';
     input.classList.remove('form__input--error', 'form__select--error');
     if (errorTimers[field]) {
       clearTimeout(errorTimers[field]);

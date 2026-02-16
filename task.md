@@ -247,7 +247,7 @@
 ## Phase 6: Validation & Error Handling
 
 ### TASK-6.1 — Consolidate all validation rules
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Ensure every validation rule from Section 7 is enforced in the UI and in the add-player flow.
 - **Requirements:** REQ-VAL-01 to REQ-VAL-09
 - **Acceptance Criteria:**
@@ -262,7 +262,7 @@
   - REQ-VAL-09: Each player in one couple only (algorithm guarantees this)
 
 ### TASK-6.2 — Error message display system
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Build a reusable error display function that shows messages near the relevant input, auto-dismisses after 5s, and supports multiple simultaneous errors.
 - **Requirements:** REQ-ERR-01 to REQ-ERR-05
 - **Acceptance Criteria:**
