@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Integration Tests — User Workflow</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+    #app-frame { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Integration Tests — User Workflow</h1>
+  <div id="test-results"></div>
+
+  <!-- Hidden container with the full app HTML structure -->
+  <div id="app-frame">
+    <header class="header">
+      <div class="lang-switcher">
+        <button class="lang-switcher__btn" data-lang="en" type="button">EN</button>
+        <button class="lang-switcher__btn" data-lang="es" type="button">ES</button>
+      </div>
+      <h1 class="header__title" data-i18n="page.title">Beach Volleyball Couple Matching</h1>
+      <p class="header__subtitle" data-i18n="page.subtitle">Register players and generate random couples for your game</p>
+    </header>
+    <main class="main">
+      <section class="section section--input" aria-labelledby="input-heading">
+        <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
+        <form class="form" id="player-form" novalidate>
+          <div class="form__group">
+            <label class="form__label" for="player-name" data-i18n="form.nameLabel">Player Name</label>
+            <input class="form__input" type="text" id="player-name" name="playerName"
+              placeholder="Enter player name" data-i18n-placeholder="form.namePlaceholder" maxlength="50" autocomplete="off">
+            <span class="form__error" id="name-error" role="alert" aria-live="polite"></span>
+          </div>
+          <div class="form__group">
+            <label class="form__label" for="player-gender" data-i18n="form.genderLabel">Gender</label>
+            <select class="form__select" id="player-gender" name="playerGender">
+              <option value="" disabled selected data-i18n="form.genderDefault">Select Gender</option>
+              <option value="male" data-i18n="form.genderMale">Male</option>
+              <option value="female" data-i18n="form.genderFemale">Female</option>
+            </select>
+            <span class="form__error" id="gender-error" role="alert" aria-live="polite"></span>
+          </div>
+          <button class="btn btn--primary form__submit" type="submit" id="add-player-btn" disabled data-i18n="form.submit">
+            Add Player
+          </button>
+        </form>
+      </section>
+      <section class="section section--players" aria-labelledby="players-heading">
+        <h2 id="players-heading" class="section__heading">Registered Players (<span id="player-count">0</span>)</h2>
+        <p class="section__meta" id="gender-counts">Males: 0 | Females: 0</p>
+        <ul class="player-list" id="player-list"></ul>
+        <p class="player-list__empty" id="empty-message" data-i18n="players.empty">No players added yet</p>
+      </section>
+      <section class="section section--actions" aria-labelledby="actions-heading">
+        <h2 id="actions-heading" class="sr-only">Actions</h2>
+        <div class="actions">
+          <button class="btn btn--primary btn--large" id="generate-btn" disabled data-i18n="actions.generate">Generate Couples</button>
+          <p class="actions__hint" id="generate-hint" data-i18n="actions.hint">Add at least 2 players to generate couples</p>
+          <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">Regenerate Couples</button>
+          <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">Clear All Players</button>
+        </div>
+      </section>
+      <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden>
+        <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
+        <div class="couples-grid" id="couples-grid"></div>
+        <div class="unmatched" id="unmatched-notice" hidden></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../js/pairing.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    const out = document.getElementById('test-results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        out.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        out.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) out.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    // --- Helper: simulate adding a player via the form ---
+    function addPlayer(name, gender) {
+      const nameInput = document.getElementById('player-name');
+      const genderSelect = document.getElementById('player-gender');
+      const form = document.getElementById('player-form');
+
+      nameInput.value = name;
+      nameInput.dispatchEvent(new Event('input'));
+      genderSelect.value = gender;
+      genderSelect.dispatchEvent(new Event('change'));
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+
+    // --- Helper: get current player list items ---
+    function getPlayerItems() {
+      return document.querySelectorAll('#player-list .player-list__item');
+    }
+
+    // Wait for DOMContentLoaded handlers (app.js, i18n.js) to finish
+    setTimeout(function runTests() {
+
+      // ===== TEST 1: Initial empty state =====
+      assert(getPlayerItems().length === 0, 'Initial: player list is empty');
+      assert(!document.getElementById('empty-message').hidden, 'Initial: empty message is visible');
+      assert(document.getElementById('generate-btn').disabled, 'Initial: generate button is disabled');
+      assert(document.getElementById('regenerate-btn').hidden, 'Initial: regenerate button is hidden');
+      assert(document.getElementById('clear-btn').hidden, 'Initial: clear button is hidden');
+      assert(document.getElementById('results-section').hidden, 'Initial: results section is hidden');
+
+      // ===== TEST 2: Add players =====
+      addPlayer('Alice', 'female');
+      assert(getPlayerItems().length === 1, 'Add: 1 player after first add');
+      assert(document.getElementById('generate-btn').disabled, 'Add: generate still disabled with 1 player');
+
+      addPlayer('Bob', 'male');
+      assert(getPlayerItems().length === 2, 'Add: 2 players after second add');
+      assert(!document.getElementById('generate-btn').disabled, 'Add: generate enabled with 2 players');
+
+      addPlayer('Carlos', 'male');
+      addPlayer('Diana', 'female');
+      addPlayer('Eve', 'female');
+      assert(getPlayerItems().length === 5, 'Add: 5 players total');
+      assert(!document.getElementById('clear-btn').hidden, 'Add: clear button visible with players');
+
+      // ===== TEST 3: Form resets after adding =====
+      const nameInput = document.getElementById('player-name');
+      const genderSelect = document.getElementById('player-gender');
+      assert(nameInput.value === '', 'Form reset: name input cleared after add');
+      assert(genderSelect.value === '', 'Form reset: gender reset to default after add');
+      assert(document.getElementById('add-player-btn').disabled, 'Form reset: add button disabled after reset');
+
+      // ===== TEST 4: Validation — empty name =====
+      addPlayer('', 'male');
+      assert(getPlayerItems().length === 5, 'Validation: empty name does not add player');
+      const nameErr = document.getElementById('name-error');
+      assert(nameErr.textContent.trim().length > 0, 'Validation: error message shown for empty name');
+
+      // ===== TEST 5: Validation — short name =====
+      addPlayer('A', 'male');
+      assert(getPlayerItems().length === 5, 'Validation: single-char name does not add player');
+
+      // ===== TEST 6: Validation — no gender =====
+      nameInput.value = 'TestPlayer';
+      nameInput.dispatchEvent(new Event('input'));
+      // Do not set gender — leave at default
+      genderSelect.value = '';
+      genderSelect.dispatchEvent(new Event('change'));
+      document.getElementById('player-form').dispatchEvent(new Event('submit', { cancelable: true }));
+      assert(getPlayerItems().length === 5, 'Validation: no gender does not add player');
+      const genderErr = document.getElementById('gender-error');
+      assert(genderErr.textContent.trim().length > 0, 'Validation: error message shown for no gender');
+
+      // ===== TEST 7: Generate couples =====
+      document.getElementById('generate-btn').click();
+      const resultsSection = document.getElementById('results-section');
+      assert(!resultsSection.hidden, 'Generate: results section is visible');
+      const cards = document.querySelectorAll('#couples-grid .couple-card');
+      assert(cards.length > 0, 'Generate: couple cards rendered',
+        `Found ${cards.length} cards`);
+      assert(!document.getElementById('regenerate-btn').hidden, 'Generate: regenerate button visible');
+
+      // With 2M + 3F = 5 players → 2 mixed + 0 or 1 same + possible unmatched
+      const totalPlayers = 5;
+      const pairedCount = cards.length * 2;
+      const unmatchedEl = document.getElementById('unmatched-notice');
+      const hasUnmatched = !unmatchedEl.hidden;
+      assert(pairedCount + (hasUnmatched ? 1 : 0) === totalPlayers,
+        'Generate: all players accounted for',
+        `Paired: ${pairedCount}, Unmatched: ${hasUnmatched ? 1 : 0}, Total: ${totalPlayers}`);
+
+      // ===== TEST 8: Regenerate produces new results =====
+      const firstOrder = document.getElementById('couples-grid').innerHTML;
+      let different = false;
+      for (let i = 0; i < 50; i++) {
+        document.getElementById('regenerate-btn').click();
+        if (document.getElementById('couples-grid').innerHTML !== firstOrder) {
+          different = true;
+          break;
+        }
+      }
+      assert(different, 'Regenerate: produces different pairings on re-run');
+
+      // ===== TEST 9: Clear All resets state =====
+      // Stub confirm to auto-accept
+      const origConfirm = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirm;
+
+      assert(getPlayerItems().length === 0, 'Clear All: player list is empty');
+      assert(!document.getElementById('empty-message').hidden, 'Clear All: empty message visible');
+      assert(document.getElementById('generate-btn').disabled, 'Clear All: generate button disabled');
+      assert(document.getElementById('regenerate-btn').hidden, 'Clear All: regenerate button hidden');
+      assert(document.getElementById('clear-btn').hidden, 'Clear All: clear button hidden');
+      assert(document.getElementById('results-section').hidden, 'Clear All: results section hidden');
+
+      // ===== TEST 10: Error scenarios handled gracefully =====
+      // Adding valid players after clear to ensure app is in working state
+      addPlayer('Frank', 'male');
+      addPlayer('Grace', 'female');
+      assert(getPlayerItems().length === 2, 'Recovery: can add players after clear');
+      document.getElementById('generate-btn').click();
+      assert(!document.getElementById('results-section').hidden, 'Recovery: can generate after clear');
+
+      // ===== Summary =====
+      const total = passed + failed;
+      const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+      out.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+        (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+
+    }, 100);
+  </script>
+</body>
+</html>

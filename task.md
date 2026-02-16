@@ -383,7 +383,7 @@
   - Each player appears in exactly one couple
 
 ### TASK-9.2 — Integration tests for user workflow
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Test the complete flow: add players → generate → view results → regenerate → clear all.
 - **Requirements:** Section 11.2
 - **Acceptance Criteria:**
