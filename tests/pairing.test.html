@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pairing Algorithm Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Pairing Algorithm — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/pairing.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function makePlayers(maleCount, femaleCount) {
+      const players = [];
+      for (let i = 1; i <= maleCount; i++) players.push({ name: `M${i}`, gender: 'male' });
+      for (let i = 1; i <= femaleCount; i++) players.push({ name: `F${i}`, gender: 'female' });
+      return players;
+    }
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    function countByType(couples, type) {
+      return couples.filter(c => c.type === type).length;
+    }
+
+    // --- Scenario 1: Equal males and females (4M, 4F) ---
+    (function () {
+      const { couples, unmatched } = generateCouples(makePlayers(4, 4));
+      assert(couples.length === 4, 'Scenario 1: 4 couples total',
+        `Expected 4, got ${couples.length}`);
+      assert(countByType(couples, 'mixed') === 4, 'Scenario 1: all 4 are mixed',
+        `Mixed: ${countByType(couples, 'mixed')}`);
+      assert(unmatched === null, 'Scenario 1: no unmatched player');
+    })();
+
+    // --- Scenario 2: More males than females (6M, 3F) ---
+    (function () {
+      const { couples, unmatched } = generateCouples(makePlayers(6, 3));
+      assert(countByType(couples, 'mixed') === 3, 'Scenario 2: 3 mixed couples',
+        `Mixed: ${countByType(couples, 'mixed')}`);
+      assert(countByType(couples, 'same') === 1, 'Scenario 2: 1 same-gender couple',
+        `Same: ${countByType(couples, 'same')}`);
+      assert(couples.length === 4, 'Scenario 2: 4 couples total',
+        `Expected 4, got ${couples.length}`);
+      assert(unmatched !== null && unmatched.gender === 'male', 'Scenario 2: 1 unmatched male',
+        `Unmatched: ${JSON.stringify(unmatched)}`);
+    })();
+
+    // --- Scenario 3: More females than males (2M, 5F) ---
+    (function () {
+      const { couples, unmatched } = generateCouples(makePlayers(2, 5));
+      assert(countByType(couples, 'mixed') === 2, 'Scenario 3: 2 mixed couples',
+        `Mixed: ${countByType(couples, 'mixed')}`);
+      assert(countByType(couples, 'same') === 1, 'Scenario 3: 1 same-gender couple',
+        `Same: ${countByType(couples, 'same')}`);
+      assert(couples.length === 3, 'Scenario 3: 3 couples total',
+        `Expected 3, got ${couples.length}`);
+      assert(unmatched !== null && unmatched.gender === 'female', 'Scenario 3: 1 unmatched female',
+        `Unmatched: ${JSON.stringify(unmatched)}`);
+    })();
+
+    // --- Scenario 4: Only males (8M, 0F) ---
+    (function () {
+      const { couples, unmatched } = generateCouples(makePlayers(8, 0));
+      assert(couples.length === 4, 'Scenario 4: 4 couples total',
+        `Expected 4, got ${couples.length}`);
+      assert(countByType(couples, 'mixed') === 0, 'Scenario 4: 0 mixed couples');
+      assert(countByType(couples, 'same') === 4, 'Scenario 4: 4 same-gender couples',
+        `Same: ${countByType(couples, 'same')}`);
+      assert(unmatched === null, 'Scenario 4: no unmatched player');
+    })();
+
+    // --- Scenario 5: Only females (0M, 7F) ---
+    (function () {
+      const { couples, unmatched } = generateCouples(makePlayers(0, 7));
+      assert(couples.length === 3, 'Scenario 5: 3 couples total',
+        `Expected 3, got ${couples.length}`);
+      assert(countByType(couples, 'same') === 3, 'Scenario 5: 3 same-gender couples',
+        `Same: ${countByType(couples, 'same')}`);
+      assert(unmatched !== null && unmatched.gender === 'female', 'Scenario 5: 1 unmatched female',
+        `Unmatched: ${JSON.stringify(unmatched)}`);
+    })();
+
+    // --- Scenario 6: Odd balanced (3M, 2F) ---
+    (function () {
+      const { couples, unmatched } = generateCouples(makePlayers(3, 2));
+      assert(countByType(couples, 'mixed') === 2, 'Scenario 6: 2 mixed couples',
+        `Mixed: ${countByType(couples, 'mixed')}`);
+      assert(couples.length === 2, 'Scenario 6: 2 couples total',
+        `Expected 2, got ${couples.length}`);
+      assert(unmatched !== null && unmatched.gender === 'male', 'Scenario 6: 1 unmatched male',
+        `Unmatched: ${JSON.stringify(unmatched)}`);
+    })();
+
+    // --- Edge: 0 players ---
+    (function () {
+      const { couples, unmatched } = generateCouples([]);
+      assert(couples.length === 0, 'Edge: 0 players → 0 couples');
+      assert(unmatched === null, 'Edge: 0 players → no unmatched');
+    })();
+
+    // --- Edge: 1 player ---
+    (function () {
+      const { couples, unmatched } = generateCouples(makePlayers(1, 0));
+      assert(couples.length === 0, 'Edge: 1 player → 0 couples');
+      assert(unmatched !== null, 'Edge: 1 player → 1 unmatched');
+    })();
+
+    // --- Each player appears in exactly one couple (REQ-VAL-09) ---
+    (function () {
+      const players = makePlayers(6, 5);
+      const { couples, unmatched } = generateCouples(players);
+      const seen = new Set();
+      let duplicate = false;
+      couples.forEach(c => {
+        if (seen.has(c.player1.name)) duplicate = true;
+        if (seen.has(c.player2.name)) duplicate = true;
+        seen.add(c.player1.name);
+        seen.add(c.player2.name);
+      });
+      if (unmatched) {
+        if (seen.has(unmatched.name)) duplicate = true;
+        seen.add(unmatched.name);
+      }
+      assert(!duplicate, 'Uniqueness: no player appears in more than one couple');
+      assert(seen.size === players.length, 'Uniqueness: all players accounted for',
+        `Expected ${players.length}, got ${seen.size}`);
+    })();
+
+    // --- Randomization: multiple runs produce different orderings ---
+    (function () {
+      const players = makePlayers(5, 5);
+      const orderings = new Set();
+      for (let i = 0; i < 100; i++) {
+        const { couples } = generateCouples(players);
+        const key = couples.map(c => c.player1.name + '+' + c.player2.name).join('|');
+        orderings.add(key);
+      }
+      assert(orderings.size >= 2, `Randomization: ${orderings.size} unique orderings in 100 runs`);
+    })();
+
+    // --- Summary ---
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>
