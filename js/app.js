@@ -221,8 +221,9 @@
       const card = document.createElement('div');
       card.className = `couple-card couple-card--${couple.type} animate__animated animate__fadeInUp`;
       card.style.animationDelay = `${i * 80}ms`;
+      const typeLabel = couple.type === 'mixed' ? 'Mixed' : 'Same Gender';
       card.innerHTML = `
-        <p class="couple-card__title">Couple ${i + 1}</p>
+        <p class="couple-card__title">Couple ${i + 1} <span class="couple-card__type couple-card__type--${couple.type}">${typeLabel}</span></p>
         <p class="couple-card__player">
           ${escapeHTML(couple.player1.name)}
           <span class="player-list__badge player-list__badge--${couple.player1.gender}">

@@ -208,7 +208,7 @@
 ## Phase 5: Results Display
 
 ### TASK-5.1 — Couple cards layout
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Render generated couples as cards in a responsive grid/column layout.
 - **Requirements:** REQ-FR-14, REQ-FR-15, REQ-FR-16
 - **Acceptance Criteria:**
@@ -217,7 +217,7 @@
   - Cards use a responsive grid (1 column on mobile, 2-3 on desktop)
 
 ### TASK-5.2 — Visual distinction for couple types
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Apply different background colors or border styles to distinguish mixed-gender from same-gender couples.
 - **Requirements:** REQ-FR-19
 - **Acceptance Criteria:**
@@ -226,7 +226,7 @@
   - Distinction is accessible (not color-only — include an icon or label)
 
 ### TASK-5.3 — Unmatched player notification
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** If there is an unmatched player, display a prominent notification with the player's name and explanation.
 - **Requirements:** REQ-FR-11, REQ-FR-18
 - **Acceptance Criteria:**
@@ -235,7 +235,7 @@
   - Styled prominently (warning color) so it's not missed
 
 ### TASK-5.4 — Animate results appearance
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Use Animate.css to animate couple cards appearing when generated.
 - **Requirements:** REQ-NFR-01
 - **Acceptance Criteria:**
