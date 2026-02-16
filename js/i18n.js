@@ -102,13 +102,13 @@ var t, setLanguage, getLanguage;
     }
   };
 
-  var currentLang = 'en';
+  var currentLang = 'es';
 
   function detectLanguage() {
     var stored = localStorage.getItem(STORAGE_KEY);
     if (stored && translations[stored]) return stored;
     var nav = (navigator.language || '').slice(0, 2).toLowerCase();
-    return translations[nav] ? nav : 'en';
+    return translations[nav] ? nav : 'es';
   }
 
   /**
