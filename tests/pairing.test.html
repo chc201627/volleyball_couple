@@ -161,6 +161,15 @@
       assert(orderings.size >= 2, `Randomization: ${orderings.size} unique orderings in 100 runs`);
     })();
 
+    // --- Edge: 200 players (REQ-VAL-08) ---
+    (function () {
+      const players = makePlayers(100, 100);
+      const { couples, unmatched } = generateCouples(players);
+      assert(couples.length === 100, 'Edge: 200 players → 100 couples');
+      assert(unmatched === null, 'Edge: 200 players → no unmatched');
+      assert(countByType(couples, 'mixed') === 100, 'Edge: 200 players → all mixed');
+    })();
+
     // --- Summary ---
     const total = passed + failed;
     const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
