@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beach Volleyball Couple Matching</title>
+  <meta name="description" content="Randomly match beach volleyball players into couples with gender-balanced pairing.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="header__title">Beach Volleyball Couple Matching</h1>
+    <p class="header__subtitle">Register players and generate random couples for your game</p>
+  </header>
+
+  <main class="main">
+    <!-- Input Section -->
+    <section class="section section--input" aria-labelledby="input-heading">
+      <h2 id="input-heading" class="section__heading">Add Player</h2>
+      <form class="form" id="player-form" novalidate>
+        <div class="form__group">
+          <label class="form__label" for="player-name">Player Name</label>
+          <input
+            class="form__input"
+            type="text"
+            id="player-name"
+            name="playerName"
+            placeholder="Enter player name"
+            maxlength="50"
+            autocomplete="off"
+          >
+          <span class="form__error" id="name-error" role="alert" aria-live="polite"></span>
+        </div>
+        <div class="form__group">
+          <label class="form__label" for="player-gender">Gender</label>
+          <select class="form__select" id="player-gender" name="playerGender">
+            <option value="" disabled selected>Select Gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+          <span class="form__error" id="gender-error" role="alert" aria-live="polite"></span>
+        </div>
+        <button class="btn btn--primary form__submit" type="submit" id="add-player-btn" disabled>
+          Add Player
+        </button>
+      </form>
+    </section>
+
+    <!-- Player List Section -->
+    <section class="section section--players" aria-labelledby="players-heading">
+      <h2 id="players-heading" class="section__heading">
+        Registered Players (<span id="player-count">0</span>)
+      </h2>
+      <p class="section__meta" id="gender-counts">Males: 0 | Females: 0</p>
+      <ul class="player-list" id="player-list">
+        <!-- Player items rendered by JS -->
+      </ul>
+      <p class="player-list__empty" id="empty-message">No players added yet</p>
+    </section>
+
+    <!-- Action Section -->
+    <section class="section section--actions" aria-labelledby="actions-heading">
+      <h2 id="actions-heading" class="sr-only">Actions</h2>
+      <div class="actions">
+        <button class="btn btn--primary btn--large" id="generate-btn" disabled>
+          Generate Couples
+        </button>
+        <button class="btn btn--primary btn--large" id="regenerate-btn" hidden>
+          Regenerate Couples
+        </button>
+        <button class="btn btn--warning" id="clear-btn" hidden>
+          Clear All Players
+        </button>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden>
+      <h2 id="results-heading" class="section__heading">Generated Couples</h2>
+      <div class="couples-grid" id="couples-grid">
+        <!-- Couple cards rendered by JS -->
+      </div>
+      <div class="unmatched" id="unmatched-notice" hidden>
+        <!-- Unmatched player notice rendered by JS -->
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; 2026 Beach Volleyball Couple Matching</p>
+  </footer>
+
+  <script src="js/pairing.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
