@@ -333,6 +333,28 @@ select {
   letter-spacing: 0.5px;
   color: var(--color-text-secondary);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.couple-card__type {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.couple-card__type--mixed {
+  background-color: rgba(33, 150, 243, 0.12);
+  color: var(--color-primary-dark);
+}
+
+.couple-card__type--same {
+  background-color: rgba(255, 152, 0, 0.12);
+  color: var(--color-warning-dark);
 }
 
 .couple-card__player {
