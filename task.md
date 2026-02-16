@@ -277,7 +277,7 @@
 ## Phase 7: Polish & Responsiveness
 
 ### TASK-7.1 — Mobile-first responsive design
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Ensure the full layout works seamlessly from 320px to 1920px using CSS media queries and Flexbox/Grid.
 - **Requirements:** REQ-NFR-03, REQ-NFR-10
 - **Acceptance Criteria:**
@@ -288,7 +288,7 @@
   - Touch targets are at least 44×44px on mobile
 
 ### TASK-7.2 — WCAG 2.1 Level AA color accessibility
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Verify all text/background color combinations meet WCAG AA contrast ratios (4.5:1 for normal text, 3:1 for large text).
 - **Requirements:** REQ-NFR-05
 - **Acceptance Criteria:**
@@ -298,7 +298,7 @@
   - Focus indicators are visible
 
 ### TASK-7.3 — Animate.css transitions for key interactions
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Apply subtle animations to: adding a player, removing a player, generating couples, and clearing all.
 - **Requirements:** REQ-NFR-01
 - **Acceptance Criteria:**
@@ -308,7 +308,7 @@
   - Animations respect `prefers-reduced-motion`
 
 ### TASK-7.4 — Performance optimization
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Ensure the app loads in < 3 seconds and couple generation completes in < 1 second for 100 players.
 - **Requirements:** REQ-NFR-06, REQ-NFR-07, REQ-NFR-08
 - **Acceptance Criteria:**
@@ -317,7 +317,7 @@
   - UI remains responsive during all interactions
 
 ### TASK-7.5 — Clear labels, instructions, and empty states
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Add clear labels, placeholder text, and helpful empty states throughout the app.
 - **Requirements:** REQ-NFR-01, REQ-NFR-02, REQ-NFR-04
 - **Acceptance Criteria:**

@@ -270,15 +270,16 @@ select {
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-white);
 }
 
 .player-list__badge--male {
-  background-color: var(--color-male);
+  background-color: rgba(100, 181, 246, 0.2);
+  color: #1565c0;
 }
 
 .player-list__badge--female {
-  background-color: var(--color-female);
+  background-color: rgba(240, 98, 146, 0.2);
+  color: #ad1457;
 }
 
 .player-list__remove {
