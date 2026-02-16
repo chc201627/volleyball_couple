@@ -1,65 +1,65 @@
-# Beach Volleyball Couple Matching
+# Emparejamiento de Vóley Playa
 
-A static web app that registers beach volleyball players and generates random couples using a priority-based pairing algorithm: mixed-gender first, then same-gender, with unmatched player handling.
+Aplicación web estática que registra jugadores de vóley playa y genera parejas aleatorias usando un algoritmo de emparejamiento por prioridad: parejas mixtas primero, luego del mismo género, con manejo de jugador sin pareja.
 
-**Live Demo:** https://chc201627.github.io/volleyball_couple/
+**Demo en vivo:** https://chc201627.github.io/volleyball_couple/
 
-## Features
+## Características
 
-- Player registration with name and gender
-- Real-time validation (min/max length, required fields)
-- Priority-based pairing algorithm (mixed > same-gender > unmatched)
-- Regenerate couples with new random pairings
-- Responsive design (320px to 1920px)
-- Bilingual support (English / Spanish)
-- Animate.css transitions
+- Registro de jugadores con nombre y género
+- Validación en tiempo real (largo mínimo/máximo, campos obligatorios)
+- Algoritmo de emparejamiento por prioridad (mixto > mismo género > sin pareja)
+- Regenerar parejas con nuevas combinaciones aleatorias
+- Diseño responsivo (320px a 1920px)
+- Soporte bilingüe (Español / Inglés)
+- Transiciones con Animate.css
 
-## Tech Stack
+## Stack Tecnológico
 
-- Vanilla HTML5, CSS3, JavaScript (ES6+)
-- [Animate.css](https://animate.style/) via CDN
-- GitHub Pages for hosting
+- HTML5, CSS3, JavaScript (ES6+) sin frameworks
+- [Animate.css](https://animate.style/) vía CDN
+- GitHub Pages para hosting
 
-## Getting Started
+## Inicio Rápido
 
-No build step required. Open `index.html` in any modern browser:
+No requiere compilación. Abre `index.html` en cualquier navegador moderno:
 
 ```bash
-# Clone the repo
+# Clonar el repositorio
 git clone https://github.com/chc201627/volleyball_couple.git
 cd volleyball_couple
 
-# Open in browser
+# Abrir en el navegador
 open index.html
 ```
 
-## Project Structure
+## Estructura del Proyecto
 
 ```
-index.html              Single-page app
-css/styles.css          Mobile-first BEM styles with CSS custom properties
-js/pairing.js           Standalone pairing algorithm module
-js/i18n.js              Internationalization (EN/ES)
-js/app.js               UI logic (IIFE, depends on pairing.js + i18n.js)
+index.html              Aplicación de página única
+css/styles.css          Estilos BEM mobile-first con variables CSS
+js/pairing.js           Módulo independiente del algoritmo de emparejamiento
+js/i18n.js              Internacionalización (ES/EN)
+js/app.js               Lógica de UI (IIFE, depende de pairing.js + i18n.js)
 tests/
-  pairing.test.html     Unit tests for pairing algorithm (all 6 scenarios + edge cases)
-  integration.test.html Integration tests for full user workflow
+  pairing.test.html     Tests unitarios del algoritmo (6 escenarios + casos límite)
+  integration.test.html Tests de integración del flujo completo
 ```
 
-## Pairing Algorithm
+## Algoritmo de Emparejamiento
 
-1. Separate players by gender and shuffle both lists
-2. **Priority 1:** Create mixed-gender couples (male + female)
-3. **Priority 2:** Pair remaining same-gender players
-4. **Priority 3:** Flag leftover player as unmatched (odd total)
+1. Separar jugadores por género y mezclar ambas listas aleatoriamente
+2. **Prioridad 1:** Crear parejas mixtas (hombre + mujer)
+3. **Prioridad 2:** Emparejar jugadores restantes del mismo género
+4. **Prioridad 3:** Marcar jugador sobrante como sin pareja (total impar)
 
-## Running Tests
+## Ejecutar Tests
 
-Open the test files directly in a browser:
+Abre los archivos de test directamente en el navegador:
 
-- `tests/pairing.test.html` — Unit tests (6 scenarios, edge cases 0/1/200 players, randomization, uniqueness)
-- `tests/integration.test.html` — Full workflow (add players, validate, generate, regenerate, clear all)
+- `tests/pairing.test.html` — Tests unitarios (6 escenarios, casos límite 0/1/200 jugadores, aleatorización, unicidad)
+- `tests/integration.test.html` — Flujo completo (agregar jugadores, validar, generar, regenerar, limpiar todo)
 
-## Browser Support
+## Navegadores Soportados
 
-Chrome, Firefox, Safari, Edge (latest 2 versions), iOS Safari 13+
+Chrome, Firefox, Safari, Edge (últimas 2 versiones), iOS Safari 13+
