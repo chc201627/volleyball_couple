@@ -373,7 +373,7 @@
 ## Phase 9: Cross-Browser & Device Testing
 
 ### TASK-9.1 — Unit tests for pairing algorithm
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Write unit tests covering all 6 scenarios from Section 5.3, plus edge cases (0 players, 1 player, 200 players).
 - **Requirements:** Section 11.1
 - **Acceptance Criteria:**
