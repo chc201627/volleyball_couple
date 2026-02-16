@@ -298,6 +298,12 @@ select {
   gap: 12px;
 }
 
+.actions__hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 /* --- Couples Grid --- */
 .couples-grid {
   display: grid;

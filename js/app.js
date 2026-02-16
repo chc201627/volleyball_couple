@@ -26,6 +26,7 @@
   const emptyMessage = document.getElementById('empty-message');
 
   const generateBtn = document.getElementById('generate-btn');
+  const generateHint = document.getElementById('generate-hint');
   const regenerateBtn = document.getElementById('regenerate-btn');
   const clearBtn = document.getElementById('clear-btn');
 
@@ -207,6 +208,7 @@
 
   function updateActionButtons() {
     generateBtn.disabled = players.length < 2;
+    generateHint.hidden = players.length >= 2;
     regenerateBtn.hidden = !couplesGenerated;
     clearBtn.hidden = players.length === 0;
   }
