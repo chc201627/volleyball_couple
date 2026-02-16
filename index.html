@@ -10,38 +10,43 @@
 </head>
 <body>
   <header class="header">
-    <h1 class="header__title">Beach Volleyball Couple Matching</h1>
-    <p class="header__subtitle">Register players and generate random couples for your game</p>
+    <div class="lang-switcher">
+      <button class="lang-switcher__btn" data-lang="en" type="button">EN</button>
+      <button class="lang-switcher__btn" data-lang="es" type="button">ES</button>
+    </div>
+    <h1 class="header__title" data-i18n="page.title">Beach Volleyball Couple Matching</h1>
+    <p class="header__subtitle" data-i18n="page.subtitle">Register players and generate random couples for your game</p>
   </header>
 
   <main class="main">
     <!-- Input Section -->
     <section class="section section--input" aria-labelledby="input-heading">
-      <h2 id="input-heading" class="section__heading">Add Player</h2>
+      <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
       <form class="form" id="player-form" novalidate>
         <div class="form__group">
-          <label class="form__label" for="player-name">Player Name</label>
+          <label class="form__label" for="player-name" data-i18n="form.nameLabel">Player Name</label>
           <input
             class="form__input"
             type="text"
             id="player-name"
             name="playerName"
             placeholder="Enter player name"
+            data-i18n-placeholder="form.namePlaceholder"
             maxlength="50"
             autocomplete="off"
           >
           <span class="form__error" id="name-error" role="alert" aria-live="polite"></span>
         </div>
         <div class="form__group">
-          <label class="form__label" for="player-gender">Gender</label>
+          <label class="form__label" for="player-gender" data-i18n="form.genderLabel">Gender</label>
           <select class="form__select" id="player-gender" name="playerGender">
-            <option value="" disabled selected>Select Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
+            <option value="" disabled selected data-i18n="form.genderDefault">Select Gender</option>
+            <option value="male" data-i18n="form.genderMale">Male</option>
+            <option value="female" data-i18n="form.genderFemale">Female</option>
           </select>
           <span class="form__error" id="gender-error" role="alert" aria-live="polite"></span>
         </div>
-        <button class="btn btn--primary form__submit" type="submit" id="add-player-btn" disabled>
+        <button class="btn btn--primary form__submit" type="submit" id="add-player-btn" disabled data-i18n="form.submit">
           Add Player
         </button>
       </form>
@@ -56,21 +61,21 @@
       <ul class="player-list" id="player-list">
         <!-- Player items rendered by JS -->
       </ul>
-      <p class="player-list__empty" id="empty-message">No players added yet</p>
+      <p class="player-list__empty" id="empty-message" data-i18n="players.empty">No players added yet</p>
     </section>
 
     <!-- Action Section -->
     <section class="section section--actions" aria-labelledby="actions-heading">
       <h2 id="actions-heading" class="sr-only">Actions</h2>
       <div class="actions">
-        <button class="btn btn--primary btn--large" id="generate-btn" disabled>
+        <button class="btn btn--primary btn--large" id="generate-btn" disabled data-i18n="actions.generate">
           Generate Couples
         </button>
-        <p class="actions__hint" id="generate-hint">Add at least 2 players to generate couples</p>
-        <button class="btn btn--primary btn--large" id="regenerate-btn" hidden>
+        <p class="actions__hint" id="generate-hint" data-i18n="actions.hint">Add at least 2 players to generate couples</p>
+        <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
           Regenerate Couples
         </button>
-        <button class="btn btn--warning" id="clear-btn" hidden>
+        <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
           Clear All Players
         </button>
       </div>
@@ -78,7 +83,7 @@
 
     <!-- Results Section -->
     <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden>
-      <h2 id="results-heading" class="section__heading">Generated Couples</h2>
+      <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
       <div class="couples-grid" id="couples-grid">
         <!-- Couple cards rendered by JS -->
       </div>
@@ -89,10 +94,11 @@
   </main>
 
   <footer class="footer">
-    <p>&copy; 2026 Beach Volleyball Couple Matching</p>
+    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching</p>
   </footer>
 
   <script src="js/pairing.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

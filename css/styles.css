@@ -77,6 +77,39 @@ select {
   color: var(--color-white);
   text-align: center;
   padding: 24px 16px;
+  position: relative;
+}
+
+/* --- Language Switcher --- */
+.lang-switcher {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 4px;
+}
+
+.lang-switcher__btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--color-white);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition), border-color var(--transition);
+  min-height: 32px;
+}
+
+.lang-switcher__btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.lang-switcher__btn--active {
+  background: var(--color-white);
+  color: var(--color-primary-dark);
+  border-color: var(--color-white);
 }
 
 .header__title {
