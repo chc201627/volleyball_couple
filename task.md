@@ -177,7 +177,7 @@
 ## Phase 4: Action Buttons
 
 ### TASK-4.1 — Generate Couples button
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Add a large primary "Generate Couples" button. Disabled when fewer than 2 players are registered.
 - **Requirements:** REQ-FR-07, REQ-VAL-07
 - **Acceptance Criteria:**
@@ -186,7 +186,7 @@
   - Clicking triggers `generateCouples()` and renders results
 
 ### TASK-4.2 — Regenerate Couples button
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** After first generation, show a "Regenerate Couples" button that re-runs the algorithm with the same player list.
 - **Requirements:** REQ-FR-17
 - **Acceptance Criteria:**
@@ -195,7 +195,7 @@
   - Produces new random pairings (not identical to previous)
 
 ### TASK-4.3 — Clear All Players button
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Add a "Clear All Players" button with warning/secondary styling. Must show a confirmation dialog before clearing.
 - **Requirements:** REQ-FR-05 (bulk remove)
 - **Acceptance Criteria:**
