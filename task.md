@@ -63,7 +63,7 @@
 ## Phase 2: Player Registration UI
 
 ### TASK-2.1 — Player name input field
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Create a text input for player names with placeholder "Enter player name".
 - **Requirements:** REQ-FR-01, REQ-VAL-04, REQ-VAL-05
 - **Acceptance Criteria:**
@@ -73,7 +73,7 @@
   - Input clears after successful player addition
 
 ### TASK-2.2 — Gender dropdown
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Create a `<select>` element with options: "Select Gender" (disabled default), "Male", "Female".
 - **Requirements:** REQ-FR-02
 - **Acceptance Criteria:**
@@ -81,7 +81,7 @@
   - Resets to default after successful player addition
 
 ### TASK-2.3 — Add Player button with disabled state
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Create an "Add Player" button styled as a primary action. It should be disabled when name is empty or gender is not selected.
 - **Requirements:** REQ-FR-03, REQ-NFR-02
 - **Acceptance Criteria:**
@@ -90,7 +90,7 @@
   - Clicking the button adds the player and clears the form
 
 ### TASK-2.4 — Form validation and error messages
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Implement client-side validation for all input rules. Display error messages near the relevant field.
 - **Requirements:** REQ-VAL-01, REQ-VAL-02, REQ-VAL-03, REQ-VAL-04, REQ-VAL-05, REQ-ERR-01, REQ-ERR-02, REQ-ERR-03, REQ-ERR-04, REQ-ERR-05
 - **Acceptance Criteria:**
@@ -105,7 +105,7 @@
   - Multiple errors can display simultaneously
 
 ### TASK-2.5 — Player list display
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Display all registered players in a scrollable list. Each entry shows name, gender badge (colored), and a remove button (×).
 - **Requirements:** REQ-FR-04, REQ-FR-05
 - **Acceptance Criteria:**
@@ -116,7 +116,7 @@
   - List updates immediately on add/remove
 
 ### TASK-2.6 — Gender count display
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Show a live count of males and females below the section header.
 - **Requirements:** REQ-FR-06
 - **Acceptance Criteria:**
@@ -124,7 +124,7 @@
   - Updates in real-time when players are added or removed
 
 ### TASK-2.7 — Visual feedback on player addition
-- [ ] **Priority:** P1
+- [x] **Priority:** P1
 - **Description:** Add Animate.css animation when a new player appears in the list.
 - **Requirements:** REQ-NFR-01 (intuitive UX)
 - **Acceptance Criteria:**
