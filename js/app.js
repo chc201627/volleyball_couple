@@ -151,7 +151,17 @@
 
   function removePlayer(id) {
     const idx = players.findIndex(p => p.id === id);
-    if (idx !== -1) {
+    if (idx === -1) return;
+
+    const item = playerList.children[idx];
+    if (item) {
+      item.classList.remove('animate__fadeIn');
+      item.classList.add('animate__fadeOut');
+      item.addEventListener('animationend', () => {
+        players.splice(players.findIndex(p => p.id === id), 1);
+        updateUI();
+      }, { once: true });
+    } else {
       players.splice(idx, 1);
       updateUI();
     }
