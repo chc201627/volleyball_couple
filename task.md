@@ -136,7 +136,7 @@
 ## Phase 3: Pairing Algorithm
 
 ### TASK-3.1 — Implement Fisher-Yates shuffle utility
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Create a `shuffle(array)` function using Fisher-Yates algorithm for true randomization.
 - **Requirements:** REQ-FR-13
 - **Acceptance Criteria:**
@@ -144,7 +144,7 @@
   - Distribution is uniform (no bias)
 
 ### TASK-3.2 — Implement `generateCouples(playerList)` function
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Implement the pairing algorithm in `js/pairing.js` as a standalone, reusable function following the pseudocode in Section 5.2 of requirements.
 - **Requirements:** REQ-FR-07, REQ-FR-08, REQ-FR-09, REQ-FR-10, REQ-FR-11, REQ-FR-12, REQ-TECH-02, REQ-TECH-03
 - **Acceptance Criteria:**
@@ -158,7 +158,7 @@
 - **Notes:** Must pass all 6 example scenarios from Section 5.3.
 
 ### TASK-3.3 — Verify algorithm against all example scenarios
-- [ ] **Priority:** P0
+- [x] **Priority:** P0
 - **Description:** Manually or programmatically verify the algorithm output for each scenario in the requirements table.
 - **Requirements:** REQ-FR-07 to REQ-FR-13
 - **Acceptance Criteria:**
