@@ -328,9 +328,51 @@
 
 ---
 
-## Phase 8: Cross-Browser & Device Testing
+## Phase 8: Internationalization (i18n)
 
-### TASK-8.1 — Unit tests for pairing algorithm
+### TASK-8.0 — Create i18n translation module
+- [x] **Priority:** P1
+- **Description:** Create `js/i18n.js` with English and Spanish translation dictionaries, a `t(key, params)` function for string interpolation, language detection from `navigator.language`, localStorage persistence, and `data-i18n` DOM update logic.
+- **Requirements:** Languages section
+- **Acceptance Criteria:**
+  - `t()` function returns translated strings with `{param}` interpolation
+  - `setLanguage(lang)` updates `<html lang>`, re-renders `data-i18n` elements, notifies app.js
+  - `getLanguage()` returns current language code
+  - Default language detected from browser, fallback to English
+  - Language choice persisted in localStorage
+
+### TASK-8.1 — Add data-i18n attributes and language switcher to HTML
+- [x] **Priority:** P1
+- **Description:** Add `data-i18n` attributes to all static text elements in `index.html`, `data-i18n-placeholder` for input placeholders, and a language switcher (EN/ES buttons) in the header.
+- **Requirements:** Languages section
+- **Acceptance Criteria:**
+  - All static text elements have `data-i18n` attributes
+  - Language switcher visible in header with EN/ES buttons
+  - Script load order: `pairing.js` → `i18n.js` → `app.js`
+
+### TASK-8.2 — Replace hardcoded strings in app.js with t() calls
+- [x] **Priority:** P1
+- **Description:** Update `js/app.js` to use `t()` for all user-facing strings (validation errors, player badges, couple labels, confirm dialogs). Expose `_onLanguageChange` callback for i18n to trigger re-renders.
+- **Requirements:** Languages section
+- **Acceptance Criteria:**
+  - All dynamic strings use `t()` with appropriate keys
+  - Language switch triggers full UI re-render including results
+  - Validation errors display in selected language
+
+### TASK-8.3 — Language switcher CSS styling
+- [x] **Priority:** P1
+- **Description:** Add BEM styles for `.lang-switcher` button group in the header with active state highlighting.
+- **Requirements:** Languages section
+- **Acceptance Criteria:**
+  - Switcher positioned in top-right of header
+  - Active language button visually distinct (white background)
+  - Buttons meet minimum touch target size
+
+---
+
+## Phase 9: Cross-Browser & Device Testing
+
+### TASK-9.1 — Unit tests for pairing algorithm
 - [ ] **Priority:** P0
 - **Description:** Write unit tests covering all 6 scenarios from Section 5.3, plus edge cases (0 players, 1 player, 200 players).
 - **Requirements:** Section 11.1
@@ -340,7 +382,7 @@
   - Randomization test: running 100 times produces at least 2 different orderings
   - Each player appears in exactly one couple
 
-### TASK-8.2 — Integration tests for user workflow
+### TASK-9.2 — Integration tests for user workflow
 - [ ] **Priority:** P1
 - **Description:** Test the complete flow: add players → generate → view results → regenerate → clear all.
 - **Requirements:** Section 11.2
@@ -350,7 +392,7 @@
   - Clear All resets the entire app state
   - Error scenarios handled gracefully
 
-### TASK-8.3 — Cross-browser testing checklist
+### TASK-9.3 — Cross-browser testing checklist
 - [ ] **Priority:** P1
 - **Description:** Manually verify the app on all supported browsers and screen sizes.
 - **Requirements:** REQ-NFR-09, REQ-NFR-10, REQ-NFR-11, Section 11.4
@@ -366,9 +408,9 @@
 
 ---
 
-## Phase 9: Deployment
+## Phase 10: Deployment
 
-### TASK-9.1 — Deploy to GitHub Pages
+### TASK-10.1 — Deploy to GitHub Pages
 - [ ] **Priority:** P1
 - **Description:** Configure the repository for GitHub Pages deployment from the `main` branch.
 - **Requirements:** Tech Stack (GitHub Pages)
