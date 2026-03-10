@@ -78,6 +78,18 @@
         <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
           Clear All Players
         </button>
+        <div class="tournament-setup" id="tournament-setup" hidden>
+          <label class="tournament-setup__label" for="group-count" data-i18n="tournament.groupsLabel">Groups:</label>
+          <div class="tournament-setup__options" id="group-count-options">
+            <button class="tournament-setup__opt tournament-setup__opt--active" data-groups="1" type="button">A</button>
+            <button class="tournament-setup__opt" data-groups="2" type="button">A–B</button>
+            <button class="tournament-setup__opt" data-groups="3" type="button">A–C</button>
+            <button class="tournament-setup__opt" data-groups="4" type="button">A–D</button>
+          </div>
+          <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
+            Start Tournament
+          </button>
+        </div>
       </div>
     </section>
 
@@ -91,6 +103,19 @@
         <!-- Unmatched player notice rendered by JS -->
       </div>
     </section>
+
+    <!-- Tournament Section -->
+    <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden>
+      <div class="tournament-header">
+        <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
+        <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
+          Reset Tournament
+        </button>
+      </div>
+      <div class="tournament-groups" id="tournament-groups">
+        <!-- Group panels rendered by JS -->
+      </div>
+    </section>
   </main>
 
   <footer class="footer">
@@ -99,6 +124,7 @@
 
   <script src="js/pairing.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/tournament.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

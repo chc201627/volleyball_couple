@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tournament Module Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Tournament Module — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/tournament.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    function heading(title) {
+      results.innerHTML += `<h2>${title}</h2>`;
+    }
+
+    function makeCouple(i) {
+      return {
+        player1: { id: i * 2, name: `P${i * 2}`, gender: 'male' },
+        player2: { id: i * 2 + 1, name: `P${i * 2 + 1}`, gender: 'female' },
+        type: 'mixed',
+      };
+    }
+
+    function makeCouplesResult(n, withUnmatched) {
+      const couples = [];
+      for (let i = 0; i < n; i++) couples.push(makeCouple(i));
+      return {
+        couples,
+        unmatched: withUnmatched ? { id: 99, name: 'Solo', gender: 'male' } : null,
+      };
+    }
+
+    // ─── createTeams ────────────────────────────────────────────────────────────
+
+    heading('createTeams');
+
+    (function () {
+      const result = makeCouplesResult(3, false);
+      const teams = createTeams(result);
+      assert(teams.length === 3, 'createTeams: 3 couples → 3 teams',
+        `Got ${teams.length}`);
+      assert(teams[0].id === 't0', 'createTeams: first team id is "t0"',
+        `Got ${teams[0].id}`);
+      assert(teams[0].name === 'P0 & P1', 'createTeams: name is "player1 & player2"',
+        `Got ${teams[0].name}`);
+      assert(teams[0].player1 && teams[0].player2, 'createTeams: team has player1 and player2');
+    })();
+
+    (function () {
+      // unmatched player should be ignored
+      const result = makeCouplesResult(4, true);
+      const teams = createTeams(result);
+      assert(teams.length === 4, 'createTeams: unmatched player is ignored',
+        `Got ${teams.length}`);
+    })();
+
+    (function () {
+      const teams = createTeams({ couples: [], unmatched: null });
+      assert(teams.length === 0, 'createTeams: empty couples → empty teams');
+    })();
+
+    (function () {
+      const teams = createTeams(null);
+      assert(teams.length === 0, 'createTeams: null input → empty teams');
+    })();
+
+    // ─── createGroups ────────────────────────────────────────────────────────────
+
+    heading('createGroups');
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(4));
+      const groups = createGroups(teams);
+      assert(groups.length === 1, 'createGroups: 4 teams → 1 group',
+        `Got ${groups.length}`);
+      assert(groups[0].teams.length === 4, 'createGroups: group has 4 teams',
+        `Got ${groups[0].teams.length}`);
+      assert(groups[0].id === 'A', 'createGroups: first group id is "A"');
+    })();
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(8));
+      const groups = createGroups(teams);
+      assert(groups.length === 2, 'createGroups: 8 teams → 2 groups',
+        `Got ${groups.length}`);
+      assert(groups[0].teams.length === 4, 'createGroups: 8 teams, group A has 4',
+        `Got ${groups[0].teams.length}`);
+      assert(groups[1].teams.length === 4, 'createGroups: 8 teams, group B has 4',
+        `Got ${groups[1].teams.length}`);
+    })();
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(7));
+      const groups = createGroups(teams);
+      assert(groups.length === 2, 'createGroups: 7 teams → 2 groups',
+        `Got ${groups.length}`);
+      const sizes = groups.map(g => g.teams.length).sort((a, b) => b - a);
+      assert(sizes[0] === 4 && sizes[1] === 3, 'createGroups: 7 teams split 4+3',
+        `Got ${sizes}`);
+    })();
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(5));
+      const groups = createGroups(teams);
+      assert(groups.length === 1, 'createGroups: 5 teams → 1 group (avoid <2 per group)',
+        `Got ${groups.length}`);
+    })();
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = createGroups(teams);
+      assert(groups.length === 1, 'createGroups: 2 teams → 1 group',
+        `Got ${groups.length}`);
+      assert(groups[0].teams.length === 2, 'createGroups: 2 teams, group has 2');
+    })();
+
+    (function () {
+      // All teams must be distributed (no team lost)
+      const n = 9;
+      const teams = createTeams(makeCouplesResult(n));
+      const groups = createGroups(teams);
+      const total = groups.reduce((sum, g) => sum + g.teams.length, 0);
+      assert(total === n, `createGroups: all ${n} teams distributed`,
+        `Got ${total}`);
+    })();
+
+    (function () {
+      // No group should have fewer than 2 teams
+      for (let n = 2; n <= 20; n++) {
+        const teams = createTeams(makeCouplesResult(n));
+        const groups = createGroups(teams);
+        const minSize = Math.min(...groups.map(g => g.teams.length));
+        assert(minSize >= 2, `createGroups: no group < 2 teams (n=${n})`,
+          `Minimum group size: ${minSize}`);
+      }
+    })();
+
+    // ─── generateMatches ─────────────────────────────────────────────────────────
+
+    heading('generateMatches');
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(4));
+      const groups = createGroups(teams);
+      const matches = generateMatches(groups);
+      // 4 teams in 1 group → 4*3/2 = 6 matches
+      assert(matches.length === 6, 'generateMatches: 4 teams → 6 matches',
+        `Got ${matches.length}`);
+    })();
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(3));
+      const groups = [{ id: 'A', teams }]; // force 1 group of 3
+      const matches = generateMatches(groups);
+      // 3 teams → 3 matches
+      assert(matches.length === 3, 'generateMatches: 3 teams → 3 matches',
+        `Got ${matches.length}`);
+    })();
+
+    (function () {
+      // Each team plays exactly N-1 matches
+      const n = 4;
+      const teams = createTeams(makeCouplesResult(n));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      teams.forEach(team => {
+        const appearances = matches.filter(
+          m => m.team1Id === team.id || m.team2Id === team.id
+        ).length;
+        assert(appearances === n - 1, `generateMatches: team ${team.id} plays ${n - 1} matches`,
+          `Got ${appearances}`);
+      });
+    })();
+
+    (function () {
+      // No duplicate match pairs
+      const teams = createTeams(makeCouplesResult(5));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      const pairs = new Set(matches.map(m => [m.team1Id, m.team2Id].sort().join('|')));
+      assert(pairs.size === matches.length, 'generateMatches: no duplicate match pairs',
+        `Unique pairs: ${pairs.size}, total matches: ${matches.length}`);
+    })();
+
+    (function () {
+      // All matches start unplayed with null scores
+      const teams = createTeams(makeCouplesResult(4));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      const allUnplayed = matches.every(m => !m.played && m.score1 === null && m.score2 === null);
+      assert(allUnplayed, 'generateMatches: all matches start unplayed with null scores');
+    })();
+
+    (function () {
+      // Match IDs follow the pattern groupId-team1Id-team2Id
+      const teams = createTeams(makeCouplesResult(3));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      const validIds = matches.every(m => m.id.startsWith('A-'));
+      assert(validIds, 'generateMatches: match IDs start with group ID');
+    })();
+
+    // ─── calculateStandings ──────────────────────────────────────────────────────
+
+    heading('calculateStandings');
+
+    (function () {
+      // All unplayed → all zeros
+      const teams = createTeams(makeCouplesResult(3));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      const standings = calculateStandings(groups, matches);
+      const group = standings.get('A');
+      assert(group.length === 3, 'calculateStandings: 3 entries for 3 teams',
+        `Got ${group.length}`);
+      const allZero = group.every(s => s.points === 0 && s.played === 0);
+      assert(allZero, 'calculateStandings: all unplayed → all zeros');
+    })();
+
+    (function () {
+      // Win=3pts, Loss=0pts
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      let matches = generateMatches(groups);
+      matches = recordMatchScore(matches, matches[0].id, 21, 15);
+      const standings = calculateStandings(groups, matches);
+      const group = standings.get('A');
+      const winner = group.find(s => s.won === 1);
+      const loser = group.find(s => s.lost === 1);
+      assert(winner && winner.points === 3, 'calculateStandings: winner gets 3 points',
+        `Winner points: ${winner ? winner.points : 'N/A'}`);
+      assert(loser && loser.points === 0, 'calculateStandings: loser gets 0 points',
+        `Loser points: ${loser ? loser.points : 'N/A'}`);
+    })();
+
+    (function () {
+      // Set differential tiebreaker
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      let matches = generateMatches(groups);
+      matches = recordMatchScore(matches, matches[0].id, 25, 10);
+      const standings = calculateStandings(groups, matches);
+      const group = standings.get('A');
+      assert(group[0].setsFor > group[0].setsAgainst,
+        'calculateStandings: leader has positive set differential');
+    })();
+
+    (function () {
+      // Standings length equals team count
+      const n = 4;
+      const teams = createTeams(makeCouplesResult(n));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      const standings = calculateStandings(groups, matches);
+      assert(standings.get('A').length === n,
+        `calculateStandings: standings length equals team count (${n})`);
+    })();
+
+    (function () {
+      // Multi-group: standings map has entry for each group
+      const teams = createTeams(makeCouplesResult(8));
+      const groups = createGroups(teams);
+      const matches = generateMatches(groups);
+      const standings = calculateStandings(groups, matches);
+      assert(standings.size === groups.length,
+        `calculateStandings: map has ${groups.length} group entries`,
+        `Got ${standings.size}`);
+    })();
+
+    // ─── recordMatchScore ─────────────────────────────────────────────────────────
+
+    heading('recordMatchScore');
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      const original = generateMatches(groups);
+      const updated = recordMatchScore(original, original[0].id, 21, 18);
+      const match = updated.find(m => m.id === original[0].id);
+      assert(match.score1 === 21 && match.score2 === 18,
+        'recordMatchScore: scores are saved correctly');
+      assert(match.played === true,
+        'recordMatchScore: match marked as played');
+    })();
+
+    (function () {
+      // Immutability: original array unchanged
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      const original = generateMatches(groups);
+      const originalScore1 = original[0].score1;
+      recordMatchScore(original, original[0].id, 21, 18);
+      assert(original[0].score1 === originalScore1,
+        'recordMatchScore: original array is not mutated');
+    })();
+
+    (function () {
+      // Throws on equal scores
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      let threw = false;
+      try { recordMatchScore(matches, matches[0].id, 15, 15); }
+      catch (e) { threw = true; }
+      assert(threw, 'recordMatchScore: throws on equal scores (no draws)');
+    })();
+
+    (function () {
+      // Throws on negative scores
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      let threw = false;
+      try { recordMatchScore(matches, matches[0].id, -1, 15); }
+      catch (e) { threw = true; }
+      assert(threw, 'recordMatchScore: throws on negative score');
+    })();
+
+    (function () {
+      // Throws on non-integer scores
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      let threw = false;
+      try { recordMatchScore(matches, matches[0].id, 21.5, 18); }
+      catch (e) { threw = true; }
+      assert(threw, 'recordMatchScore: throws on non-integer score');
+    })();
+
+    (function () {
+      // Throws on empty scores
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      let threw = false;
+      try { recordMatchScore(matches, matches[0].id, '', 18); }
+      catch (e) { threw = true; }
+      assert(threw, 'recordMatchScore: throws on empty score');
+    })();
+
+    // ─── isTournamentComplete ─────────────────────────────────────────────────────
+
+    heading('isTournamentComplete');
+
+    (function () {
+      const teams = createTeams(makeCouplesResult(3));
+      const groups = [{ id: 'A', teams }];
+      const matches = generateMatches(groups);
+      assert(!isTournamentComplete(matches),
+        'isTournamentComplete: false when matches are unplayed');
+    })();
+
+    (function () {
+      // All matches played
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      let matches = generateMatches(groups);
+      matches = recordMatchScore(matches, matches[0].id, 21, 15);
+      assert(isTournamentComplete(matches),
+        'isTournamentComplete: true when all matches played');
+    })();
+
+    (function () {
+      // Partial completion → false
+      const teams = createTeams(makeCouplesResult(3));
+      const groups = [{ id: 'A', teams }];
+      let matches = generateMatches(groups);
+      matches = recordMatchScore(matches, matches[0].id, 21, 15);
+      assert(!isTournamentComplete(matches),
+        'isTournamentComplete: false when some matches still unplayed');
+    })();
+
+    (function () {
+      assert(isTournamentComplete([]),
+        'isTournamentComplete: true for empty matches array');
+    })();
+
+    // ─── Summary ─────────────────────────────────────────────────────────────────
+
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>
