@@ -108,9 +108,17 @@
     <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden>
       <div class="tournament-header">
         <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
-        <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
-          Reset Tournament
-        </button>
+        <div class="tournament-header__actions">
+          <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
+            Share
+          </button>
+          <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
+            Reset Tournament
+          </button>
+        </div>
+      </div>
+      <div class="tournament-readonly-banner" id="readonly-banner" hidden>
+        <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
       </div>
       <div class="tournament-groups" id="tournament-groups">
         <!-- Group panels rendered by JS -->

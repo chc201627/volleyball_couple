@@ -58,6 +58,9 @@ var t, setLanguage, getLanguage;
       // Tournament
       'tournament.groupsLabel': 'Groups:',
       'tournament.groupOption': '{n} Group(s)',
+      'tournament.share': '🔗 Share',
+      'tournament.shareCopied': '✓ Copied!',
+      'tournament.readonlyBanner': '👁 View only — ask the organizer for the latest link',
       'tournament.start': 'Start Tournament',
       'tournament.heading': 'Tournament',
       'tournament.reset': 'Reset Tournament',
@@ -125,6 +128,9 @@ var t, setLanguage, getLanguage;
       // Torneo
       'tournament.groupsLabel': 'Grupos:',
       'tournament.groupOption': '{n} Grupo(s)',
+      'tournament.share': '🔗 Compartir',
+      'tournament.shareCopied': '✓ ¡Copiado!',
+      'tournament.readonlyBanner': '👁 Solo lectura — pide al organizador el enlace más reciente',
       'tournament.start': 'Iniciar Torneo',
       'tournament.heading': 'Torneo',
       'tournament.reset': 'Reiniciar Torneo',

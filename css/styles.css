@@ -503,6 +503,24 @@ select {
   min-height: 36px;
 }
 
+/* --- Share Button --- */
+.btn--share {
+  background-color: var(--color-white);
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary);
+}
+
+.btn--share:hover:not(:disabled) {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.btn--share--copied {
+  background-color: var(--color-success);
+  color: var(--color-white);
+  border-color: var(--color-success);
+}
+
 /* --- Tournament Section --- */
 .tournament-header {
   display: flex;
@@ -515,6 +533,26 @@ select {
 
 .tournament-header .section__heading {
   margin-bottom: 0;
+}
+
+.tournament-header__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* --- Read-only Banner --- */
+.tournament-readonly-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--color-primary-dark);
+  margin-bottom: 16px;
 }
 
 .tournament-groups {

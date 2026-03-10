@@ -14,6 +14,7 @@
   let lastResult = null;
   let tournamentState = null;   // { teams, groups, matches }
   let activeMatchId = null;     // which match card has the score form open
+  let isReadOnly = false;       // true when viewing a shared URL (no editing)
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -41,7 +42,9 @@
   const tournamentSetup = document.getElementById('tournament-setup');
   const startTournamentBtn = document.getElementById('start-tournament-btn');
   const groupCountOptions = document.getElementById('group-count-options');
+  const shareTournamentBtn = document.getElementById('share-tournament-btn');
   const resetTournamentBtn = document.getElementById('reset-tournament-btn');
+  const readonlyBanner = document.getElementById('readonly-banner');
   const tournamentSection = document.getElementById('tournament-section');
   const tournamentGroupsEl = document.getElementById('tournament-groups');
 
@@ -58,14 +61,27 @@
     clearBtn.addEventListener('click', handleClearAll);
     startTournamentBtn.addEventListener('click', handleStartTournament);
     resetTournamentBtn.addEventListener('click', handleResetTournament);
+    shareTournamentBtn.addEventListener('click', handleShareTournament);
     groupCountOptions.addEventListener('click', handleGroupOptClick);
     updateUI();
 
-    // Restore tournament from localStorage if saved
-    tournamentState = loadTournamentState();
-    if (tournamentState) {
+    // Check URL for a shared tournament (#t=...)
+    var urlState = loadFromURL();
+    if (urlState) {
+      isReadOnly = true;
+      tournamentState = urlState;
       tournamentSection.hidden = false;
+      readonlyBanner.hidden = false;
+      resetTournamentBtn.hidden = true;
+      tournamentSetup.hidden = true;
       renderTournament();
+    } else {
+      // Restore tournament from localStorage if saved
+      tournamentState = loadTournamentState();
+      if (tournamentState) {
+        tournamentSection.hidden = false;
+        renderTournament();
+      }
     }
   }
 
@@ -371,6 +387,7 @@
     tournamentState = { teams: teams, groups: groups, matches: matches };
     activeMatchId = null;
     saveTournamentState();
+    pushShareURL();
     tournamentSection.hidden = false;
     renderTournament();
     updateActionButtons();
@@ -418,6 +435,7 @@
       };
       activeMatchId = null;
       saveTournamentState();
+      pushShareURL();
       renderTournament();
     } catch (e) {
       errorEl.textContent = t(e.message) || e.message;
@@ -441,6 +459,80 @@
     } catch (e) {
       return null;
     }
+  }
+
+  // --- URL Sharing ---
+
+  function encodeTournamentState(state) {
+    try {
+      return btoa(encodeURIComponent(JSON.stringify(state)));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function decodeTournamentState(encoded) {
+    try {
+      return JSON.parse(decodeURIComponent(atob(encoded)));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function getShareURL() {
+    if (!tournamentState) return null;
+    var encoded = encodeTournamentState(tournamentState);
+    if (!encoded) return null;
+    return window.location.origin + window.location.pathname + '#t=' + encoded;
+  }
+
+  function loadFromURL() {
+    var hash = window.location.hash;
+    if (!hash || !hash.startsWith('#t=')) return null;
+    return decodeTournamentState(hash.slice(3));
+  }
+
+  function pushShareURL() {
+    if (isReadOnly || !tournamentState) return;
+    var encoded = encodeTournamentState(tournamentState);
+    if (!encoded) return;
+    // Silently update URL so the browser bar always reflects current state
+    history.replaceState(null, '', '#t=' + encoded);
+  }
+
+  function handleShareTournament() {
+    var url = getShareURL();
+    if (!url) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        showShareCopied();
+      }).catch(function () {
+        fallbackCopyText(url);
+      });
+    } else {
+      fallbackCopyText(url);
+    }
+  }
+
+  function fallbackCopyText(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showShareCopied(); } catch (e) { /* silent */ }
+    document.body.removeChild(ta);
+  }
+
+  function showShareCopied() {
+    var originalText = t('tournament.share');
+    shareTournamentBtn.textContent = t('tournament.shareCopied');
+    shareTournamentBtn.classList.add('btn--share--copied');
+    setTimeout(function () {
+      shareTournamentBtn.textContent = originalText;
+      shareTournamentBtn.classList.remove('btn--share--copied');
+    }, 2500);
   }
 
   // --- Tournament Rendering ---
@@ -572,27 +664,29 @@
       scoreEl.className = 'match-card__score' + (match.played ? ' match-card__score--played' : '');
       scoreEl.textContent = match.played ? (match.score1 + ' \u2013 ' + match.score2) : '\u2013';
 
-      var btn = document.createElement('button');
-      btn.className = 'match-card__btn';
-      btn.type = 'button';
-      if (activeMatchId === match.id) {
-        btn.textContent = t('tournament.match.cancel');
-        btn.addEventListener('click', function () { handleScoreEntry(match.id); });
-      } else if (match.played) {
-        btn.textContent = t('tournament.match.edit');
-        btn.addEventListener('click', function () { handleScoreEntry(match.id); });
-      } else {
-        btn.textContent = t('tournament.match.enterScore');
-        btn.addEventListener('click', function () { handleScoreEntry(match.id); });
-      }
-
       main.appendChild(teamsEl);
       main.appendChild(scoreEl);
-      main.appendChild(btn);
+
+      if (!isReadOnly) {
+        var btn = document.createElement('button');
+        btn.className = 'match-card__btn';
+        btn.type = 'button';
+        if (activeMatchId === match.id) {
+          btn.textContent = t('tournament.match.cancel');
+          btn.addEventListener('click', function () { handleScoreEntry(match.id); });
+        } else if (match.played) {
+          btn.textContent = t('tournament.match.edit');
+          btn.addEventListener('click', function () { handleScoreEntry(match.id); });
+        } else {
+          btn.textContent = t('tournament.match.enterScore');
+          btn.addEventListener('click', function () { handleScoreEntry(match.id); });
+        }
+        main.appendChild(btn);
+      }
       li.appendChild(main);
 
-      // Score form (shown only for active match)
-      if (activeMatchId === match.id) {
+      // Score form (shown only for active match, never in read-only mode)
+      if (!isReadOnly && activeMatchId === match.id) {
         var form = document.createElement('div');
         form.className = 'score-form';
 
