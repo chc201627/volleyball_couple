@@ -418,9 +418,6 @@
     }
     activeMatchId = matchId;
     renderTournament();
-    // Focus first score input
-    const input = document.querySelector('.score-form__input');
-    if (input) input.focus();
   }
 
   function handleSaveScore(matchId, input1El, input2El, errorEl) {
@@ -639,19 +636,20 @@
     ul.className = 'match-list';
 
     matches.forEach(function (match) {
-      var team1 = tournamentState.teams.find(function (t) { return t.id === match.team1Id; });
-      var team2 = tournamentState.teams.find(function (t) { return t.id === match.team2Id; });
+      var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
+      var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
       var name1 = team1 ? team1.name : match.team1Id;
       var name2 = team2 ? team2.name : match.team2Id;
+      var isActive = activeMatchId === match.id;
 
       var li = document.createElement('li');
       li.className = 'match-card' +
         (match.played ? ' match-card--played' : '') +
-        (activeMatchId === match.id ? ' match-card--active' : '');
+        (isActive ? ' match-card--active' : '');
 
-      // Main row: teams + score + button
-      var main = document.createElement('div');
-      main.className = 'match-card__main';
+      // ── Row: team names | score | button (only when NOT active) ──
+      var row = document.createElement('div');
+      row.className = 'match-card__row';
 
       var teamsEl = document.createElement('span');
       teamsEl.className = 'match-card__teams';
@@ -664,35 +662,27 @@
       scoreEl.className = 'match-card__score' + (match.played ? ' match-card__score--played' : '');
       scoreEl.textContent = match.played ? (match.score1 + ' \u2013 ' + match.score2) : '\u2013';
 
-      main.appendChild(teamsEl);
-      main.appendChild(scoreEl);
+      row.appendChild(teamsEl);
+      row.appendChild(scoreEl);
 
-      if (!isReadOnly) {
+      // Show Enter/Edit button only when the form is NOT open
+      if (!isReadOnly && !isActive) {
         var btn = document.createElement('button');
         btn.className = 'match-card__btn';
         btn.type = 'button';
-        if (activeMatchId === match.id) {
-          btn.textContent = t('tournament.match.cancel');
-          btn.addEventListener('click', function () { handleScoreEntry(match.id); });
-        } else if (match.played) {
-          btn.textContent = t('tournament.match.edit');
-          btn.addEventListener('click', function () { handleScoreEntry(match.id); });
-        } else {
-          btn.textContent = t('tournament.match.enterScore');
-          btn.addEventListener('click', function () { handleScoreEntry(match.id); });
-        }
-        main.appendChild(btn);
+        btn.textContent = match.played ? t('tournament.match.edit') : t('tournament.match.enterScore');
+        btn.addEventListener('click', (function (mid) {
+          return function () { handleScoreEntry(mid); };
+        })(match.id));
+        row.appendChild(btn);
       }
-      li.appendChild(main);
 
-      // Score form (shown only for active match, never in read-only mode)
-      if (!isReadOnly && activeMatchId === match.id) {
-        var form = document.createElement('div');
-        form.className = 'score-form';
+      li.appendChild(row);
 
-        var lbl1 = document.createElement('span');
-        lbl1.className = 'score-form__label';
-        lbl1.textContent = escapeHTML(name1.split(' & ')[0] || name1) + ':';
+      // ── Score form (only when this card is active) ──
+      if (!isReadOnly && isActive) {
+        var scoreForm = document.createElement('div');
+        scoreForm.className = 'match-card__score-form';
 
         var in1 = document.createElement('input');
         in1.type = 'number';
@@ -700,15 +690,12 @@
         in1.max = '999';
         in1.className = 'score-form__input';
         in1.value = match.played ? match.score1 : '';
+        in1.placeholder = '0';
         in1.setAttribute('aria-label', name1);
 
         var sep = document.createElement('span');
         sep.className = 'score-form__sep';
         sep.textContent = '\u2013';
-
-        var lbl2 = document.createElement('span');
-        lbl2.className = 'score-form__label';
-        lbl2.textContent = escapeHTML(name2.split(' & ')[0] || name2) + ':';
 
         var in2 = document.createElement('input');
         in2.type = 'number';
@@ -716,10 +703,8 @@
         in2.max = '999';
         in2.className = 'score-form__input';
         in2.value = match.played ? match.score2 : '';
+        in2.placeholder = '0';
         in2.setAttribute('aria-label', name2);
-
-        var actions = document.createElement('div');
-        actions.className = 'score-form__actions';
 
         var saveBtn = document.createElement('button');
         saveBtn.type = 'button';
@@ -729,7 +714,8 @@
         var cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
         cancelBtn.className = 'score-form__cancel';
-        cancelBtn.textContent = t('tournament.match.cancel');
+        cancelBtn.textContent = '\u00d7'; // ×
+        cancelBtn.setAttribute('aria-label', t('tournament.match.cancel'));
         cancelBtn.addEventListener('click', function () {
           activeMatchId = null;
           renderTournament();
@@ -742,24 +728,22 @@
           handleSaveScore(match.id, in1, in2, errorEl);
         });
 
-        // Save on Enter key
         [in1, in2].forEach(function (inp) {
           inp.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') handleSaveScore(match.id, in1, in2, errorEl);
           });
         });
 
-        actions.appendChild(saveBtn);
-        actions.appendChild(cancelBtn);
+        scoreForm.appendChild(in1);
+        scoreForm.appendChild(sep);
+        scoreForm.appendChild(in2);
+        scoreForm.appendChild(saveBtn);
+        scoreForm.appendChild(cancelBtn);
+        scoreForm.appendChild(errorEl);
+        li.appendChild(scoreForm);
 
-        form.appendChild(lbl1);
-        form.appendChild(in1);
-        form.appendChild(sep);
-        form.appendChild(lbl2);
-        form.appendChild(in2);
-        form.appendChild(actions);
-        form.appendChild(errorEl);
-        li.appendChild(form);
+        // Auto-focus first input
+        setTimeout(function () { in1.focus(); }, 0);
       }
 
       ul.appendChild(li);

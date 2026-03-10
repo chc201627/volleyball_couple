@@ -505,20 +505,18 @@ select {
 
 /* --- Share Button --- */
 .btn--share {
-  background-color: var(--color-white);
-  color: var(--color-primary);
-  border: 1.5px solid var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border: none;
 }
 
 .btn--share:hover:not(:disabled) {
-  background-color: var(--color-primary);
-  color: var(--color-white);
+  background-color: var(--color-primary-dark);
 }
 
 .btn--share--copied {
   background-color: var(--color-success);
   color: var(--color-white);
-  border-color: var(--color-success);
 }
 
 /* --- Tournament Section --- */
@@ -657,11 +655,12 @@ select {
   margin-bottom: 4px;
 }
 
-/* --- Match Card --- */
+/* --- Match Card (mobile-first) --- */
 .match-card {
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--color-bg);
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
@@ -677,32 +676,36 @@ select {
   background: rgba(33, 150, 243, 0.04);
 }
 
-.match-card__main {
+/* Row: team names + score + action button */
+.match-card__row {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .match-card__teams {
   flex: 1;
-  font-weight: 500;
-  font-size: 0.9375rem;
   min-width: 0;
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .match-card__vs {
   color: var(--color-text-secondary);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 400;
+  white-space: nowrap;
 }
 
 .match-card__score {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--color-text-secondary);
-  min-width: 64px;
-  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .match-card__score--played {
@@ -710,17 +713,18 @@ select {
 }
 
 .match-card__btn {
+  flex-shrink: 0;
   background: none;
   border: 1px solid var(--color-primary);
   color: var(--color-primary);
   border-radius: 4px;
-  padding: 4px 12px;
-  font-size: 0.8125rem;
+  padding: 4px 10px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   min-height: 32px;
-  transition: background-color var(--transition), color var(--transition);
   white-space: nowrap;
+  transition: background-color var(--transition), color var(--transition);
 }
 
 .match-card__btn:hover {
@@ -728,31 +732,25 @@ select {
   color: var(--color-white);
 }
 
-/* --- Score Form --- */
-.score-form {
+/* Score form: compact row inside the card */
+.match-card__score-form {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.score-form__label {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
 .score-form__input {
-  width: 60px;
-  padding: 6px 8px;
+  width: 56px;
+  padding: 6px 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   text-align: center;
   font-size: 1rem;
   background: var(--color-white);
   transition: border-color var(--transition);
-  min-height: 44px;
+  min-height: 40px;
+  flex-shrink: 0;
 }
 
 .score-form__input:focus {
@@ -764,12 +762,7 @@ select {
 .score-form__sep {
   font-weight: 700;
   color: var(--color-text-secondary);
-}
-
-.score-form__actions {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .score-form__save {
@@ -782,6 +775,7 @@ select {
   font-weight: 600;
   cursor: pointer;
   min-height: 36px;
+  flex-shrink: 0;
   transition: background-color var(--transition);
 }
 
@@ -790,14 +784,16 @@ select {
 }
 
 .score-form__cancel {
+  flex-shrink: 0;
   background: none;
   border: 1px solid var(--color-border);
   border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 0.8125rem;
+  padding: 6px 10px;
+  font-size: 0.875rem;
   cursor: pointer;
   min-height: 36px;
   color: var(--color-text-secondary);
+  line-height: 1;
   transition: border-color var(--transition), color var(--transition);
 }
 
@@ -810,7 +806,6 @@ select {
   width: 100%;
   font-size: 0.8125rem;
   color: var(--color-error);
-  margin-top: 4px;
 }
 
 /* --- Tournament Complete Banner --- */
@@ -890,22 +885,6 @@ select {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
     gap: 24px;
-  }
-
-  .match-card {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .match-card__main {
-    flex: 1;
-    flex-wrap: nowrap;
-  }
-
-  .score-form {
-    margin-top: 0;
-    margin-left: 12px;
-    flex-wrap: nowrap;
   }
 }
 
