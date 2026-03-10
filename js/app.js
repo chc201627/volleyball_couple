@@ -15,6 +15,8 @@
   let tournamentState = null;   // { teams, groups, matches }
   let activeMatchId = null;     // which match card has the score form open
   let isReadOnly = false;       // true when viewing a shared URL (no editing)
+  var db = null;                // Firebase Database instance (null = not configured)
+  var sessionId = null;         // Active session ID written to / read from Firebase
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -65,22 +67,55 @@
     groupCountOptions.addEventListener('click', handleGroupOptClick);
     updateUI();
 
-    // Check URL for a shared tournament (#t=...)
-    var urlState = loadFromURL();
-    if (urlState) {
-      isReadOnly = true;
-      tournamentState = urlState;
-      tournamentSection.hidden = false;
-      readonlyBanner.hidden = false;
-      resetTournamentBtn.hidden = true;
-      tournamentSetup.hidden = true;
-      renderTournament();
-    } else {
-      // Restore tournament from localStorage if saved
+    // Boot Firebase and decide how to restore tournament state
+    var firebaseReady = initFirebase();
+    var urlSid = getSessionIdFromURL();
+
+    if (firebaseReady && urlSid) {
+      sessionId = urlSid;
+      if (!isSessionOwner(urlSid)) {
+        // Viewer: subscribe for real-time updates
+        isReadOnly = true;
+        tournamentSection.hidden = false;
+        readonlyBanner.hidden = false;
+        resetTournamentBtn.hidden = true;
+        tournamentSetup.hidden = true;
+        subscribeToSession(urlSid);
+      } else {
+        // Organizer re-opening their own session
+        loadSessionOnce(urlSid, function (state) {
+          if (state) {
+            tournamentState = state;
+            saveTournamentState();
+            tournamentSection.hidden = false;
+            renderTournament();
+          }
+        });
+      }
+    } else if (firebaseReady) {
+      // Firebase ready but no session ID in URL — check localStorage
       tournamentState = loadTournamentState();
       if (tournamentState) {
         tournamentSection.hidden = false;
         renderTournament();
+      }
+    } else {
+      // Firebase not configured — fall back to legacy #t= URL hash + localStorage
+      var urlState = loadFromURL();
+      if (urlState) {
+        isReadOnly = true;
+        tournamentState = urlState;
+        tournamentSection.hidden = false;
+        readonlyBanner.hidden = false;
+        resetTournamentBtn.hidden = true;
+        tournamentSetup.hidden = true;
+        renderTournament();
+      } else {
+        tournamentState = loadTournamentState();
+        if (tournamentState) {
+          tournamentSection.hidden = false;
+          renderTournament();
+        }
       }
     }
   }
@@ -387,7 +422,14 @@
     tournamentState = { teams: teams, groups: groups, matches: matches };
     activeMatchId = null;
     saveTournamentState();
-    pushShareURL();
+    if (db) {
+      sessionId = generateSessionId();
+      markSessionOwner(sessionId);
+      history.replaceState(null, '', '#s=' + sessionId);
+      writeToFirebase(tournamentState);
+    } else {
+      pushShareURL();
+    }
     tournamentSection.hidden = false;
     renderTournament();
     updateActionButtons();
@@ -396,9 +438,14 @@
 
   function handleResetTournament() {
     if (!confirm(t('tournament.confirmReset'))) return;
+    if (db && sessionId) {
+      db.ref('tournaments/' + sessionId).remove();
+      sessionId = null;
+    }
     tournamentState = null;
     activeMatchId = null;
     localStorage.removeItem('bv-tournament');
+    history.replaceState(null, '', window.location.pathname + window.location.search);
     tournamentSection.hidden = true;
     tournamentGroupsEl.innerHTML = '';
     // Reset group selector to default (1 group / A)
@@ -432,7 +479,11 @@
       };
       activeMatchId = null;
       saveTournamentState();
-      pushShareURL();
+      if (db && sessionId) {
+        writeToFirebase(tournamentState);
+      } else {
+        pushShareURL();
+      }
       renderTournament();
     } catch (e) {
       errorEl.textContent = t(e.message) || e.message;
@@ -456,6 +507,80 @@
     } catch (e) {
       return null;
     }
+  }
+
+  // --- Firebase ---
+
+  function initFirebase() {
+    if (typeof firebase === 'undefined' ||
+        typeof FIREBASE_CONFIG === 'undefined' ||
+        FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
+      return false;
+    }
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+      db = firebase.database();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function generateSessionId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function getSessionIdFromURL() {
+    var hash = window.location.hash;
+    if (!hash || !hash.startsWith('#s=')) return null;
+    return hash.slice(3);
+  }
+
+  function isSessionOwner(sid) {
+    try {
+      var owned = JSON.parse(localStorage.getItem('bv-owned-sessions') || '[]');
+      return owned.indexOf(sid) !== -1;
+    } catch (e) { return false; }
+  }
+
+  function markSessionOwner(sid) {
+    try {
+      var owned = JSON.parse(localStorage.getItem('bv-owned-sessions') || '[]');
+      if (owned.indexOf(sid) === -1) {
+        owned.push(sid);
+        localStorage.setItem('bv-owned-sessions', JSON.stringify(owned));
+      }
+    } catch (e) {}
+  }
+
+  function writeToFirebase(state) {
+    if (!db || !sessionId) return;
+    db.ref('tournaments/' + sessionId).set({
+      state: state,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    });
+  }
+
+  function subscribeToSession(sid) {
+    if (!db || !sid) return;
+    db.ref('tournaments/' + sid).on('value', function (snapshot) {
+      var data = snapshot.val();
+      if (!data || !data.state) return;
+      tournamentState = data.state;
+      saveTournamentState();
+      tournamentSection.hidden = false;
+      renderTournament();
+    });
+  }
+
+  function loadSessionOnce(sid, callback) {
+    if (!db || !sid) { callback(null); return; }
+    db.ref('tournaments/' + sid).once('value', function (snapshot) {
+      var data = snapshot.val();
+      callback(data && data.state ? data.state : null);
+    });
   }
 
   // --- URL Sharing ---
@@ -498,7 +623,7 @@
   }
 
   function handleShareTournament() {
-    var url = getShareURL();
+    var url = db ? window.location.href : getShareURL();
     if (!url) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {

@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "tournaments": {
+      "$sessionId": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}
