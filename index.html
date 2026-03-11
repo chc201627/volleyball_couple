@@ -68,6 +68,44 @@
     <section class="section section--actions" aria-labelledby="actions-heading">
       <h2 id="actions-heading" class="sr-only">Actions</h2>
       <div class="actions">
+        <!-- Pairing Mode Toggle (hidden for read-only viewers via JS) -->
+        <div class="pairing-toggle" id="pairing-toggle" hidden>
+          <span class="pairing-toggle__label" data-i18n="pairing.modeLabel">Pairing Mode</span>
+          <div class="pairing-toggle__options" role="group">
+            <button class="pairing-toggle__opt pairing-toggle__opt--active"
+                    id="mode-random-btn" type="button" data-mode="random"
+                    data-i18n="pairing.modeRandom">Random</button>
+            <button class="pairing-toggle__opt"
+                    id="mode-manual-btn" type="button" data-mode="manual"
+                    data-i18n="pairing.modeManual">Manual</button>
+          </div>
+        </div>
+
+        <!-- Manual Pairing Panel (shown only in manual mode) -->
+        <div class="manual-pairing" id="manual-pairing-panel" hidden>
+          <div class="manual-pairing__selectors">
+            <div class="manual-pairing__selector-group">
+              <label class="form__label" for="select-man" data-i18n="pairing.selectMan">Player 1</label>
+              <select class="form__select" id="select-man">
+                <option value="" disabled selected data-i18n="pairing.selectMan">Player 1</option>
+              </select>
+            </div>
+            <div class="manual-pairing__selector-group">
+              <label class="form__label" for="select-woman" data-i18n="pairing.selectWoman">Player 2</label>
+              <select class="form__select" id="select-woman">
+                <option value="" disabled selected data-i18n="pairing.selectWoman">Player 2</option>
+              </select>
+            </div>
+            <button class="btn btn--primary manual-pairing__pair-btn" id="manual-pair-btn" type="button" disabled
+                    data-i18n="pairing.pairBtn">Pair</button>
+          </div>
+          <p class="manual-pairing__hint" data-i18n="pairing.manualHint">Unpaired players will be paired randomly</p>
+          <ul class="manual-pairing__list" id="manual-pairs-list"></ul>
+          <p class="manual-pairing__empty" id="manual-pairs-empty" data-i18n="pairing.noPaired">No couples paired yet</p>
+          <button class="btn btn--success" id="confirm-manual-btn" type="button"
+                  data-i18n="pairing.confirmBtn">Confirm Couples</button>
+        </div>
+
         <button class="btn btn--primary btn--large" id="generate-btn" disabled data-i18n="actions.generate">
           Generate Couples
         </button>

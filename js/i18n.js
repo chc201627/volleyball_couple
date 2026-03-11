@@ -83,6 +83,17 @@ var t, setLanguage, getLanguage;
       'tournament.error.scoreNegative': 'Scores must be 0 or higher',
       'tournament.error.scoreDraw': 'Scores cannot be equal (no draws in volleyball)',
       'tournament.error.scoreNotInt': 'Scores must be whole numbers',
+      // Pairing mode
+      'pairing.modeLabel': 'Pairing Mode',
+      'pairing.modeRandom': 'Random',
+      'pairing.modeManual': 'Manual',
+      'pairing.selectMan': 'Player 1',
+      'pairing.selectWoman': 'Player 2',
+      'pairing.pairBtn': 'Pair',
+      'pairing.confirmBtn': 'Confirm Couples',
+      'pairing.noPaired': 'No couples paired yet',
+      'pairing.removePair': 'Remove pair',
+      'pairing.manualHint': 'Unpaired players will be paired randomly',
       // Footer
       'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching'
     },
@@ -153,6 +164,17 @@ var t, setLanguage, getLanguage;
       'tournament.error.scoreNegative': 'Los resultados deben ser 0 o mayores',
       'tournament.error.scoreDraw': 'Los resultados no pueden ser iguales (no hay empates en v\u00f3ley)',
       'tournament.error.scoreNotInt': 'Los resultados deben ser n\u00fameros enteros',
+      // Modo de emparejamiento
+      'pairing.modeLabel': 'Modo de Emparejamiento',
+      'pairing.modeRandom': 'Aleatorio',
+      'pairing.modeManual': 'Manual',
+      'pairing.selectMan': 'Jugador 1',
+      'pairing.selectWoman': 'Jugador 2',
+      'pairing.pairBtn': 'Emparejar',
+      'pairing.confirmBtn': 'Confirmar Parejas',
+      'pairing.noPaired': 'Ninguna pareja formada a\u00fan',
+      'pairing.removePair': 'Eliminar pareja',
+      'pairing.manualHint': 'Los jugadores sin pareja se emparejar\u00e1n aleatoriamente',
       // Pie de p\u00e1gina
       'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa'
     }

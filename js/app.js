@@ -17,6 +17,8 @@
   let isReadOnly = false;       // true when viewing a shared URL (no editing)
   var db = null;                // Firebase Database instance (null = not configured)
   var sessionId = null;         // Active session ID written to / read from Firebase
+  let pairingMode = 'random';  // 'random' | 'manual'
+  let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -36,6 +38,17 @@
   const generateHint = document.getElementById('generate-hint');
   const regenerateBtn = document.getElementById('regenerate-btn');
   const clearBtn = document.getElementById('clear-btn');
+
+  const pairingToggle      = document.getElementById('pairing-toggle');
+  const modeRandomBtn      = document.getElementById('mode-random-btn');
+  const modeManualBtn      = document.getElementById('mode-manual-btn');
+  const manualPairingPanel = document.getElementById('manual-pairing-panel');
+  const selectMan          = document.getElementById('select-man');
+  const selectWoman        = document.getElementById('select-woman');
+  const manualPairBtn      = document.getElementById('manual-pair-btn');
+  const manualPairsList    = document.getElementById('manual-pairs-list');
+  const manualPairsEmpty   = document.getElementById('manual-pairs-empty');
+  const confirmManualBtn   = document.getElementById('confirm-manual-btn');
 
   const resultsSection = document.getElementById('results-section');
   const couplesGrid = document.getElementById('couples-grid');
@@ -61,6 +74,11 @@
     generateBtn.addEventListener('click', handleGenerate);
     regenerateBtn.addEventListener('click', handleGenerate);
     clearBtn.addEventListener('click', handleClearAll);
+    pairingToggle.addEventListener('click', handlePairingModeClick);
+    manualPairBtn.addEventListener('click', handleManualPair);
+    confirmManualBtn.addEventListener('click', handleConfirmManualCouples);
+    selectMan.addEventListener('change', renderManualDropdowns);
+    selectWoman.addEventListener('change', renderManualDropdowns);
     startTournamentBtn.addEventListener('click', handleStartTournament);
     resetTournamentBtn.addEventListener('click', handleResetTournament);
     shareTournamentBtn.addEventListener('click', handleShareTournament);
@@ -233,6 +251,9 @@
   // --- Remove Player ---
 
   function removePlayer(id) {
+    if (pairingMode === 'manual') {
+      manualPairs = manualPairs.filter(p => p.player1.id !== id && p.player2.id !== id);
+    }
     const idx = players.findIndex(p => p.id === id);
     if (idx === -1) return;
 
@@ -257,6 +278,10 @@
     players.length = 0;
     couplesGenerated = false;
     lastResult = null;
+    manualPairs = [];
+    pairingMode = 'random';
+    modeRandomBtn.classList.add('pairing-toggle__opt--active');
+    modeManualBtn.classList.remove('pairing-toggle__opt--active');
     updateUI();
   }
 
@@ -325,9 +350,24 @@
   }
 
   function updateActionButtons() {
-    generateBtn.disabled = players.length < 2;
-    generateHint.hidden = players.length >= 2;
-    regenerateBtn.hidden = !couplesGenerated;
+    const hasEnough = players.length >= 2;
+
+    // Mode toggle: only for the session creator with enough players
+    pairingToggle.hidden = isReadOnly || !hasEnough;
+
+    // Random mode controls
+    generateBtn.hidden   = pairingMode !== 'random';
+    generateBtn.disabled = !hasEnough;
+    generateHint.hidden  = hasEnough || pairingMode !== 'random';
+    regenerateBtn.hidden = !couplesGenerated || pairingMode !== 'random';
+
+    // Manual mode panel
+    manualPairingPanel.hidden = pairingMode !== 'manual' || !hasEnough;
+    if (pairingMode === 'manual' && hasEnough) {
+      renderManualDropdowns();
+      renderManualPairsList();
+    }
+
     clearBtn.hidden = players.length === 0;
     tournamentSetup.hidden = !couplesGenerated || tournamentState !== null;
     // Keep max selectable groups in sync with available teams
@@ -876,6 +916,154 @@
 
     container.appendChild(ul);
     return container;
+  }
+
+  // --- Manual Pairing ---
+
+  function handlePairingModeClick(e) {
+    var btn = e.target.closest('.pairing-toggle__opt');
+    if (!btn) return;
+    var newMode = btn.getAttribute('data-mode');
+    if (newMode === pairingMode) return;
+
+    pairingMode = newMode;
+    manualPairs = [];
+    couplesGenerated = false;
+    lastResult = null;
+
+    modeRandomBtn.classList.toggle('pairing-toggle__opt--active', pairingMode === 'random');
+    modeManualBtn.classList.toggle('pairing-toggle__opt--active', pairingMode === 'manual');
+
+    updateUI();
+  }
+
+  function renderManualDropdowns() {
+    var pairedIds = new Set();
+    manualPairs.forEach(function (pair) {
+      pairedIds.add(pair.player1.id);
+      pairedIds.add(pair.player2.id);
+    });
+
+    var available = players.filter(function (p) { return !pairedIds.has(p.id); });
+
+    var prevP1 = selectMan.value;
+    var prevP2 = selectWoman.value;
+
+    // Player 1: all available except what's currently selected in Player 2
+    selectMan.innerHTML = '<option value="" disabled selected>' + escapeHTML(t('pairing.selectMan')) + '</option>';
+    available.forEach(function (p) {
+      if (String(p.id) === prevP2) return;
+      var opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      selectMan.appendChild(opt);
+    });
+    if (prevP1 && prevP1 !== prevP2 && available.some(function (p) { return String(p.id) === prevP1; })) {
+      selectMan.value = prevP1;
+    }
+
+    // Player 2: all available except what's currently selected in Player 1
+    var p1Now = selectMan.value;
+    selectWoman.innerHTML = '<option value="" disabled selected>' + escapeHTML(t('pairing.selectWoman')) + '</option>';
+    available.forEach(function (p) {
+      if (String(p.id) === p1Now) return;
+      var opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      selectWoman.appendChild(opt);
+    });
+    if (prevP2 && prevP2 !== p1Now && available.some(function (p) { return String(p.id) === prevP2; })) {
+      selectWoman.value = prevP2;
+    }
+
+    updateManualPairBtnState();
+  }
+
+  function updateManualPairBtnState() {
+    manualPairBtn.disabled = !(selectMan.value && selectWoman.value);
+  }
+
+  function renderManualPairsList() {
+    manualPairsList.innerHTML = '';
+    manualPairsEmpty.hidden = manualPairs.length > 0;
+
+    manualPairs.forEach(function (pair, idx) {
+      var li = document.createElement('li');
+      li.className = 'manual-pairing__pair-item animate__animated animate__fadeIn';
+
+      var badge1 = pair.player1.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+      var badge2 = pair.player2.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+
+      var namesEl = document.createElement('span');
+      namesEl.className = 'manual-pairing__pair-names';
+      namesEl.innerHTML =
+        escapeHTML(pair.player1.name) +
+        ' <span class="player-list__badge player-list__badge--' + pair.player1.gender + '">' + badge1 + '</span>' +
+        ' <span class="manual-pairing__pair-sep">&amp;</span> ' +
+        escapeHTML(pair.player2.name) +
+        ' <span class="player-list__badge player-list__badge--' + pair.player2.gender + '">' + badge2 + '</span>';
+
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'manual-pairing__remove';
+      removeBtn.type = 'button';
+      removeBtn.setAttribute('aria-label', t('pairing.removePair'));
+      removeBtn.innerHTML = '&times;';
+      removeBtn.addEventListener('click', (function (i) {
+        return function () { removeManualPair(i); };
+      })(idx));
+
+      li.appendChild(namesEl);
+      li.appendChild(removeBtn);
+      manualPairsList.appendChild(li);
+    });
+  }
+
+  function handleManualPair() {
+    var manId   = selectMan.value;
+    var womanId = selectWoman.value;
+    if (!manId || !womanId) return;
+
+    var man   = players.find(function (p) { return String(p.id) === manId; });
+    var woman = players.find(function (p) { return String(p.id) === womanId; });
+    if (!man || !woman) return;
+
+    manualPairs.push({ player1: man, player2: woman });
+    selectMan.value   = '';
+    selectWoman.value = '';
+
+    renderManualDropdowns();
+    renderManualPairsList();
+  }
+
+  function removeManualPair(index) {
+    manualPairs.splice(index, 1);
+    renderManualDropdowns();
+    renderManualPairsList();
+  }
+
+  function handleConfirmManualCouples() {
+    var confirmedCouples = manualPairs.map(function (pair) {
+      var type = (pair.player1.gender !== pair.player2.gender) ? 'mixed' : 'same';
+      return { player1: pair.player1, player2: pair.player2, type: type };
+    });
+
+    var pairedIds = new Set();
+    manualPairs.forEach(function (pair) {
+      pairedIds.add(pair.player1.id);
+      pairedIds.add(pair.player2.id);
+    });
+
+    var remainingPlayers = players.filter(function (p) { return !pairedIds.has(p.id); });
+    var autoResult = generateCouples(remainingPlayers);
+
+    lastResult = {
+      couples:   confirmedCouples.concat(autoResult.couples),
+      unmatched: autoResult.unmatched,
+    };
+
+    couplesGenerated = true;
+    renderResults(lastResult);
+    updateUI();
   }
 
   // --- Utilities ---

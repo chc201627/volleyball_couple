@@ -36,6 +36,11 @@
   padding: 0;
 }
 
+/* Ensure display:flex/grid rules never override the hidden attribute */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: var(--font-family);
   font-size: 16px;
@@ -355,6 +360,143 @@ select {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
   font-style: italic;
+}
+
+/* --- Pairing Mode Toggle --- */
+.pairing-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pairing-toggle__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.pairing-toggle__options {
+  display: flex;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.pairing-toggle__opt {
+  padding: 8px 18px;
+  border: none;
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+.pairing-toggle__opt:hover:not(.pairing-toggle__opt--active) {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+.pairing-toggle__opt--active {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+/* --- Manual Pairing Panel --- */
+.manual-pairing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.manual-pairing__selectors {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manual-pairing__selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.manual-pairing__pair-btn {
+  align-self: flex-start;
+  min-width: 100px;
+}
+
+.manual-pairing__hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.manual-pairing__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manual-pairing__pair-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-white);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  font-size: 0.9375rem;
+}
+
+.manual-pairing__pair-names {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.manual-pairing__pair-sep {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.manual-pairing__remove {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition), background-color var(--transition);
+}
+
+.manual-pairing__remove:hover {
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+}
+
+.manual-pairing__empty {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  padding: 8px 0;
 }
 
 /* --- Couples Grid --- */
@@ -833,6 +975,16 @@ select {
    Responsive — Tablet (≥ 600px)
    ============================================ */
 @media (min-width: 600px) {
+  .manual-pairing__selectors {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .manual-pairing__pair-btn {
+    align-self: flex-end;
+    margin-bottom: 0;
+  }
+
   .header__title {
     font-size: 2rem;
   }
