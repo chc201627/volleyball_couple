@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>King of the Court — Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>King of the Court — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/king-of-court.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    function heading(title) {
+      results.innerHTML += `<h2>${title}</h2>`;
+    }
+
+    function makeTeam(i) {
+      return { id: `t${i}`, name: `Team ${i}` };
+    }
+
+    function makeTeams(n) {
+      const teams = [];
+      for (let i = 0; i < n; i++) teams.push(makeTeam(i));
+      return teams;
+    }
+
+    // ─── createKingGame ──────────────────────────────────────────────────────────
+
+    heading('createKingGame');
+
+    (function () {
+      const teams = makeTeams(4);
+      const state = createKingGame(teams, 'consecutive', 5);
+
+      assert(state.king.id === 't0',
+        'first team becomes king');
+      assert(state.queue.length === 3,
+        'remaining 3 teams form queue');
+      assert(state.queue[0].id === 't1',
+        'queue head is second team');
+      assert(state.kingWins === 0,
+        'kingWins starts at 0');
+      assert(state.kingTotalWins === 0,
+        'kingTotalWins starts at 0');
+      assert(state.winner === null,
+        'winner starts as null');
+      assert(state.winCondition === 'consecutive',
+        'winCondition stored correctly');
+      assert(state.targetWins === 5,
+        'targetWins stored correctly');
+      assert(state.rallyLog.length === 0,
+        'rallyLog starts empty');
+    })();
+
+    (function () {
+      // caller's array should not be mutated
+      const teams = makeTeams(3);
+      const original = teams.slice();
+      createKingGame(teams, 'consecutive', 5);
+      assert(teams.length === original.length,
+        'caller teams array is not mutated');
+    })();
+
+    (function () {
+      let threw = false;
+      try { createKingGame([makeTeam(0)], 'consecutive', 5); } catch (e) {
+        threw = e.message === 'king.error.notEnoughTeams';
+      }
+      assert(threw, 'throws king.error.notEnoughTeams for < 2 teams');
+    })();
+
+    (function () {
+      let threw = false;
+      try { createKingGame([], 'consecutive', 5); } catch (e) {
+        threw = e.message === 'king.error.notEnoughTeams';
+      }
+      assert(threw, 'throws king.error.notEnoughTeams for empty array');
+    })();
+
+    // ─── getCurrentKing / getCurrentChallenger ───────────────────────────────────
+
+    heading('getCurrentKing / getCurrentChallenger');
+
+    (function () {
+      const state = createKingGame(makeTeams(4), 'consecutive', 5);
+      assert(getCurrentKing(state).id === 't0', 'getCurrentKing returns first team');
+      assert(getCurrentChallenger(state).id === 't1', 'getCurrentChallenger returns queue head');
+    })();
+
+    (function () {
+      let state = createKingGame(makeTeams(3), 'consecutive', 5);
+      state = recordRally(state, 'challenger');
+      assert(getCurrentKing(state).id === 't1',
+        'getCurrentKing returns new king after dethrone');
+      assert(getCurrentChallenger(state).id === 't2',
+        'getCurrentChallenger returns next in queue after dethrone');
+    })();
+
+    // ─── recordRally — king wins ──────────────────────────────────────────────────
+
+    heading('recordRally — king wins');
+
+    (function () {
+      const state0 = createKingGame(makeTeams(4), 'consecutive', 5);
+      const state1 = recordRally(state0, 'king');
+
+      assert(state1.kingWins === 1, 'kingWins increments to 1');
+      assert(state1.kingTotalWins === 1, 'kingTotalWins increments to 1');
+      assert(state1.king.id === 't0', 'king remains the same');
+      assert(state1.queue.length === 3, 'queue length unchanged');
+      assert(state1.queue[0].id === 't2', 'former challenger t1 moved to tail, new head is t2');
+      assert(state1.queue[2].id === 't1', 'former challenger t1 is now at queue tail');
+      assert(state1.rallyLog.length === 1, 'rallyLog grows by 1');
+      assert(state1.rallyLog[0].winnerSide === 'king', 'log entry winnerSide is "king"');
+      assert(state1.rallyLog[0].rallyNumber === 1, 'log entry rallyNumber is 1');
+    })();
+
+    (function () {
+      // immutability: original state unchanged
+      const state0 = createKingGame(makeTeams(4), 'consecutive', 5);
+      recordRally(state0, 'king');
+      assert(state0.kingWins === 0, 'original state kingWins not mutated');
+      assert(state0.queue[0].id === 't1', 'original state queue not mutated');
+      assert(state0.rallyLog.length === 0, 'original state rallyLog not mutated');
+    })();
+
+    // ─── recordRally — challenger wins ────────────────────────────────────────────
+
+    heading('recordRally — challenger wins');
+
+    (function () {
+      const state0 = createKingGame(makeTeams(4), 'consecutive', 5);
+      const state1 = recordRally(state0, 'challenger');
+
+      assert(state1.king.id === 't1', 'challenger t1 becomes new king');
+      assert(state1.kingWins === 0, 'kingWins resets to 0');
+      assert(state1.kingTotalWins === 0, 'kingTotalWins resets to 0');
+      assert(state1.queue.length === 3, 'queue length unchanged');
+      assert(state1.queue[0].id === 't2', 'next challenger is t2');
+      assert(state1.queue[2].id === 't0', 'dethroned king t0 goes to queue tail');
+      assert(state1.rallyLog[0].winnerSide === 'challenger', 'log entry winnerSide is "challenger"');
+    })();
+
+    (function () {
+      // immutability after dethrone
+      const state0 = createKingGame(makeTeams(3), 'consecutive', 5);
+      recordRally(state0, 'challenger');
+      assert(state0.king.id === 't0', 'original king not changed after dethrone');
+    })();
+
+    // ─── isKingGameOver — consecutive ────────────────────────────────────────────
+
+    heading('isKingGameOver — consecutive');
+
+    (function () {
+      let state = createKingGame(makeTeams(3), 'consecutive', 3);
+      assert(!isKingGameOver(state), 'not over at start');
+
+      state = recordRally(state, 'king');
+      assert(!isKingGameOver(state), 'not over at 1 win (target 3)');
+
+      state = recordRally(state, 'king');
+      assert(!isKingGameOver(state), 'not over at 2 wins (target 3)');
+
+      state = recordRally(state, 'king');
+      assert(isKingGameOver(state), 'game over at 3 consecutive wins');
+      assert(state.winner !== null, 'winner is set');
+      assert(state.winner.id === 't0', 'winner is the initial king');
+    })();
+
+    (function () {
+      // Dethronement resets consecutive counter
+      let state = createKingGame(makeTeams(3), 'consecutive', 3);
+      state = recordRally(state, 'king');
+      state = recordRally(state, 'king');
+      // challenger wins — consecutive resets
+      state = recordRally(state, 'challenger');
+      assert(!isKingGameOver(state), 'not over after dethronement resets counter');
+      assert(state.kingWins === 0, 'kingWins is 0 after dethronement');
+    })();
+
+    // ─── isKingGameOver — total ───────────────────────────────────────────────────
+
+    heading('isKingGameOver — total');
+
+    (function () {
+      let state = createKingGame(makeTeams(3), 'total', 3);
+      state = recordRally(state, 'king');
+      state = recordRally(state, 'king');
+      assert(!isKingGameOver(state), 'not over at 2 total wins (target 3)');
+
+      state = recordRally(state, 'king');
+      assert(isKingGameOver(state), 'game over at 3 total wins');
+    })();
+
+    (function () {
+      // Total mode: dethronement resets new king's total to 0
+      let state = createKingGame(makeTeams(3), 'total', 3);
+      state = recordRally(state, 'king');
+      state = recordRally(state, 'king');
+      state = recordRally(state, 'challenger'); // t1 dethrones t0
+      assert(state.kingTotalWins === 0, 'new king starts with 0 total wins');
+      assert(!isKingGameOver(state), 'not over right after dethronement');
+    })();
+
+    // ─── recordRally — game already over ─────────────────────────────────────────
+
+    heading('recordRally — error cases');
+
+    (function () {
+      let state = createKingGame(makeTeams(3), 'consecutive', 1);
+      state = recordRally(state, 'king'); // game over
+      let threw = false;
+      try { recordRally(state, 'king'); } catch (e) {
+        threw = e.message === 'king.error.gameOver';
+      }
+      assert(threw, 'throws king.error.gameOver when called on finished game');
+    })();
+
+    // ─── Queue integrity ─────────────────────────────────────────────────────────
+
+    heading('Queue integrity');
+
+    (function () {
+      const n = 5;
+      let state = createKingGame(makeTeams(n), 'consecutive', 999);
+
+      for (let i = 0; i < 20; i++) {
+        const side = Math.random() < 0.5 ? 'king' : 'challenger';
+        state = recordRally(state, side);
+        const total = state.queue.length + 1; // +1 for king
+        if (total !== n) {
+          assert(false, `Queue integrity after rally ${i + 1}: expected ${n}, got ${total}`);
+          return;
+        }
+      }
+      assert(true, `queue.length + 1 === ${n} after 20 random rallies`);
+    })();
+
+    (function () {
+      // No duplicate team IDs across king + queue
+      const n = 4;
+      let state = createKingGame(makeTeams(n), 'consecutive', 999);
+      for (let i = 0; i < 15; i++) {
+        state = recordRally(state, i % 3 === 0 ? 'challenger' : 'king');
+      }
+      const allIds = [state.king.id].concat(state.queue.map(t => t.id));
+      const unique = new Set(allIds);
+      assert(unique.size === n, 'no duplicate team IDs across king + queue after 15 rallies');
+    })();
+
+    // ─── Full game simulation ─────────────────────────────────────────────────────
+
+    heading('Full game simulation');
+
+    (function () {
+      // 3 teams, target 3 consecutive, king wins 3 rallies → t0 is champion
+      let state = createKingGame(makeTeams(3), 'consecutive', 3);
+      state = recordRally(state, 'king');
+      state = recordRally(state, 'king');
+      state = recordRally(state, 'king');
+      assert(state.winner !== null, 'winner is set after 3 consecutive king wins');
+      assert(state.winner.id === 't0', 'winner is initial king t0');
+      assert(state.rallyLog.length === 3, 'rallyLog has 3 entries');
+    })();
+
+    (function () {
+      // king wins 2, challenger wins 1 (new king = t1), new king wins 3 → t1 wins
+      let state = createKingGame(makeTeams(3), 'consecutive', 3);
+      state = recordRally(state, 'king');      // t0: 1 win
+      state = recordRally(state, 'king');      // t0: 2 wins
+      state = recordRally(state, 'challenger');// t1 dethrones t0
+      state = recordRally(state, 'king');      // t1: 1 win
+      state = recordRally(state, 'king');      // t1: 2 wins
+      state = recordRally(state, 'king');      // t1: 3 wins → game over
+      assert(isKingGameOver(state), 'game is over');
+      assert(state.winner.id === 't1', 'winner is t1 (the new king)');
+    })();
+
+    // ─── Summary ─────────────────────────────────────────────────────────────────
+
+    const total = passed + failed;
+    const cls   = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `
+      <div class="summary ${cls}">
+        ${failed === 0 ? '✓ All' : '✗'} ${passed}/${total} tests passed
+        ${failed > 0 ? `— ${failed} FAILED` : ''}
+      </div>`;
+  </script>
+</body>
+</html>

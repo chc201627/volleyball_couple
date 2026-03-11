@@ -19,6 +19,9 @@
   var sessionId = null;         // Active session ID written to / read from Firebase
   let pairingMode = 'random';  // 'random' | 'manual'
   let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
+  let kingState = null;        // KingState object or null when no game active
+  let kingWinCondition = 'consecutive'; // 'consecutive' | 'total'
+  let kingTargetWins = 5;      // 5 | 7 | 10
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -63,6 +66,23 @@
   const tournamentSection = document.getElementById('tournament-section');
   const tournamentGroupsEl = document.getElementById('tournament-groups');
 
+  const kingSetup              = document.getElementById('king-setup');
+  const startKingBtn           = document.getElementById('start-king-btn');
+  const resetKingBtn           = document.getElementById('reset-king-btn');
+  const kingSection            = document.getElementById('king-section');
+  const kingWinConditionToggle = document.getElementById('king-win-condition-toggle');
+  const kingTargetToggle       = document.getElementById('king-target-toggle');
+  const kingTeamName           = document.getElementById('king-team-name');
+  const kingWinsCount          = document.getElementById('king-wins-count');
+  const kingWinsLabel          = document.getElementById('king-wins-label');
+  const challengerTeamName     = document.getElementById('challenger-team-name');
+  const kingWinsBtn            = document.getElementById('king-wins-btn');
+  const challengerWinsBtn      = document.getElementById('challenger-wins-btn');
+  const kingQueueList          = document.getElementById('king-queue-list');
+  const kingLogList            = document.getElementById('king-log-list');
+  const kingWinnerBanner       = document.getElementById('king-winner-banner');
+  const kingWinnerName         = document.getElementById('king-winner-name');
+
   // --- Error auto-dismiss timers ---
   const errorTimers = {};
 
@@ -83,6 +103,12 @@
     resetTournamentBtn.addEventListener('click', handleResetTournament);
     shareTournamentBtn.addEventListener('click', handleShareTournament);
     groupCountOptions.addEventListener('click', handleGroupOptClick);
+    startKingBtn.addEventListener('click', handleStartKing);
+    resetKingBtn.addEventListener('click', handleResetKing);
+    kingWinsBtn.addEventListener('click', function () { handleRally('king'); });
+    challengerWinsBtn.addEventListener('click', function () { handleRally('challenger'); });
+    kingWinConditionToggle.addEventListener('click', handleKingConditionClick);
+    kingTargetToggle.addEventListener('click', handleKingTargetClick);
     updateUI();
 
     // Boot Firebase and decide how to restore tournament state
@@ -136,6 +162,16 @@
         }
       }
     }
+
+    // Restore king game from localStorage (only when no tournament is active)
+    if (!tournamentState) {
+      kingState = loadKingState();
+      if (kingState) {
+        kingSection.hidden = false;
+        renderKing();
+        updateActionButtons();
+      }
+    }
   }
 
   // Expose re-render hook for i18n language changes
@@ -146,6 +182,9 @@
     }
     if (tournamentState) {
       renderTournament();
+    }
+    if (kingState) {
+      renderKing();
     }
   };
 
@@ -369,7 +408,8 @@
     }
 
     clearBtn.hidden = players.length === 0;
-    tournamentSetup.hidden = !couplesGenerated || tournamentState !== null;
+    tournamentSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
+    kingSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     // Keep max selectable groups in sync with available teams
     if (couplesGenerated && lastResult) {
       updateGroupOptions(lastResult.couples ? lastResult.couples.length : 0);
@@ -494,6 +534,114 @@
     });
     groupCountOptions.querySelector('[data-groups="1"]').classList.add('tournament-setup__opt--active');
     updateActionButtons();
+  }
+
+  // ─── King of the Court Handlers ──────────────────────────────────────────────
+
+  function handleKingConditionClick(e) {
+    const btn = e.target.closest('.king-setup__opt');
+    if (!btn || !btn.dataset.condition) return;
+    kingWinCondition = btn.dataset.condition;
+    kingWinConditionToggle.querySelectorAll('.king-setup__opt').forEach(function (b) {
+      b.classList.toggle('king-setup__opt--active', b.dataset.condition === kingWinCondition);
+    });
+  }
+
+  function handleKingTargetClick(e) {
+    const btn = e.target.closest('.king-setup__opt');
+    if (!btn || !btn.dataset.target) return;
+    kingTargetWins = parseInt(btn.dataset.target, 10);
+    kingTargetToggle.querySelectorAll('.king-setup__opt').forEach(function (b) {
+      b.classList.toggle('king-setup__opt--active', b.dataset.target === String(kingTargetWins));
+    });
+  }
+
+  function handleStartKing() {
+    if (!lastResult) return;
+    const teams = createTeams(lastResult);
+    if (teams.length < 2) return;
+    kingState = createKingGame(teams, kingWinCondition, kingTargetWins);
+    saveKingState();
+    kingSection.hidden = false;
+    renderKing();
+    updateActionButtons();
+    kingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function handleResetKing() {
+    if (!confirm(t('king.confirmReset'))) return;
+    kingState = null;
+    localStorage.removeItem('bv-king');
+    kingSection.hidden = true;
+    kingQueueList.innerHTML = '';
+    kingLogList.innerHTML = '';
+    updateActionButtons();
+  }
+
+  function handleRally(winnerSide) {
+    if (!kingState || kingState.winner) return;
+    kingState = recordRally(kingState, winnerSide);
+    saveKingState();
+    renderKing();
+  }
+
+  // ─── King of the Court Render ─────────────────────────────────────────────────
+
+  function renderKing() {
+    const king = getCurrentKing(kingState);
+    const challenger = getCurrentChallenger(kingState);
+    kingTeamName.textContent = king.name;
+    const wins = kingWinCondition === 'consecutive' ? kingState.kingWins : kingState.kingTotalWins;
+    kingWinsCount.textContent = wins;
+    kingWinsLabel.textContent = t('king.winsOf', { target: kingState.targetWins });
+    challengerTeamName.textContent = challenger.name;
+    renderKingQueue();
+    renderKingLog();
+    const isOver = isKingGameOver(kingState);
+    kingWinsBtn.disabled = isOver;
+    challengerWinsBtn.disabled = isOver;
+    kingWinnerBanner.hidden = !isOver;
+    if (isOver && kingState.winner) {
+      kingWinnerName.textContent = kingState.winner.name;
+    }
+  }
+
+  function renderKingQueue() {
+    kingQueueList.innerHTML = '';
+    kingState.queue.forEach(function (team, idx) {
+      const li = document.createElement('li');
+      li.className = 'king-queue__item animate__animated animate__fadeIn';
+      li.style.animationDelay = (idx * 30) + 'ms';
+      if (idx === 0) li.classList.add('king-queue__item--next');
+      li.textContent = escapeHTML(team.name);
+      kingQueueList.appendChild(li);
+    });
+  }
+
+  function renderKingLog() {
+    kingLogList.innerHTML = '';
+    const log = kingState.rallyLog.slice().reverse();
+    log.forEach(function (entry) {
+      const li = document.createElement('li');
+      li.className = 'king-log__entry king-log__entry--' + entry.winnerSide;
+      const winnerId = entry.winnerSide === 'king' ? entry.kingTeamId : entry.challengerTeamId;
+      const team = kingState.teams.find(function (tm) { return tm.id === winnerId; });
+      li.textContent = team
+        ? t('king.logEntry', { team: team.name, wins: entry.kingWinsAfter })
+        : '';
+      kingLogList.appendChild(li);
+    });
+  }
+
+  function saveKingState() {
+    try { localStorage.setItem('bv-king', JSON.stringify(kingState)); } catch (e) {}
+  }
+
+  function loadKingState() {
+    try {
+      const raw = localStorage.getItem('bv-king');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
   }
 
   function handleScoreEntry(matchId) {

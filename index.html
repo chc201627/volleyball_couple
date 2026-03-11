@@ -128,6 +128,28 @@
             Start Tournament
           </button>
         </div>
+        <!-- King of the Court Setup (shown after couples generated, no active tournament or king game) -->
+        <div class="king-setup" id="king-setup" hidden>
+          <div class="king-setup__options">
+            <span class="king-setup__label" data-i18n="king.winConditionLabel">Win Condition:</span>
+            <div class="king-setup__toggle" id="king-win-condition-toggle">
+              <button class="king-setup__opt king-setup__opt--active" data-condition="consecutive"
+                      type="button" data-i18n="king.condConsecutive">Consecutive</button>
+              <button class="king-setup__opt" data-condition="total"
+                      type="button" data-i18n="king.condTotal">Total</button>
+            </div>
+          </div>
+          <div class="king-setup__options">
+            <span class="king-setup__label" data-i18n="king.targetLabel">Target Wins:</span>
+            <div class="king-setup__toggle" id="king-target-toggle">
+              <button class="king-setup__opt king-setup__opt--active" data-target="5" type="button">5</button>
+              <button class="king-setup__opt" data-target="7" type="button">7</button>
+              <button class="king-setup__opt" data-target="10" type="button">10</button>
+            </div>
+          </div>
+          <button class="btn btn--success btn--large" id="start-king-btn"
+                  type="button" data-i18n="king.start">Start King of the Court</button>
+        </div>
       </div>
     </section>
 
@@ -139,6 +161,49 @@
       </div>
       <div class="unmatched" id="unmatched-notice" hidden>
         <!-- Unmatched player notice rendered by JS -->
+      </div>
+    </section>
+
+    <!-- King of the Court Section -->
+    <section class="section section--king" id="king-section" aria-labelledby="king-heading" hidden>
+      <div class="king-header">
+        <h2 id="king-heading" class="section__heading" data-i18n="king.heading">King of the Court</h2>
+        <button class="btn btn--warning btn--small" id="reset-king-btn"
+                type="button" data-i18n="king.reset">Reset King</button>
+      </div>
+      <div class="king-court">
+        <div class="king-court__throne" id="king-throne">
+          <div class="king-court__crown" aria-hidden="true">&#9819;</div>
+          <p class="king-court__role" data-i18n="king.roleKing">KING</p>
+          <p class="king-court__team-name" id="king-team-name">—</p>
+          <div class="king-court__wins">
+            <span id="king-wins-count">0</span>
+            <span class="king-court__wins-label" id="king-wins-label"></span>
+          </div>
+        </div>
+        <div class="king-court__vs" aria-hidden="true">VS</div>
+        <div class="king-court__challenger">
+          <p class="king-court__role" data-i18n="king.roleChallenger">CHALLENGER</p>
+          <p class="king-court__team-name" id="challenger-team-name">—</p>
+        </div>
+      </div>
+      <div class="king-actions" id="king-actions">
+        <button class="btn btn--success king-actions__btn" id="king-wins-btn"
+                type="button" data-i18n="king.kingWins">King Wins Rally</button>
+        <button class="btn btn--warning king-actions__btn" id="challenger-wins-btn"
+                type="button" data-i18n="king.challengerWins">Challenger Wins Rally</button>
+      </div>
+      <div class="king-queue">
+        <h3 class="king-queue__heading" data-i18n="king.queueHeading">Challengers Queue</h3>
+        <ol class="king-queue__list" id="king-queue-list"></ol>
+      </div>
+      <details class="king-log">
+        <summary class="king-log__summary" data-i18n="king.logHeading">Rally Log</summary>
+        <ol class="king-log__list" id="king-log-list" reversed></ol>
+      </details>
+      <div class="king-winner" id="king-winner-banner" hidden>
+        <p class="king-winner__title" data-i18n="king.winnerTitle">Champion!</p>
+        <p class="king-winner__name" id="king-winner-name">—</p>
       </div>
     </section>
 
@@ -176,6 +241,7 @@
   <script src="js/pairing.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/tournament.js"></script>
+  <script src="js/king-of-court.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
