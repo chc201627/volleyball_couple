@@ -22,14 +22,16 @@
  * @returns {Array<{ id: string, player1: object, player2: object, type: string, name: string }>}
  */
 function createTeams(couplesResult) {
-  const couples = (couplesResult && couplesResult.couples) ? couplesResult.couples : [];
+  const couples = (couplesResult && couplesResult.couples) ? couplesResult.couples : (couplesResult && couplesResult.teams ? couplesResult.teams : []);
   return couples.map(function (couple, index) {
+    const playersInTeam = couple.players || [couple.player1, couple.player2];
     return {
       id: 't' + index,
-      player1: couple.player1,
-      player2: couple.player2,
+      players: playersInTeam,
+      player1: playersInTeam[0],
+      player2: playersInTeam[1] || null,
       type: couple.type,
-      name: couple.player1.name + ' & ' + couple.player2.name,
+      name: playersInTeam.map(function (p) { return p.name; }).join(' & '),
     };
   });
 }

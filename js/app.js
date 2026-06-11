@@ -22,6 +22,7 @@
   let kingState = null;        // KingState object or null when no game active
   let kingWinCondition = 'consecutive'; // 'consecutive' | 'total'
   let kingTargetWins = 5;      // 5 | 7 | 10
+  let teamSize = 2;            // 2 | 3 | 4 - target size of teams
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -56,6 +57,8 @@
   const resultsSection = document.getElementById('results-section');
   const couplesGrid = document.getElementById('couples-grid');
   const unmatchedNotice = document.getElementById('unmatched-notice');
+
+  const matchTypeSelection = document.getElementById('match-type-selection');
 
   const tournamentSetup = document.getElementById('tournament-setup');
   const startTournamentBtn = document.getElementById('start-tournament-btn');
@@ -95,6 +98,7 @@
     regenerateBtn.addEventListener('click', handleGenerate);
     clearBtn.addEventListener('click', handleClearAll);
     pairingToggle.addEventListener('click', handlePairingModeClick);
+    matchTypeSelection.addEventListener('click', handleMatchTypeClick);
     manualPairBtn.addEventListener('click', handleManualPair);
     confirmManualBtn.addEventListener('click', handleConfirmManualCouples);
     selectMan.addEventListener('change', renderManualDropdowns);
@@ -319,15 +323,19 @@
     lastResult = null;
     manualPairs = [];
     pairingMode = 'random';
+    teamSize = 2;
     modeRandomBtn.classList.add('pairing-toggle__opt--active');
     modeManualBtn.classList.remove('pairing-toggle__opt--active');
+    document.querySelectorAll('.match-type__opt').forEach(function (b) {
+      b.classList.toggle('match-type__opt--active', parseInt(b.getAttribute('data-size'), 10) === 2);
+    });
     updateUI();
   }
 
-  // --- Generate Couples ---
+  // --- Generate Couples/Teams ---
 
   function handleGenerate() {
-    const result = generateCouples(players);
+    const result = teamSize === 2 ? generateCouples(players) : generateTeams(players, teamSize);
     couplesGenerated = true;
     lastResult = result;
     renderResults(result);
@@ -389,14 +397,28 @@
   }
 
   function updateActionButtons() {
-    const hasEnough = players.length >= 2;
+    const hasEnough = players.length >= teamSize;
 
-    // Mode toggle: only for the session creator with enough players
-    pairingToggle.hidden = isReadOnly || !hasEnough;
+    // Match type selection is only for the creator
+    matchTypeSelection.hidden = isReadOnly;
 
-    // Random mode controls
+    // Mode toggle: only for the session creator with enough players and teamSize === 2
+    pairingToggle.hidden = isReadOnly || !hasEnough || teamSize > 2;
+
+    // Random/manual controls
     generateBtn.hidden   = pairingMode !== 'random';
     generateBtn.disabled = !hasEnough;
+
+    if (teamSize === 2) {
+      generateBtn.textContent = t('actions.generate');
+      regenerateBtn.textContent = t('actions.regenerate');
+      generateHint.textContent = t('actions.hint');
+    } else {
+      generateBtn.textContent = t('actions.generateTeams');
+      regenerateBtn.textContent = t('actions.regenerateTeams');
+      generateHint.textContent = t('actions.hintTeams', { n: teamSize });
+    }
+
     generateHint.hidden  = hasEnough || pairingMode !== 'random';
     regenerateBtn.hidden = !couplesGenerated || pairingMode !== 'random';
 
@@ -412,53 +434,110 @@
     kingSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     // Keep max selectable groups in sync with available teams
     if (couplesGenerated && lastResult) {
-      updateGroupOptions(lastResult.couples ? lastResult.couples.length : 0);
+      const teamCount = lastResult.teams ? lastResult.teams.length : (lastResult.couples ? lastResult.couples.length : 0);
+      updateGroupOptions(teamCount);
     }
   }
 
-  function renderResults({ couples, unmatched }) {
+  function renderResults(result) {
     resultsSection.hidden = false;
     couplesGrid.innerHTML = '';
 
-    couples.forEach((couple, i) => {
+    const teams = result.teams || result.couples || [];
+    const isCouple = teamSize === 2;
+
+    const resultsHeading = document.getElementById('results-heading');
+    if (resultsHeading) {
+      resultsHeading.setAttribute('data-i18n', isCouple ? 'results.heading' : 'results.headingTeams');
+      resultsHeading.textContent = t(isCouple ? 'results.heading' : 'results.headingTeams');
+    }
+
+    teams.forEach((team, i) => {
       const card = document.createElement('div');
-      card.className = `couple-card couple-card--${couple.type} animate__animated animate__fadeInUp`;
+      card.className = `couple-card couple-card--${team.type} animate__animated animate__fadeInUp`;
       card.style.animationDelay = `${i * 80}ms`;
-      const typeLabel = couple.type === 'mixed' ? t('results.typeMixed') : t('results.typeSame');
-      const badge1 = couple.player1.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
-      const badge2 = couple.player2.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+      const typeLabel = team.type === 'mixed' ? t('results.typeMixed') : t('results.typeSame');
+      const cardTitle = isCouple ? t('results.couple', { n: i + 1 }) : t('results.team', { n: i + 1 });
+      
+      let playersHTML = '';
+      const teamPlayers = team.players || [team.player1, team.player2];
+      teamPlayers.forEach(player => {
+        const badge = player.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        playersHTML += `
+          <p class="couple-card__player">
+            ${escapeHTML(player.name)}
+            <span class="player-list__badge player-list__badge--${player.gender}">
+              ${badge}
+            </span>
+          </p>
+        `;
+      });
+
       card.innerHTML = `
-        <p class="couple-card__title">${escapeHTML(t('results.couple', { n: i + 1 }))} <span class="couple-card__type couple-card__type--${couple.type}">${escapeHTML(typeLabel)}</span></p>
-        <p class="couple-card__player">
-          ${escapeHTML(couple.player1.name)}
-          <span class="player-list__badge player-list__badge--${couple.player1.gender}">
-            ${badge1}
-          </span>
-        </p>
-        <p class="couple-card__player">
-          ${escapeHTML(couple.player2.name)}
-          <span class="player-list__badge player-list__badge--${couple.player2.gender}">
-            ${badge2}
-          </span>
-        </p>
+        <p class="couple-card__title">${escapeHTML(cardTitle)} <span class="couple-card__type couple-card__type--${team.type}">${escapeHTML(typeLabel)}</span></p>
+        ${playersHTML}
       `;
       couplesGrid.appendChild(card);
     });
 
-    if (unmatched) {
+    const unmatched = result.unmatched;
+    if (unmatched && (Array.isArray(unmatched) ? unmatched.length > 0 : unmatched)) {
       unmatchedNotice.hidden = false;
-      const unmatchedBadge = unmatched.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
-      unmatchedNotice.innerHTML = `
-        <p class="unmatched__title">${escapeHTML(t('results.unmatched', { name: unmatched.name }))}
-          <span class="player-list__badge player-list__badge--${unmatched.gender}">
-            ${unmatchedBadge}
-          </span>
-        </p>
-        <p class="unmatched__text">${escapeHTML(t('results.unmatchedExplain'))}</p>
-      `;
+      const unmatchedList = Array.isArray(unmatched) ? unmatched : [unmatched];
+      
+      let unmatchedHTML = '';
+      if (unmatchedList.length === 1) {
+        const u = unmatchedList[0];
+        const badge = u.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        unmatchedHTML = `
+          <p class="unmatched__title">${escapeHTML(t('results.unmatched', { name: u.name }))}
+            <span class="player-list__badge player-list__badge--${u.gender}">
+              ${badge}
+            </span>
+          </p>
+          <p class="unmatched__text">${escapeHTML(t('results.unmatchedExplain'))}</p>
+        `;
+      } else {
+        // Multiple unmatched players (for 3vs3 and 4vs4)
+        unmatchedHTML = `<p class="unmatched__title">${escapeHTML(t('results.unmatchedMultiple'))}</p>`;
+        unmatchedList.forEach(u => {
+          const badge = u.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+          unmatchedHTML += `
+            <p class="unmatched__player" style="margin-top: 6px;">
+              ${escapeHTML(u.name)}
+              <span class="player-list__badge player-list__badge--${u.gender}">
+                ${badge}
+              </span>
+            </p>
+          `;
+        });
+        unmatchedHTML += `<p class="unmatched__text">${escapeHTML(t('results.unmatchedExplainMultiple'))}</p>`;
+      }
+      unmatchedNotice.innerHTML = unmatchedHTML;
     } else {
       unmatchedNotice.hidden = true;
     }
+  }
+
+  function handleMatchTypeClick(e) {
+    var btn = e.target.closest('.match-type__opt');
+    if (!btn) return;
+    var newSize = parseInt(btn.getAttribute('data-size'), 10);
+    if (newSize === teamSize) return;
+
+    teamSize = newSize;
+    couplesGenerated = false;
+    lastResult = null;
+    manualPairs = [];
+    if (teamSize > 2) {
+      pairingMode = 'random';
+    }
+
+    document.querySelectorAll('.match-type__opt').forEach(function (b) {
+      b.classList.toggle('match-type__opt--active', parseInt(b.getAttribute('data-size'), 10) === teamSize);
+    });
+
+    updateUI();
   }
 
   // --- Tournament Handlers ---

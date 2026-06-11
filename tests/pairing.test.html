@@ -170,6 +170,42 @@
       assert(countByType(couples, 'mixed') === 100, 'Edge: 200 players → all mixed');
     })();
 
+    // --- 3vs3 Matching: 4M, 2F (teamSize = 3) ---
+    (function () {
+      const { teams, unmatched } = generateTeams(makePlayers(4, 2), 3);
+      assert(teams.length === 2, '3vs3 matching: 6 players → 2 teams of 3', `Got ${teams.length}`);
+      assert(teams.every(t => t.players.length === 3), '3vs3 matching: all teams have exactly 3 players');
+      // Total 4M + 2F. We can make both teams mixed:
+      // Since each team needs at least 1M, 1F, and we have 2F total, we must put 1F in each team.
+      // So both teams must be mixed!
+      assert(teams.filter(t => t.type === 'mixed').length === 2, '3vs3 matching: both teams are mixed-gender');
+      assert(unmatched.length === 0, '3vs3 matching: no unmatched players');
+    })();
+
+    // --- 3vs3 Matching: 5M, 2F (teamSize = 3) ---
+    (function () {
+      const { teams, unmatched } = generateTeams(makePlayers(5, 2), 3);
+      assert(teams.length === 2, '3vs3 matching: 7 players → 2 teams of 3', `Got ${teams.length}`);
+      assert(unmatched.length === 1 && unmatched[0].gender === 'male', '3vs3 matching: 1 unmatched male player');
+    })();
+
+    // --- 4vs4 Matching: 5M, 3F (teamSize = 4) ---
+    (function () {
+      const { teams, unmatched } = generateTeams(makePlayers(5, 3), 4);
+      assert(teams.length === 2, '4vs4 matching: 8 players → 2 teams of 4', `Got ${teams.length}`);
+      assert(teams.every(t => t.players.length === 4), '4vs4 matching: all teams have exactly 4 players');
+      assert(teams.filter(t => t.type === 'mixed').length === 2, '4vs4 matching: both teams are mixed-gender');
+      assert(unmatched.length === 0, '4vs4 matching: no unmatched players');
+    })();
+
+    // --- 4vs4 Matching: 8M, 0F (teamSize = 4) ---
+    (function () {
+      const { teams, unmatched } = generateTeams(makePlayers(8, 0), 4);
+      assert(teams.length === 2, '4vs4 matching: 8 players → 2 same-gender teams of 4');
+      assert(teams.every(t => t.type === 'same'), '4vs4 matching: all teams are same-gender');
+      assert(unmatched.length === 0, '4vs4 matching: no unmatched players');
+    })();
+
     // --- Summary ---
     const total = passed + failed;
     const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';

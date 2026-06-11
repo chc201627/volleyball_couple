@@ -44,17 +44,24 @@ var t, setLanguage, getLanguage;
       'players.badgeFemale': 'F',
       // Actions
       'actions.generate': 'Generate Couples',
+      'actions.generateTeams': 'Generate Teams',
       'actions.regenerate': 'Regenerate Couples',
+      'actions.regenerateTeams': 'Regenerate Teams',
       'actions.clearAll': 'Clear All Players',
       'actions.hint': 'Add at least 2 players to generate couples',
+      'actions.hintTeams': 'Add at least {n} players to generate teams',
       'actions.confirmClear': 'Are you sure you want to remove all players?',
       // Results
       'results.heading': 'Generated Couples',
+      'results.headingTeams': 'Generated Teams',
       'results.couple': 'Couple {n}',
+      'results.team': 'Team {n}',
       'results.typeMixed': 'Mixed',
       'results.typeSame': 'Same Gender',
       'results.unmatched': 'Unmatched Player: {name}',
       'results.unmatchedExplain': 'This player could not be paired due to an odd number of players.',
+      'results.unmatchedMultiple': 'Unmatched Players',
+      'results.unmatchedExplainMultiple': 'These players could not be grouped because they did not form a complete team.',
       // Tournament
       'tournament.groupsLabel': 'Groups:',
       'tournament.groupOption': '{n} Group(s)',
@@ -83,6 +90,11 @@ var t, setLanguage, getLanguage;
       'tournament.error.scoreNegative': 'Scores must be 0 or higher',
       'tournament.error.scoreDraw': 'Scores cannot be equal (no draws in volleyball)',
       'tournament.error.scoreNotInt': 'Scores must be whole numbers',
+      // Match Type
+      'matchType.label': 'Match Type',
+      'matchType.2v2': '2vs2 (Couples)',
+      'matchType.3v3': '3vs3',
+      'matchType.4v4': '4vs4',
       // Pairing mode
       'pairing.modeLabel': 'Pairing Mode',
       'pairing.modeRandom': 'Random',
@@ -144,17 +156,24 @@ var t, setLanguage, getLanguage;
       'players.badgeFemale': 'F',
       // Acciones
       'actions.generate': 'Generar Parejas',
+      'actions.generateTeams': 'Generar Equipos',
       'actions.regenerate': 'Regenerar Parejas',
+      'actions.regenerateTeams': 'Regenerar Equipos',
       'actions.clearAll': 'Eliminar Todos',
       'actions.hint': 'Agrega al menos 2 jugadores para generar parejas',
+      'actions.hintTeams': 'Agrega al menos {n} jugadores para generar equipos',
       'actions.confirmClear': '\u00bfEst\u00e1s seguro de que quieres eliminar todos los jugadores?',
       // Resultados
       'results.heading': 'Parejas Generadas',
+      'results.headingTeams': 'Equipos Generados',
       'results.couple': 'Pareja {n}',
+      'results.team': 'Equipo {n}',
       'results.typeMixed': 'Mixta',
       'results.typeSame': 'Mismo G\u00e9nero',
       'results.unmatched': 'Jugador sin pareja: {name}',
       'results.unmatchedExplain': 'Este jugador no pudo ser emparejado debido a un n\u00famero impar de jugadores.',
+      'results.unmatchedMultiple': 'Jugadores sin equipo',
+      'results.unmatchedExplainMultiple': 'Estos jugadores no pudieron ser agrupados debido a que no completaban un equipo.',
       // Torneo
       'tournament.groupsLabel': 'Grupos:',
       'tournament.groupOption': '{n} Grupo(s)',
@@ -183,6 +202,11 @@ var t, setLanguage, getLanguage;
       'tournament.error.scoreNegative': 'Los resultados deben ser 0 o mayores',
       'tournament.error.scoreDraw': 'Los resultados no pueden ser iguales (no hay empates en v\u00f3ley)',
       'tournament.error.scoreNotInt': 'Los resultados deben ser n\u00fameros enteros',
+      // Tipo de Partido
+      'matchType.label': 'Tipo de Partido',
+      'matchType.2v2': '2vs2 (Parejas)',
+      'matchType.3v3': '3vs3',
+      'matchType.4v4': '4vs4',
       // Modo de emparejamiento
       'pairing.modeLabel': 'Modo de Emparejamiento',
       'pairing.modeRandom': 'Aleatorio',
