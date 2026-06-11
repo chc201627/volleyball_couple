@@ -68,6 +68,22 @@
     <section class="section section--actions" aria-labelledby="actions-heading">
       <h2 id="actions-heading" class="sr-only">Actions</h2>
       <div class="actions">
+        <!-- Match Type Selector (hidden for read-only viewers via JS) -->
+        <div class="match-type" id="match-type-selection" hidden>
+          <span class="match-type__label" data-i18n="matchType.label">Match Type</span>
+          <div class="match-type__options" role="group">
+            <button class="match-type__opt match-type__opt--active"
+                    id="type-2v2-btn" type="button" data-size="2"
+                    data-i18n="matchType.2v2">2vs2 (Couples)</button>
+            <button class="match-type__opt"
+                    id="type-3v3-btn" type="button" data-size="3"
+                    data-i18n="matchType.3v3">3vs3</button>
+            <button class="match-type__opt"
+                    id="type-4v4-btn" type="button" data-size="4"
+                    data-i18n="matchType.4v4">4vs4</button>
+          </div>
+        </div>
+
         <!-- Pairing Mode Toggle (hidden for read-only viewers via JS) -->
         <div class="pairing-toggle" id="pairing-toggle" hidden>
           <span class="pairing-toggle__label" data-i18n="pairing.modeLabel">Pairing Mode</span>

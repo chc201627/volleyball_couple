@@ -406,6 +406,50 @@ select {
   color: var(--color-white);
 }
 
+/* --- Match Type Selector --- */
+.match-type {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.match-type__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.match-type__options {
+  display: flex;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.match-type__opt {
+  padding: 8px 18px;
+  border: none;
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+.match-type__opt:hover:not(.match-type__opt--active) {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+.match-type__opt--active {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
 /* --- Manual Pairing Panel --- */
 .manual-pairing {
   display: flex;

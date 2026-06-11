@@ -22,6 +22,7 @@
   let kingState = null;        // KingState object or null when no game active
   let kingWinCondition = 'consecutive'; // 'consecutive' | 'total'
   let kingTargetWins = 5;      // 5 | 7 | 10
+  let teamSize = 2;            // 2 | 3 | 4 - target size of teams
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -46,8 +47,6 @@
   const modeRandomBtn      = document.getElementById('mode-random-btn');
   const modeManualBtn      = document.getElementById('mode-manual-btn');
   const manualPairingPanel = document.getElementById('manual-pairing-panel');
-  const selectMan          = document.getElementById('select-man');
-  const selectWoman        = document.getElementById('select-woman');
   const manualPairBtn      = document.getElementById('manual-pair-btn');
   const manualPairsList    = document.getElementById('manual-pairs-list');
   const manualPairsEmpty   = document.getElementById('manual-pairs-empty');
@@ -56,6 +55,8 @@
   const resultsSection = document.getElementById('results-section');
   const couplesGrid = document.getElementById('couples-grid');
   const unmatchedNotice = document.getElementById('unmatched-notice');
+
+  const matchTypeSelection = document.getElementById('match-type-selection');
 
   const tournamentSetup = document.getElementById('tournament-setup');
   const startTournamentBtn = document.getElementById('start-tournament-btn');
@@ -95,10 +96,9 @@
     regenerateBtn.addEventListener('click', handleGenerate);
     clearBtn.addEventListener('click', handleClearAll);
     pairingToggle.addEventListener('click', handlePairingModeClick);
+    matchTypeSelection.addEventListener('click', handleMatchTypeClick);
     manualPairBtn.addEventListener('click', handleManualPair);
     confirmManualBtn.addEventListener('click', handleConfirmManualCouples);
-    selectMan.addEventListener('change', renderManualDropdowns);
-    selectWoman.addEventListener('change', renderManualDropdowns);
     startTournamentBtn.addEventListener('click', handleStartTournament);
     resetTournamentBtn.addEventListener('click', handleResetTournament);
     shareTournamentBtn.addEventListener('click', handleShareTournament);
@@ -291,7 +291,10 @@
 
   function removePlayer(id) {
     if (pairingMode === 'manual') {
-      manualPairs = manualPairs.filter(p => p.player1.id !== id && p.player2.id !== id);
+      manualPairs = manualPairs.filter(function (pair) {
+        var playersInTeam = pair.players || [pair.player1, pair.player2];
+        return !playersInTeam.some(function (p) { return p.id === id; });
+      });
     }
     const idx = players.findIndex(p => p.id === id);
     if (idx === -1) return;
@@ -319,15 +322,19 @@
     lastResult = null;
     manualPairs = [];
     pairingMode = 'random';
+    teamSize = 2;
     modeRandomBtn.classList.add('pairing-toggle__opt--active');
     modeManualBtn.classList.remove('pairing-toggle__opt--active');
+    document.querySelectorAll('.match-type__opt').forEach(function (b) {
+      b.classList.toggle('match-type__opt--active', parseInt(b.getAttribute('data-size'), 10) === 2);
+    });
     updateUI();
   }
 
-  // --- Generate Couples ---
+  // --- Generate Couples/Teams ---
 
   function handleGenerate() {
-    const result = generateCouples(players);
+    const result = teamSize === 2 ? generateCouples(players) : generateTeams(players, teamSize);
     couplesGenerated = true;
     lastResult = result;
     renderResults(result);
@@ -389,14 +396,28 @@
   }
 
   function updateActionButtons() {
-    const hasEnough = players.length >= 2;
+    const hasEnough = players.length >= teamSize;
+
+    // Match type selection is only for the creator
+    matchTypeSelection.hidden = isReadOnly;
 
     // Mode toggle: only for the session creator with enough players
     pairingToggle.hidden = isReadOnly || !hasEnough;
 
-    // Random mode controls
+    // Random/manual controls
     generateBtn.hidden   = pairingMode !== 'random';
     generateBtn.disabled = !hasEnough;
+
+    if (teamSize === 2) {
+      generateBtn.textContent = t('actions.generate');
+      regenerateBtn.textContent = t('actions.regenerate');
+      generateHint.textContent = t('actions.hint');
+    } else {
+      generateBtn.textContent = t('actions.generateTeams');
+      regenerateBtn.textContent = t('actions.regenerateTeams');
+      generateHint.textContent = t('actions.hintTeams', { n: teamSize });
+    }
+
     generateHint.hidden  = hasEnough || pairingMode !== 'random';
     regenerateBtn.hidden = !couplesGenerated || pairingMode !== 'random';
 
@@ -412,53 +433,108 @@
     kingSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     // Keep max selectable groups in sync with available teams
     if (couplesGenerated && lastResult) {
-      updateGroupOptions(lastResult.couples ? lastResult.couples.length : 0);
+      const teamCount = lastResult.teams ? lastResult.teams.length : (lastResult.couples ? lastResult.couples.length : 0);
+      updateGroupOptions(teamCount);
     }
   }
 
-  function renderResults({ couples, unmatched }) {
+  function renderResults(result) {
     resultsSection.hidden = false;
     couplesGrid.innerHTML = '';
 
-    couples.forEach((couple, i) => {
+    const teams = result.teams || result.couples || [];
+    const isCouple = teamSize === 2;
+
+    const resultsHeading = document.getElementById('results-heading');
+    if (resultsHeading) {
+      resultsHeading.setAttribute('data-i18n', isCouple ? 'results.heading' : 'results.headingTeams');
+      resultsHeading.textContent = t(isCouple ? 'results.heading' : 'results.headingTeams');
+    }
+
+    teams.forEach((team, i) => {
       const card = document.createElement('div');
-      card.className = `couple-card couple-card--${couple.type} animate__animated animate__fadeInUp`;
+      card.className = `couple-card couple-card--${team.type} animate__animated animate__fadeInUp`;
       card.style.animationDelay = `${i * 80}ms`;
-      const typeLabel = couple.type === 'mixed' ? t('results.typeMixed') : t('results.typeSame');
-      const badge1 = couple.player1.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
-      const badge2 = couple.player2.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+      const typeLabel = team.type === 'mixed' ? t('results.typeMixed') : t('results.typeSame');
+      const cardTitle = isCouple ? t('results.couple', { n: i + 1 }) : t('results.team', { n: i + 1 });
+      
+      let playersHTML = '';
+      const teamPlayers = team.players || [team.player1, team.player2];
+      teamPlayers.forEach(player => {
+        const badge = player.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        playersHTML += `
+          <p class="couple-card__player">
+            ${escapeHTML(player.name)}
+            <span class="player-list__badge player-list__badge--${player.gender}">
+              ${badge}
+            </span>
+          </p>
+        `;
+      });
+
       card.innerHTML = `
-        <p class="couple-card__title">${escapeHTML(t('results.couple', { n: i + 1 }))} <span class="couple-card__type couple-card__type--${couple.type}">${escapeHTML(typeLabel)}</span></p>
-        <p class="couple-card__player">
-          ${escapeHTML(couple.player1.name)}
-          <span class="player-list__badge player-list__badge--${couple.player1.gender}">
-            ${badge1}
-          </span>
-        </p>
-        <p class="couple-card__player">
-          ${escapeHTML(couple.player2.name)}
-          <span class="player-list__badge player-list__badge--${couple.player2.gender}">
-            ${badge2}
-          </span>
-        </p>
+        <p class="couple-card__title">${escapeHTML(cardTitle)} <span class="couple-card__type couple-card__type--${team.type}">${escapeHTML(typeLabel)}</span></p>
+        ${playersHTML}
       `;
       couplesGrid.appendChild(card);
     });
 
-    if (unmatched) {
+    const unmatched = result.unmatched;
+    if (unmatched && (Array.isArray(unmatched) ? unmatched.length > 0 : unmatched)) {
       unmatchedNotice.hidden = false;
-      const unmatchedBadge = unmatched.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
-      unmatchedNotice.innerHTML = `
-        <p class="unmatched__title">${escapeHTML(t('results.unmatched', { name: unmatched.name }))}
-          <span class="player-list__badge player-list__badge--${unmatched.gender}">
-            ${unmatchedBadge}
-          </span>
-        </p>
-        <p class="unmatched__text">${escapeHTML(t('results.unmatchedExplain'))}</p>
-      `;
+      const unmatchedList = Array.isArray(unmatched) ? unmatched : [unmatched];
+      
+      let unmatchedHTML = '';
+      if (unmatchedList.length === 1) {
+        const u = unmatchedList[0];
+        const badge = u.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        unmatchedHTML = `
+          <p class="unmatched__title">${escapeHTML(t('results.unmatched', { name: u.name }))}
+            <span class="player-list__badge player-list__badge--${u.gender}">
+              ${badge}
+            </span>
+          </p>
+          <p class="unmatched__text">${escapeHTML(t('results.unmatchedExplain'))}</p>
+        `;
+      } else {
+        // Multiple unmatched players (for 3vs3 and 4vs4)
+        unmatchedHTML = `<p class="unmatched__title">${escapeHTML(t('results.unmatchedMultiple'))}</p>`;
+        unmatchedList.forEach(u => {
+          const badge = u.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+          unmatchedHTML += `
+            <p class="unmatched__player" style="margin-top: 6px;">
+              ${escapeHTML(u.name)}
+              <span class="player-list__badge player-list__badge--${u.gender}">
+                ${badge}
+              </span>
+            </p>
+          `;
+        });
+        unmatchedHTML += `<p class="unmatched__text">${escapeHTML(t('results.unmatchedExplainMultiple'))}</p>`;
+      }
+      unmatchedNotice.innerHTML = unmatchedHTML;
     } else {
       unmatchedNotice.hidden = true;
     }
+  }
+
+  function handleMatchTypeClick(e) {
+    var btn = e.target.closest('.match-type__opt');
+    if (!btn) return;
+    var newSize = parseInt(btn.getAttribute('data-size'), 10);
+    if (newSize === teamSize) return;
+
+    teamSize = newSize;
+    couplesGenerated = false;
+    lastResult = null;
+    manualPairs = [];
+    // pairingMode is preserved
+
+    document.querySelectorAll('.match-type__opt').forEach(function (b) {
+      b.classList.toggle('match-type__opt--active', parseInt(b.getAttribute('data-size'), 10) === teamSize);
+    });
+
+    updateUI();
   }
 
   // --- Tournament Handlers ---
@@ -1085,50 +1161,127 @@
     updateUI();
   }
 
+  function getManualSelectors() {
+    var selectorsContainer = document.querySelector('.manual-pairing__selectors');
+    if (!selectorsContainer) return [];
+    var selects = selectorsContainer.querySelectorAll('.form__select');
+    return Array.prototype.slice.call(selects);
+  }
+
+  function getTeamType(teamPlayers) {
+    var hasMale = teamPlayers.some(function (p) { return p.gender === 'male'; });
+    var hasFemale = teamPlayers.some(function (p) { return p.gender === 'female'; });
+    return (hasMale && hasFemale) ? 'mixed' : 'same';
+  }
+
   function renderManualDropdowns() {
+    var selectorsContainer = document.querySelector('.manual-pairing__selectors');
+    if (!selectorsContainer) return;
+
     var pairedIds = new Set();
     manualPairs.forEach(function (pair) {
-      pairedIds.add(pair.player1.id);
-      pairedIds.add(pair.player2.id);
+      var playersInTeam = pair.players || [pair.player1, pair.player2];
+      playersInTeam.forEach(function (p) {
+        pairedIds.add(p.id);
+      });
     });
 
     var available = players.filter(function (p) { return !pairedIds.has(p.id); });
 
-    var prevP1 = selectMan.value;
-    var prevP2 = selectWoman.value;
-
-    // Player 1: all available except what's currently selected in Player 2
-    selectMan.innerHTML = '<option value="" disabled selected>' + escapeHTML(t('pairing.selectMan')) + '</option>';
-    available.forEach(function (p) {
-      if (String(p.id) === prevP2) return;
-      var opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      selectMan.appendChild(opt);
+    var selects = selectorsContainer.querySelectorAll('.form__select');
+    var currentValues = [];
+    selects.forEach(function (sel) {
+      currentValues.push(sel.value);
     });
-    if (prevP1 && prevP1 !== prevP2 && available.some(function (p) { return String(p.id) === prevP1; })) {
-      selectMan.value = prevP1;
+
+    var currentGroups = selectorsContainer.querySelectorAll('.manual-pairing__selector-group');
+    currentGroups.forEach(function (el) {
+      el.remove();
+    });
+
+    for (var i = 0; i < teamSize; i++) {
+      var group = document.createElement('div');
+      group.className = 'manual-pairing__selector-group';
+
+      var label = document.createElement('label');
+      label.className = 'form__label';
+      label.htmlFor = 'select-player-' + i;
+      label.textContent = t('pairing.selectPlayerX', { n: i + 1 });
+
+      var select = document.createElement('select');
+      select.className = 'form__select';
+      select.id = 'select-player-' + i;
+      select.addEventListener('change', renderManualDropdowns);
+
+      var defOpt = document.createElement('option');
+      defOpt.value = '';
+      defOpt.disabled = true;
+      defOpt.selected = !currentValues[i];
+      defOpt.textContent = t('pairing.selectPlayerX', { n: i + 1 });
+      select.appendChild(defOpt);
+
+      group.appendChild(label);
+      group.appendChild(select);
+      selectorsContainer.insertBefore(group, manualPairBtn);
     }
 
-    // Player 2: all available except what's currently selected in Player 1
-    var p1Now = selectMan.value;
-    selectWoman.innerHTML = '<option value="" disabled selected>' + escapeHTML(t('pairing.selectWoman')) + '</option>';
-    available.forEach(function (p) {
-      if (String(p.id) === p1Now) return;
-      var opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      selectWoman.appendChild(opt);
+    var newSelects = selectorsContainer.querySelectorAll('.form__select');
+    newSelects.forEach(function (sel, k) {
+      var prevVal = currentValues[k];
+      var otherSelected = currentValues.filter(function (val, idx) {
+        return idx !== k && val !== '';
+      });
+
+      sel.innerHTML = '';
+      var defOpt = document.createElement('option');
+      defOpt.value = '';
+      defOpt.disabled = true;
+      defOpt.selected = !prevVal;
+      defOpt.textContent = t('pairing.selectPlayerX', { n: k + 1 });
+      sel.appendChild(defOpt);
+
+      available.forEach(function (p) {
+        if (otherSelected.indexOf(String(p.id)) !== -1) return;
+        var opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        opt.selected = prevVal && String(p.id) === prevVal;
+        sel.appendChild(opt);
+      });
+
+      if (prevVal && otherSelected.indexOf(prevVal) === -1 && available.some(function (p) { return String(p.id) === prevVal; })) {
+        sel.value = prevVal;
+      } else {
+        sel.value = '';
+      }
     });
-    if (prevP2 && prevP2 !== p1Now && available.some(function (p) { return String(p.id) === prevP2; })) {
-      selectWoman.value = prevP2;
+
+    var manualHint = document.querySelector('.manual-pairing__hint');
+    if (manualHint) {
+      var hintKey = teamSize === 2 ? 'pairing.manualHint' : 'pairing.manualHintTeams';
+      manualHint.setAttribute('data-i18n', hintKey);
+      manualHint.textContent = t(hintKey);
+    }
+    if (manualPairsEmpty) {
+      var emptyKey = teamSize === 2 ? 'pairing.noPaired' : 'pairing.noPairedTeams';
+      manualPairsEmpty.setAttribute('data-i18n', emptyKey);
+      manualPairsEmpty.textContent = t(emptyKey);
+    }
+    if (confirmManualBtn) {
+      var confirmKey = teamSize === 2 ? 'pairing.confirmBtn' : 'pairing.confirmBtnTeams';
+      confirmManualBtn.setAttribute('data-i18n', confirmKey);
+      confirmManualBtn.textContent = t(confirmKey);
     }
 
     updateManualPairBtnState();
   }
 
   function updateManualPairBtnState() {
-    manualPairBtn.disabled = !(selectMan.value && selectWoman.value);
+    var selects = getManualSelectors();
+    var allSelected = selects.length > 0 && selects.every(function (sel) {
+      return sel.value !== '';
+    });
+    manualPairBtn.disabled = !allSelected;
   }
 
   function renderManualPairsList() {
@@ -1139,22 +1292,25 @@
       var li = document.createElement('li');
       li.className = 'manual-pairing__pair-item animate__animated animate__fadeIn';
 
-      var badge1 = pair.player1.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
-      var badge2 = pair.player2.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
-
+      var playersInTeam = pair.players || [pair.player1, pair.player2];
       var namesEl = document.createElement('span');
       namesEl.className = 'manual-pairing__pair-names';
-      namesEl.innerHTML =
-        escapeHTML(pair.player1.name) +
-        ' <span class="player-list__badge player-list__badge--' + pair.player1.gender + '">' + badge1 + '</span>' +
-        ' <span class="manual-pairing__pair-sep">&amp;</span> ' +
-        escapeHTML(pair.player2.name) +
-        ' <span class="player-list__badge player-list__badge--' + pair.player2.gender + '">' + badge2 + '</span>';
+
+      var html = '';
+      playersInTeam.forEach(function (player, pIdx) {
+        var badge = player.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        if (pIdx > 0) {
+          html += ' <span class="manual-pairing__pair-sep">&amp;</span> ';
+        }
+        html += escapeHTML(player.name) +
+          ' <span class="player-list__badge player-list__badge--' + player.gender + '">' + badge + '</span>';
+      });
+      namesEl.innerHTML = html;
 
       var removeBtn = document.createElement('button');
       removeBtn.className = 'manual-pairing__remove';
       removeBtn.type = 'button';
-      removeBtn.setAttribute('aria-label', t('pairing.removePair'));
+      removeBtn.setAttribute('aria-label', t(teamSize === 2 ? 'pairing.removePair' : 'pairing.removePairTeams'));
       removeBtn.innerHTML = '&times;';
       removeBtn.addEventListener('click', (function (i) {
         return function () { removeManualPair(i); };
@@ -1167,17 +1323,28 @@
   }
 
   function handleManualPair() {
-    var manId   = selectMan.value;
-    var womanId = selectWoman.value;
-    if (!manId || !womanId) return;
+    var selects = getManualSelectors();
+    var selectedIds = [];
+    for (var i = 0; i < selects.length; i++) {
+      var val = selects[i].value;
+      if (!val) return;
+      selectedIds.push(val);
+    }
 
-    var man   = players.find(function (p) { return String(p.id) === manId; });
-    var woman = players.find(function (p) { return String(p.id) === womanId; });
-    if (!man || !woman) return;
+    var selectedPlayers = selectedIds.map(function (id) {
+      return players.find(function (p) { return String(p.id) === id; });
+    });
+    if (selectedPlayers.some(function (p) { return !p; })) return;
 
-    manualPairs.push({ player1: man, player2: woman });
-    selectMan.value   = '';
-    selectWoman.value = '';
+    if (teamSize === 2) {
+      manualPairs.push({ player1: selectedPlayers[0], player2: selectedPlayers[1] });
+    } else {
+      manualPairs.push({ players: selectedPlayers });
+    }
+
+    selects.forEach(function (sel) {
+      sel.value = '';
+    });
 
     renderManualDropdowns();
     renderManualPairsList();
@@ -1190,24 +1357,38 @@
   }
 
   function handleConfirmManualCouples() {
-    var confirmedCouples = manualPairs.map(function (pair) {
-      var type = (pair.player1.gender !== pair.player2.gender) ? 'mixed' : 'same';
-      return { player1: pair.player1, player2: pair.player2, type: type };
+    var confirmedTeams = manualPairs.map(function (pair) {
+      var playersInTeam = pair.players || [pair.player1, pair.player2];
+      var type = getTeamType(playersInTeam);
+      if (teamSize === 2) {
+        return { player1: playersInTeam[0], player2: playersInTeam[1], type: type };
+      }
+      return { players: playersInTeam, type: type };
     });
 
     var pairedIds = new Set();
     manualPairs.forEach(function (pair) {
-      pairedIds.add(pair.player1.id);
-      pairedIds.add(pair.player2.id);
+      var playersInTeam = pair.players || [pair.player1, pair.player2];
+      playersInTeam.forEach(function (p) {
+        pairedIds.add(p.id);
+      });
     });
 
     var remainingPlayers = players.filter(function (p) { return !pairedIds.has(p.id); });
-    var autoResult = generateCouples(remainingPlayers);
-
-    lastResult = {
-      couples:   confirmedCouples.concat(autoResult.couples),
-      unmatched: autoResult.unmatched,
-    };
+    
+    if (teamSize === 2) {
+      var autoResult = generateCouples(remainingPlayers);
+      lastResult = {
+        couples: confirmedTeams.concat(autoResult.couples),
+        unmatched: autoResult.unmatched,
+      };
+    } else {
+      var autoResult = generateTeams(remainingPlayers, teamSize);
+      lastResult = {
+        teams: confirmedTeams.concat(autoResult.teams),
+        unmatched: autoResult.unmatched,
+      };
+    }
 
     couplesGenerated = true;
     renderResults(lastResult);

@@ -30,13 +30,22 @@
       <p class="header__subtitle" data-i18n="page.subtitle">Register players and generate random couples for your game</p>
     </header>
     <main class="main">
+      <!-- Input Section -->
       <section class="section section--input" aria-labelledby="input-heading">
         <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
         <form class="form" id="player-form" novalidate>
           <div class="form__group">
             <label class="form__label" for="player-name" data-i18n="form.nameLabel">Player Name</label>
-            <input class="form__input" type="text" id="player-name" name="playerName"
-              placeholder="Enter player name" data-i18n-placeholder="form.namePlaceholder" maxlength="50" autocomplete="off">
+            <input
+              class="form__input"
+              type="text"
+              id="player-name"
+              name="playerName"
+              placeholder="Enter player name"
+              data-i18n-placeholder="form.namePlaceholder"
+              maxlength="50"
+              autocomplete="off"
+            >
             <span class="form__error" id="name-error" role="alert" aria-live="polite"></span>
           </div>
           <div class="form__group">
@@ -53,25 +62,197 @@
           </button>
         </form>
       </section>
+
+      <!-- Player List Section -->
       <section class="section section--players" aria-labelledby="players-heading">
-        <h2 id="players-heading" class="section__heading">Registered Players (<span id="player-count">0</span>)</h2>
+        <h2 id="players-heading" class="section__heading">
+          Registered Players (<span id="player-count">0</span>)
+        </h2>
         <p class="section__meta" id="gender-counts">Males: 0 | Females: 0</p>
-        <ul class="player-list" id="player-list"></ul>
+        <ul class="player-list" id="player-list">
+          <!-- Player items rendered by JS -->
+        </ul>
         <p class="player-list__empty" id="empty-message" data-i18n="players.empty">No players added yet</p>
       </section>
+
+      <!-- Action Section -->
       <section class="section section--actions" aria-labelledby="actions-heading">
         <h2 id="actions-heading" class="sr-only">Actions</h2>
         <div class="actions">
-          <button class="btn btn--primary btn--large" id="generate-btn" disabled data-i18n="actions.generate">Generate Couples</button>
+          <!-- Match Type Selector (hidden for read-only viewers via JS) -->
+          <div class="match-type" id="match-type-selection" hidden>
+            <span class="match-type__label" data-i18n="matchType.label">Match Type</span>
+            <div class="match-type__options" role="group">
+              <button class="match-type__opt match-type__opt--active"
+                      id="type-2v2-btn" type="button" data-size="2"
+                      data-i18n="matchType.2v2">2vs2 (Couples)</button>
+              <button class="match-type__opt"
+                      id="type-3v3-btn" type="button" data-size="3"
+                      data-i18n="matchType.3v3">3vs3</button>
+              <button class="match-type__opt"
+                      id="type-4v4-btn" type="button" data-size="4"
+                      data-i18n="matchType.4v4">4vs4</button>
+            </div>
+          </div>
+
+          <!-- Pairing Mode Toggle (hidden for read-only viewers via JS) -->
+          <div class="pairing-toggle" id="pairing-toggle" hidden>
+            <span class="pairing-toggle__label" data-i18n="pairing.modeLabel">Pairing Mode</span>
+            <div class="pairing-toggle__options" role="group">
+              <button class="pairing-toggle__opt pairing-toggle__opt--active"
+                      id="mode-random-btn" type="button" data-mode="random"
+                      data-i18n="pairing.modeRandom">Random</button>
+              <button class="pairing-toggle__opt"
+                      id="mode-manual-btn" type="button" data-mode="manual"
+                      data-i18n="pairing.modeManual">Manual</button>
+            </div>
+          </div>
+
+          <!-- Manual Pairing Panel (shown only in manual mode) -->
+          <div class="manual-pairing" id="manual-pairing-panel" hidden>
+            <div class="manual-pairing__selectors">
+              <div class="manual-pairing__selector-group">
+                <label class="form__label" for="select-man" data-i18n="pairing.selectMan">Player 1</label>
+                <select class="form__select" id="select-man">
+                  <option value="" disabled selected data-i18n="pairing.selectMan">Player 1</option>
+                </select>
+              </div>
+              <div class="manual-pairing__selector-group">
+                <label class="form__label" for="select-woman" data-i18n="pairing.selectWoman">Player 2</label>
+                <select class="form__select" id="select-woman">
+                  <option value="" disabled selected data-i18n="pairing.selectWoman">Player 2</option>
+                </select>
+              </div>
+              <button class="btn btn--primary manual-pairing__pair-btn" id="manual-pair-btn" type="button" disabled
+                      data-i18n="pairing.pairBtn">Pair</button>
+            </div>
+            <p class="manual-pairing__hint" data-i18n="pairing.manualHint">Unpaired players will be paired randomly</p>
+            <ul class="manual-pairing__list" id="manual-pairs-list"></ul>
+            <p class="manual-pairing__empty" id="manual-pairs-empty" data-i18n="pairing.noPaired">No couples paired yet</p>
+            <button class="btn btn--success" id="confirm-manual-btn" type="button"
+                    data-i18n="pairing.confirmBtn">Confirm Couples</button>
+          </div>
+
+          <button class="btn btn--primary btn--large" id="generate-btn" disabled data-i18n="actions.generate">
+            Generate Couples
+          </button>
           <p class="actions__hint" id="generate-hint" data-i18n="actions.hint">Add at least 2 players to generate couples</p>
-          <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">Regenerate Couples</button>
-          <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">Clear All Players</button>
+          <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
+            Regenerate Couples
+          </button>
+          <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
+            Clear All Players
+          </button>
+          <div class="tournament-setup" id="tournament-setup" hidden>
+            <label class="tournament-setup__label" for="group-count" data-i18n="tournament.groupsLabel">Groups:</label>
+            <div class="tournament-setup__options" id="group-count-options">
+              <button class="tournament-setup__opt tournament-setup__opt--active" data-groups="1" type="button">A</button>
+              <button class="tournament-setup__opt" data-groups="2" type="button">A–B</button>
+              <button class="tournament-setup__opt" data-groups="3" type="button">A–C</button>
+              <button class="tournament-setup__opt" data-groups="4" type="button">A–D</button>
+            </div>
+            <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
+              Start Tournament
+            </button>
+          </div>
+          <!-- King of the Court Setup (shown after couples generated, no active tournament or king game) -->
+          <div class="king-setup" id="king-setup" hidden>
+            <div class="king-setup__options">
+              <span class="king-setup__label" data-i18n="king.winConditionLabel">Win Condition:</span>
+              <div class="king-setup__toggle" id="king-win-condition-toggle">
+                <button class="king-setup__opt king-setup__opt--active" data-condition="consecutive"
+                        type="button" data-i18n="king.condConsecutive">Consecutive</button>
+                <button class="king-setup__opt" data-condition="total"
+                        type="button" data-i18n="king.condTotal">Total</button>
+              </div>
+            </div>
+            <div class="king-setup__options">
+              <span class="king-setup__label" data-i18n="king.targetLabel">Target Wins:</span>
+              <div class="king-setup__toggle" id="king-target-toggle">
+                <button class="king-setup__opt king-setup__opt--active" data-target="5" type="button">5</button>
+                <button class="king-setup__opt" data-target="7" type="button">7</button>
+                <button class="king-setup__opt" data-target="10" type="button">10</button>
+              </div>
+            </div>
+            <button class="btn btn--success btn--large" id="start-king-btn"
+                    type="button" data-i18n="king.start">Start King of the Court</button>
+          </div>
         </div>
       </section>
+
+      <!-- Results Section -->
       <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden>
         <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
-        <div class="couples-grid" id="couples-grid"></div>
-        <div class="unmatched" id="unmatched-notice" hidden></div>
+        <div class="couples-grid" id="couples-grid">
+          <!-- Couple cards rendered by JS -->
+        </div>
+        <div class="unmatched" id="unmatched-notice" hidden>
+          <!-- Unmatched player notice rendered by JS -->
+        </div>
+      </section>
+
+      <!-- King of the Court Section -->
+      <section class="section section--king" id="king-section" aria-labelledby="king-heading" hidden>
+        <div class="king-header">
+          <h2 id="king-heading" class="section__heading" data-i18n="king.heading">King of the Court</h2>
+          <button class="btn btn--warning btn--small" id="reset-king-btn"
+                  type="button" data-i18n="king.reset">Reset King</button>
+        </div>
+        <div class="king-court">
+          <div class="king-court__throne" id="king-throne">
+            <div class="king-court__crown" aria-hidden="true">&#9819;</div>
+            <p class="king-court__role" data-i18n="king.roleKing">KING</p>
+            <p class="king-court__team-name" id="king-team-name">—</p>
+            <div class="king-court__wins">
+              <span id="king-wins-count">0</span>
+              <span class="king-court__wins-label" id="king-wins-label"></span>
+            </div>
+          </div>
+          <div class="king-court__vs" aria-hidden="true">VS</div>
+          <div class="king-court__challenger">
+            <p class="king-court__role" data-i18n="king.roleChallenger">CHALLENGER</p>
+            <p class="king-court__team-name" id="challenger-team-name">—</p>
+          </div>
+        </div>
+        <div class="king-actions" id="king-actions">
+          <button class="btn btn--success king-actions__btn" id="king-wins-btn"
+                  type="button" data-i18n="king.kingWins">King Wins Rally</button>
+          <button class="btn btn--warning king-actions__btn" id="challenger-wins-btn"
+                  type="button" data-i18n="king.challengerWins">Challenger Wins Rally</button>
+        </div>
+        <div class="king-queue">
+          <h3 class="king-queue__heading" data-i18n="king.queueHeading">Challengers Queue</h3>
+          <ol class="king-queue__list" id="king-queue-list"></ol>
+        </div>
+        <details class="king-log">
+          <summary class="king-log__summary" data-i18n="king.logHeading">Rally Log</summary>
+          <ol class="king-log__list" id="king-log-list" reversed></ol>
+        </details>
+        <div class="king-winner" id="king-winner-banner" hidden>
+          <p class="king-winner__title" data-i18n="king.winnerTitle">Champion!</p>
+          <p class="king-winner__name" id="king-winner-name">—</p>
+        </div>
+      </section>
+
+      <!-- Tournament Section -->
+      <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden>
+        <div class="tournament-header">
+          <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
+          <div class="tournament-header__actions">
+            <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
+              Share
+            </button>
+            <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
+              Reset Tournament
+            </button>
+          </div>
+        </div>
+        <div class="tournament-readonly-banner" id="readonly-banner" hidden>
+          <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
+        </div>
+        <div class="tournament-groups" id="tournament-groups">
+          <!-- Group panels rendered by JS -->
+        </div>
       </section>
     </main>
   </div>
@@ -218,6 +399,186 @@
       assert(getPlayerItems().length === 2, 'Recovery: can add players after clear');
       document.getElementById('generate-btn').click();
       assert(!document.getElementById('results-section').hidden, 'Recovery: can generate after clear');
+
+      // ===== TEST 11: Switch to 3vs3 match type and generate teams =====
+      document.getElementById('type-3v3-btn').click();
+      assert(document.getElementById('generate-btn').disabled, '3vs3: generate button is disabled with 2 players (need 3)');
+      assert(document.getElementById('pairing-toggle').hidden, '3vs3: pairing mode toggle is hidden');
+
+      addPlayer('Hank', 'male');
+      assert(!document.getElementById('generate-btn').disabled, '3vs3: generate button enabled with 3 players');
+      assert(!document.getElementById('pairing-toggle').hidden, '3vs3: pairing mode toggle is visible with 3 players');
+      assert(document.getElementById('generate-hint').textContent.includes('3'), '3vs3: hint updates with target size');
+
+      addPlayer('Ivy', 'female');
+      addPlayer('Jack', 'male'); // Total 5 players (3M, 2F)
+      document.getElementById('generate-btn').click();
+
+      const cards3v3 = document.querySelectorAll('#couples-grid .couple-card');
+      assert(cards3v3.length === 1, '3vs3: generated 1 team from 5 players', `Found ${cards3v3.length} cards`);
+      const cardTitle3v3 = cards3v3[0].querySelector('.couple-card__title').textContent;
+      assert(cardTitle3v3.includes('Team 1') || cardTitle3v3.includes('Equipo 1'), '3vs3: card title is Team/Equipo 1', `Title: ${cardTitle3v3}`);
+      const unmatchedEl3v3 = document.getElementById('unmatched-notice');
+      assert(!unmatchedEl3v3.hidden, '3vs3: unmatched notice is visible');
+      assert(unmatchedEl3v3.textContent.includes('Unmatched Players') || unmatchedEl3v3.textContent.includes('Jugadores sin equipo'), '3vs3: unmatched header is pluralized');
+
+      // ===== TEST 12: Switch to 4vs4 match type and generate teams =====
+      document.getElementById('type-4v4-btn').click();
+      assert(!document.getElementById('generate-btn').disabled, '4vs4: generate button is enabled with 5 players (>= 4)');
+      
+      // Let's add more players to make exactly 8 players (4M, 4F)
+      addPlayer('Kate', 'female');
+      addPlayer('Leo', 'male');
+      addPlayer('Mia', 'female'); // Total 8 players (4M, 4F)
+      document.getElementById('generate-btn').click();
+
+      const cards4v4 = document.querySelectorAll('#couples-grid .couple-card');
+      assert(cards4v4.length === 2, '4vs4: generated 2 teams from 8 players', `Found ${cards4v4.length} cards`);
+      const unmatchedEl4v4 = document.getElementById('unmatched-notice');
+      assert(unmatchedEl4v4.hidden, '4vs4: no unmatched players');
+
+      // ===== TEST 13: Clear all and verify match type resets to 2vs2 =====
+      const origConfirm2 = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirm2;
+
+      assert(document.getElementById('type-2v2-btn').classList.contains('match-type__opt--active'), 'Clear: match type resets to 2vs2 (Couples)');
+
+      // ===== TEST 14: Manual Pairing for 2vs2 (Couples) =====
+      const origConfirmManual = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirmManual;
+
+      addPlayer('Alice', 'female');
+      addPlayer('Bob', 'male');
+      addPlayer('Carlos', 'male');
+      addPlayer('Diana', 'female');
+
+      document.getElementById('mode-manual-btn').click();
+      assert(!document.getElementById('manual-pairing-panel').hidden, 'Manual 2vs2: manual pairing panel is visible');
+
+      var selectors2v2 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(selectors2v2.length === 2, 'Manual 2vs2: renders 2 selectors');
+
+      var playerListOptionAlice = Array.from(selectors2v2[0].options).find(opt => opt.textContent === 'Alice');
+      var playerListOptionBob = Array.from(selectors2v2[1].options).find(opt => opt.textContent === 'Bob');
+      assert(!!playerListOptionAlice, 'Manual 2vs2: Alice is an option in selector 1');
+      assert(!!playerListOptionBob, 'Manual 2vs2: Bob is an option in selector 2');
+
+      selectors2v2[0].value = playerListOptionAlice.value;
+      selectors2v2[0].dispatchEvent(new Event('change'));
+      selectors2v2 = document.querySelectorAll('.manual-pairing__selector-group select');
+      var optionAliceInSel2 = Array.from(selectors2v2[1].options).find(opt => opt.textContent === 'Alice');
+      assert(!optionAliceInSel2, 'Manual 2vs2: Alice is excluded from selector 2 options');
+
+      var optionBobInSel2 = Array.from(selectors2v2[1].options).find(opt => opt.textContent === 'Bob');
+      selectors2v2[1].value = optionBobInSel2.value;
+      selectors2v2[1].dispatchEvent(new Event('change'));
+
+      assert(!document.getElementById('manual-pair-btn').disabled, 'Manual 2vs2: pair button is enabled');
+      document.getElementById('manual-pair-btn').click();
+
+      var manualItems = document.querySelectorAll('#manual-pairs-list li');
+      assert(manualItems.length === 1, 'Manual 2vs2: 1 pair in list');
+      assert(manualItems[0].textContent.includes('Alice') && manualItems[0].textContent.includes('Bob'), 'Manual 2vs2: pair is Alice & Bob');
+
+      document.getElementById('confirm-manual-btn').click();
+      assert(!document.getElementById('results-section').hidden, 'Manual 2vs2: results section is visible');
+      var resultsCards = document.querySelectorAll('#couples-grid .couple-card');
+      assert(resultsCards.length === 2, 'Manual 2vs2: 2 couples generated (1 manual + 1 auto)');
+
+      // ===== TEST 15: Manual Pairing for 3vs3 =====
+      const origConfirmManual3 = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirmManual3;
+
+      document.getElementById('type-3v3-btn').click();
+      addPlayer('P1', 'male');
+      addPlayer('P2', 'female');
+      addPlayer('P3', 'male');
+      addPlayer('P4', 'female');
+      addPlayer('P5', 'male');
+      addPlayer('P6', 'female');
+
+      document.getElementById('mode-manual-btn').click();
+      assert(!document.getElementById('manual-pairing-panel').hidden, 'Manual 3vs3: manual pairing panel is visible');
+
+      var selectors3v3 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(selectors3v3.length === 3, 'Manual 3vs3: renders 3 selectors');
+
+      selectors3v3[0].value = Array.from(selectors3v3[0].options).find(opt => opt.textContent === 'P1').value;
+      selectors3v3[0].dispatchEvent(new Event('change'));
+
+      selectors3v3 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(!Array.from(selectors3v3[1].options).some(opt => opt.textContent === 'P1'), 'Manual 3vs3: P1 excluded from selector 2');
+
+      selectors3v3[1].value = Array.from(selectors3v3[1].options).find(opt => opt.textContent === 'P2').value;
+      selectors3v3[1].dispatchEvent(new Event('change'));
+
+      selectors3v3 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors3v3[2].value = Array.from(selectors3v3[2].options).find(opt => opt.textContent === 'P3').value;
+      selectors3v3[2].dispatchEvent(new Event('change'));
+
+      assert(!document.getElementById('manual-pair-btn').disabled, 'Manual 3vs3: pair button is enabled');
+      document.getElementById('manual-pair-btn').click();
+
+      var manualItems3v3 = document.querySelectorAll('#manual-pairs-list li');
+      assert(manualItems3v3.length === 1, 'Manual 3vs3: 1 team in list');
+      assert(manualItems3v3[0].textContent.includes('P1') && manualItems3v3[0].textContent.includes('P2') && manualItems3v3[0].textContent.includes('P3'), 'Manual 3vs3: team contains P1, P2, P3');
+
+      document.getElementById('confirm-manual-btn').click();
+      var resultsCards3v3 = document.querySelectorAll('#couples-grid .couple-card');
+      assert(resultsCards3v3.length === 2, 'Manual 3vs3: 2 teams generated total (1 manual + 1 auto)');
+
+      // ===== TEST 16: Manual Pairing for 4vs4 =====
+      const origConfirmManual4 = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirmManual4;
+
+      document.getElementById('type-4v4-btn').click();
+      addPlayer('A1', 'male');
+      addPlayer('A2', 'female');
+      addPlayer('A3', 'male');
+      addPlayer('A4', 'female');
+      addPlayer('A5', 'male');
+      addPlayer('A6', 'female');
+      addPlayer('A7', 'male');
+      addPlayer('A8', 'female');
+
+      document.getElementById('mode-manual-btn').click();
+      assert(!document.getElementById('manual-pairing-panel').hidden, 'Manual 4vs4: manual pairing panel is visible');
+
+      var selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(selectors4v4.length === 4, 'Manual 4vs4: renders 4 selectors');
+
+      selectors4v4[0].value = Array.from(selectors4v4[0].options).find(opt => opt.textContent === 'A1').value;
+      selectors4v4[0].dispatchEvent(new Event('change'));
+
+      selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors4v4[1].value = Array.from(selectors4v4[1].options).find(opt => opt.textContent === 'A2').value;
+      selectors4v4[1].dispatchEvent(new Event('change'));
+
+      selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors4v4[2].value = Array.from(selectors4v4[2].options).find(opt => opt.textContent === 'A3').value;
+      selectors4v4[2].dispatchEvent(new Event('change'));
+
+      selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors4v4[3].value = Array.from(selectors4v4[3].options).find(opt => opt.textContent === 'A4').value;
+      selectors4v4[3].dispatchEvent(new Event('change'));
+
+      assert(!document.getElementById('manual-pair-btn').disabled, 'Manual 4vs4: pair button is enabled');
+      document.getElementById('manual-pair-btn').click();
+
+      var manualItems4v4 = document.querySelectorAll('#manual-pairs-list li');
+      assert(manualItems4v4.length === 1, 'Manual 4vs4: 1 team in list');
+
+      document.getElementById('confirm-manual-btn').click();
+      var resultsCards4v4 = document.querySelectorAll('#couples-grid .couple-card');
+      assert(resultsCards4v4.length === 2, 'Manual 4vs4: 2 teams generated total (1 manual + 1 auto)');
 
       // ===== Summary =====
       const total = passed + failed;
