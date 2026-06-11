@@ -338,16 +338,16 @@
       addPlayer('A', 'male');
       assert(getPlayerItems().length === 5, 'Validation: single-char name does not add player');
 
-      // ===== TEST 6: Validation — no gender =====
+      // ===== TEST 6: Optional gender (defaults to unspecified) =====
       nameInput.value = 'TestPlayer';
       nameInput.dispatchEvent(new Event('input'));
       // Do not set gender — leave at default
       genderSelect.value = '';
       genderSelect.dispatchEvent(new Event('change'));
-      document.getElementById('player-form').dispatchEvent(new Event('submit', { cancelable: true }));
-      assert(getPlayerItems().length === 5, 'Validation: no gender does not add player');
-      const genderErr = document.getElementById('gender-error');
-      assert(genderErr.textContent.trim().length > 0, 'Validation: error message shown for no gender');
+      document.getElementById('player-form').dispatchEvent(new Event('submit'));
+      assert(getPlayerItems().length === 6, 'Optional Gender: no gender successfully adds player');
+      var addedBadge = getPlayerItems()[5].querySelector('.player-list__badge');
+      assert(addedBadge.textContent.trim() === 'U', 'Optional Gender: added player gender defaults to unspecified (badge U)');
 
       // ===== TEST 7: Generate couples =====
       document.getElementById('generate-btn').click();
@@ -358,8 +358,8 @@
         `Found ${cards.length} cards`);
       assert(!document.getElementById('regenerate-btn').hidden, 'Generate: regenerate button visible');
 
-      // With 2M + 3F = 5 players → 2 mixed + 0 or 1 same + possible unmatched
-      const totalPlayers = 5;
+      // With 2M + 3F + 1U = 6 players
+      const totalPlayers = 6;
       const pairedCount = cards.length * 2;
       const unmatchedEl = document.getElementById('unmatched-notice');
       const hasUnmatched = !unmatchedEl.hidden;
