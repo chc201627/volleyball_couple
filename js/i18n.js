@@ -28,6 +28,7 @@ var t, setLanguage, getLanguage;
       'form.genderDefault': 'Select Gender',
       'form.genderMale': 'Male',
       'form.genderFemale': 'Female',
+      'form.genderUnspecified': 'Unspecified / No Gender',
       'form.submit': 'Add Player',
       // Validation
       'error.nameEmpty': 'Please enter a player name',
@@ -37,11 +38,12 @@ var t, setLanguage, getLanguage;
       'error.dismiss': 'Dismiss error',
       // Player list
       'players.heading': 'Registered Players ({count})',
-      'players.genderCounts': 'Males: {males} | Females: {females}',
+      'players.genderCounts': 'Males: {males} | Females: {females} | Unspecified: {unspecified}',
       'players.empty': 'No players added yet',
       'players.remove': 'Remove {name}',
       'players.badgeMale': 'M',
       'players.badgeFemale': 'F',
+      'players.badgeUnspecified': 'U',
       // Actions
       'actions.generate': 'Generate Couples',
       'actions.generateTeams': 'Generate Teams',
@@ -145,6 +147,7 @@ var t, setLanguage, getLanguage;
       'form.genderDefault': 'Seleccionar G\u00e9nero',
       'form.genderMale': 'Masculino',
       'form.genderFemale': 'Femenino',
+      'form.genderUnspecified': 'Sin especificar',
       'form.submit': 'Agregar Jugador',
       // Validaci\u00f3n
       'error.nameEmpty': 'Por favor ingresa un nombre',
@@ -154,11 +157,12 @@ var t, setLanguage, getLanguage;
       'error.dismiss': 'Cerrar error',
       // Lista de jugadores
       'players.heading': 'Jugadores Registrados ({count})',
-      'players.genderCounts': 'Hombres: {males} | Mujeres: {females}',
+      'players.genderCounts': 'Hombres: {males} | Mujeres: {females} | Sin especificar: {unspecified}',
       'players.empty': 'A\u00fan no se han agregado jugadores',
       'players.remove': 'Eliminar {name}',
       'players.badgeMale': 'M',
       'players.badgeFemale': 'F',
+      'players.badgeUnspecified': 'U',
       // Acciones
       'actions.generate': 'Generar Parejas',
       'actions.generateTeams': 'Generar Equipos',

@@ -114,6 +114,38 @@
         `Unmatched: ${JSON.stringify(unmatched)}`);
     })();
 
+    // --- Scenario 7: Unspecified gender players (2M, 2F, 2U) ---
+    (function () {
+      const players = makePlayers(2, 2);
+      players.push({ name: 'U1', gender: 'unspecified' });
+      players.push({ name: 'U2', gender: 'unspecified' });
+      const { couples, unmatched } = generateCouples(players);
+      assert(couples.length === 3, 'Scenario 7: 3 couples total',
+        `Expected 3, got ${couples.length}`);
+      assert(unmatched === null, 'Scenario 7: no unmatched player');
+      // The 2M and 2F should pair up as mixed (since mixed has highest priority)
+      // leaving U1 and U2 to pair up.
+      assert(countByType(couples, 'mixed') === 2, 'Scenario 7: 2 mixed couples',
+        `Mixed: ${countByType(couples, 'mixed')}`);
+      assert(countByType(couples, 'same') === 1, 'Scenario 7: 1 same/other couple',
+        `Same: ${countByType(couples, 'same')}`);
+    })();
+
+    // --- Scenario 8: Only unspecified players (4U) ---
+    (function () {
+      const players = [
+        { name: 'U1', gender: 'unspecified' },
+        { name: 'U2', gender: 'unspecified' },
+        { name: 'U3', gender: 'unspecified' },
+        { name: 'U4', gender: 'unspecified' }
+      ];
+      const { couples, unmatched } = generateCouples(players);
+      assert(couples.length === 2, 'Scenario 8: 2 couples total');
+      assert(countByType(couples, 'same') === 2, 'Scenario 8: all are classified as same-gender (default)',
+        `Same: ${countByType(couples, 'same')}`);
+      assert(unmatched === null, 'Scenario 8: no unmatched');
+    })();
+
     // --- Edge: 0 players ---
     (function () {
       const { couples, unmatched } = generateCouples([]);

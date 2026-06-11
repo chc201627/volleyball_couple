@@ -54,6 +54,7 @@
               <option value="" disabled selected data-i18n="form.genderDefault">Select Gender</option>
               <option value="male" data-i18n="form.genderMale">Male</option>
               <option value="female" data-i18n="form.genderFemale">Female</option>
+              <option value="unspecified" data-i18n="form.genderUnspecified">Unspecified / No Gender</option>
             </select>
             <span class="form__error" id="gender-error" role="alert" aria-live="polite"></span>
           </div>
@@ -579,6 +580,22 @@
       document.getElementById('confirm-manual-btn').click();
       var resultsCards4v4 = document.querySelectorAll('#couples-grid .couple-card');
       assert(resultsCards4v4.length === 2, 'Manual 4vs4: 2 teams generated total (1 manual + 1 auto)');
+
+      // ===== TEST 17: Unspecified gender option and count =====
+      const origConfirmManual5 = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirmManual5;
+
+      addPlayer('Alex', 'unspecified');
+      assert(getPlayerItems().length === 1, 'Unspecified Gender: 1 player added');
+      var itemBadge = getPlayerItems()[0].querySelector('.player-list__badge');
+      assert(itemBadge.textContent.trim() === 'U', 'Unspecified Gender: badge is U');
+      assert(itemBadge.classList.contains('player-list__badge--unspecified'), 'Unspecified Gender: badge has correct unspecified class');
+      
+      var genderCountsText = document.getElementById('gender-counts').textContent;
+      assert(genderCountsText.includes('Unspecified: 1') || genderCountsText.includes('Sin especificar: 1'),
+        'Unspecified Gender: gender counts text includes Unspecified: 1');
 
       // ===== Summary =====
       const total = passed + failed;
