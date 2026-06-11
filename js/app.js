@@ -233,7 +233,6 @@
   function validateInputs() {
     const errors = {};
     const name = nameInput.value.trim();
-    const gender = genderSelect.value;
 
     if (!name) {
       errors.name = t('error.nameEmpty');
@@ -241,10 +240,6 @@
       errors.name = t('error.nameMin');
     } else if (name.length > 50) {
       errors.name = t('error.nameMax');
-    }
-
-    if (!gender) {
-      errors.gender = t('error.gender');
     }
 
     return { valid: Object.keys(errors).length === 0, errors };
@@ -302,7 +297,7 @@
     const player = {
       id: Date.now() + Math.random(),
       name: nameInput.value.trim(),
-      gender: genderSelect.value,
+      gender: genderSelect.value || 'unspecified',
     };
 
     players.push(player);
@@ -320,8 +315,7 @@
 
   function updateAddButtonState() {
     const name = nameInput.value.trim();
-    const gender = genderSelect.value;
-    addBtn.disabled = !(name.length >= 2 && gender);
+    addBtn.disabled = !(name.length >= 2);
   }
 
   // --- Remove Player ---
