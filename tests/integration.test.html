@@ -407,6 +407,7 @@
 
       addPlayer('Hank', 'male');
       assert(!document.getElementById('generate-btn').disabled, '3vs3: generate button enabled with 3 players');
+      assert(!document.getElementById('pairing-toggle').hidden, '3vs3: pairing mode toggle is visible with 3 players');
       assert(document.getElementById('generate-hint').textContent.includes('3'), '3vs3: hint updates with target size');
 
       addPlayer('Ivy', 'female');
@@ -443,6 +444,141 @@
       window.confirm = origConfirm2;
 
       assert(document.getElementById('type-2v2-btn').classList.contains('match-type__opt--active'), 'Clear: match type resets to 2vs2 (Couples)');
+
+      // ===== TEST 14: Manual Pairing for 2vs2 (Couples) =====
+      const origConfirmManual = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirmManual;
+
+      addPlayer('Alice', 'female');
+      addPlayer('Bob', 'male');
+      addPlayer('Carlos', 'male');
+      addPlayer('Diana', 'female');
+
+      document.getElementById('mode-manual-btn').click();
+      assert(!document.getElementById('manual-pairing-panel').hidden, 'Manual 2vs2: manual pairing panel is visible');
+
+      var selectors2v2 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(selectors2v2.length === 2, 'Manual 2vs2: renders 2 selectors');
+
+      var playerListOptionAlice = Array.from(selectors2v2[0].options).find(opt => opt.textContent === 'Alice');
+      var playerListOptionBob = Array.from(selectors2v2[1].options).find(opt => opt.textContent === 'Bob');
+      assert(!!playerListOptionAlice, 'Manual 2vs2: Alice is an option in selector 1');
+      assert(!!playerListOptionBob, 'Manual 2vs2: Bob is an option in selector 2');
+
+      selectors2v2[0].value = playerListOptionAlice.value;
+      selectors2v2[0].dispatchEvent(new Event('change'));
+      selectors2v2 = document.querySelectorAll('.manual-pairing__selector-group select');
+      var optionAliceInSel2 = Array.from(selectors2v2[1].options).find(opt => opt.textContent === 'Alice');
+      assert(!optionAliceInSel2, 'Manual 2vs2: Alice is excluded from selector 2 options');
+
+      var optionBobInSel2 = Array.from(selectors2v2[1].options).find(opt => opt.textContent === 'Bob');
+      selectors2v2[1].value = optionBobInSel2.value;
+      selectors2v2[1].dispatchEvent(new Event('change'));
+
+      assert(!document.getElementById('manual-pair-btn').disabled, 'Manual 2vs2: pair button is enabled');
+      document.getElementById('manual-pair-btn').click();
+
+      var manualItems = document.querySelectorAll('#manual-pairs-list li');
+      assert(manualItems.length === 1, 'Manual 2vs2: 1 pair in list');
+      assert(manualItems[0].textContent.includes('Alice') && manualItems[0].textContent.includes('Bob'), 'Manual 2vs2: pair is Alice & Bob');
+
+      document.getElementById('confirm-manual-btn').click();
+      assert(!document.getElementById('results-section').hidden, 'Manual 2vs2: results section is visible');
+      var resultsCards = document.querySelectorAll('#couples-grid .couple-card');
+      assert(resultsCards.length === 2, 'Manual 2vs2: 2 couples generated (1 manual + 1 auto)');
+
+      // ===== TEST 15: Manual Pairing for 3vs3 =====
+      const origConfirmManual3 = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirmManual3;
+
+      document.getElementById('type-3v3-btn').click();
+      addPlayer('P1', 'male');
+      addPlayer('P2', 'female');
+      addPlayer('P3', 'male');
+      addPlayer('P4', 'female');
+      addPlayer('P5', 'male');
+      addPlayer('P6', 'female');
+
+      document.getElementById('mode-manual-btn').click();
+      assert(!document.getElementById('manual-pairing-panel').hidden, 'Manual 3vs3: manual pairing panel is visible');
+
+      var selectors3v3 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(selectors3v3.length === 3, 'Manual 3vs3: renders 3 selectors');
+
+      selectors3v3[0].value = Array.from(selectors3v3[0].options).find(opt => opt.textContent === 'P1').value;
+      selectors3v3[0].dispatchEvent(new Event('change'));
+
+      selectors3v3 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(!Array.from(selectors3v3[1].options).some(opt => opt.textContent === 'P1'), 'Manual 3vs3: P1 excluded from selector 2');
+
+      selectors3v3[1].value = Array.from(selectors3v3[1].options).find(opt => opt.textContent === 'P2').value;
+      selectors3v3[1].dispatchEvent(new Event('change'));
+
+      selectors3v3 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors3v3[2].value = Array.from(selectors3v3[2].options).find(opt => opt.textContent === 'P3').value;
+      selectors3v3[2].dispatchEvent(new Event('change'));
+
+      assert(!document.getElementById('manual-pair-btn').disabled, 'Manual 3vs3: pair button is enabled');
+      document.getElementById('manual-pair-btn').click();
+
+      var manualItems3v3 = document.querySelectorAll('#manual-pairs-list li');
+      assert(manualItems3v3.length === 1, 'Manual 3vs3: 1 team in list');
+      assert(manualItems3v3[0].textContent.includes('P1') && manualItems3v3[0].textContent.includes('P2') && manualItems3v3[0].textContent.includes('P3'), 'Manual 3vs3: team contains P1, P2, P3');
+
+      document.getElementById('confirm-manual-btn').click();
+      var resultsCards3v3 = document.querySelectorAll('#couples-grid .couple-card');
+      assert(resultsCards3v3.length === 2, 'Manual 3vs3: 2 teams generated total (1 manual + 1 auto)');
+
+      // ===== TEST 16: Manual Pairing for 4vs4 =====
+      const origConfirmManual4 = window.confirm;
+      window.confirm = () => true;
+      document.getElementById('clear-btn').click();
+      window.confirm = origConfirmManual4;
+
+      document.getElementById('type-4v4-btn').click();
+      addPlayer('A1', 'male');
+      addPlayer('A2', 'female');
+      addPlayer('A3', 'male');
+      addPlayer('A4', 'female');
+      addPlayer('A5', 'male');
+      addPlayer('A6', 'female');
+      addPlayer('A7', 'male');
+      addPlayer('A8', 'female');
+
+      document.getElementById('mode-manual-btn').click();
+      assert(!document.getElementById('manual-pairing-panel').hidden, 'Manual 4vs4: manual pairing panel is visible');
+
+      var selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      assert(selectors4v4.length === 4, 'Manual 4vs4: renders 4 selectors');
+
+      selectors4v4[0].value = Array.from(selectors4v4[0].options).find(opt => opt.textContent === 'A1').value;
+      selectors4v4[0].dispatchEvent(new Event('change'));
+
+      selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors4v4[1].value = Array.from(selectors4v4[1].options).find(opt => opt.textContent === 'A2').value;
+      selectors4v4[1].dispatchEvent(new Event('change'));
+
+      selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors4v4[2].value = Array.from(selectors4v4[2].options).find(opt => opt.textContent === 'A3').value;
+      selectors4v4[2].dispatchEvent(new Event('change'));
+
+      selectors4v4 = document.querySelectorAll('.manual-pairing__selector-group select');
+      selectors4v4[3].value = Array.from(selectors4v4[3].options).find(opt => opt.textContent === 'A4').value;
+      selectors4v4[3].dispatchEvent(new Event('change'));
+
+      assert(!document.getElementById('manual-pair-btn').disabled, 'Manual 4vs4: pair button is enabled');
+      document.getElementById('manual-pair-btn').click();
+
+      var manualItems4v4 = document.querySelectorAll('#manual-pairs-list li');
+      assert(manualItems4v4.length === 1, 'Manual 4vs4: 1 team in list');
+
+      document.getElementById('confirm-manual-btn').click();
+      var resultsCards4v4 = document.querySelectorAll('#couples-grid .couple-card');
+      assert(resultsCards4v4.length === 2, 'Manual 4vs4: 2 teams generated total (1 manual + 1 auto)');
 
       // ===== Summary =====
       const total = passed + failed;
