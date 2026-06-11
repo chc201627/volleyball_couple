@@ -109,6 +109,19 @@
     challengerWinsBtn.addEventListener('click', function () { handleRally('challenger'); });
     kingWinConditionToggle.addEventListener('click', handleKingConditionClick);
     kingTargetToggle.addEventListener('click', handleKingTargetClick);
+
+    // Load players from localStorage
+    try {
+      var storedPlayers = localStorage.getItem('bv-players');
+      if (storedPlayers) {
+        var parsed = JSON.parse(storedPlayers);
+        if (Array.isArray(parsed)) {
+          players.length = 0;
+          players.push.apply(players, parsed);
+        }
+      }
+    } catch (e) {}
+
     updateUI();
 
     // Boot Firebase and decide how to restore tournament state
@@ -120,6 +133,7 @@
       if (!isSessionOwner(urlSid)) {
         // Viewer: subscribe for real-time updates
         isReadOnly = true;
+        updateUI();
         tournamentSection.hidden = false;
         readonlyBanner.hidden = false;
         resetTournamentBtn.hidden = true;
@@ -130,9 +144,15 @@
         loadSessionOnce(urlSid, function (state) {
           if (state) {
             tournamentState = state;
+            if (state.players) {
+              players.length = 0;
+              players.push.apply(players, state.players);
+              savePlayersState();
+            }
             saveTournamentState();
             tournamentSection.hidden = false;
             renderTournament();
+            updateUI();
           }
         });
       }
@@ -140,15 +160,26 @@
       // Firebase ready but no session ID in URL — check localStorage
       tournamentState = loadTournamentState();
       if (tournamentState) {
+        if (tournamentState.players) {
+          players.length = 0;
+          players.push.apply(players, tournamentState.players);
+        }
         tournamentSection.hidden = false;
         renderTournament();
+        updateUI();
       }
     } else {
       // Firebase not configured — fall back to legacy #t= URL hash + localStorage
       var urlState = loadFromURL();
       if (urlState) {
         isReadOnly = true;
+        updateUI();
         tournamentState = urlState;
+        if (urlState.players) {
+          players.length = 0;
+          players.push.apply(players, urlState.players);
+        }
+        updateUI();
         tournamentSection.hidden = false;
         readonlyBanner.hidden = false;
         resetTournamentBtn.hidden = true;
@@ -157,8 +188,13 @@
       } else {
         tournamentState = loadTournamentState();
         if (tournamentState) {
+          if (tournamentState.players) {
+            players.length = 0;
+            players.push.apply(players, tournamentState.players);
+          }
           tournamentSection.hidden = false;
           renderTournament();
+          updateUI();
         }
       }
     }
@@ -271,6 +307,7 @@
 
     players.push(player);
     resetForm();
+    savePlayersState();
     updateUI();
   }
 
@@ -305,10 +342,12 @@
       item.classList.add('animate__fadeOut');
       item.addEventListener('animationend', () => {
         players.splice(players.findIndex(p => p.id === id), 1);
+        savePlayersState();
         updateUI();
       }, { once: true });
     } else {
       players.splice(idx, 1);
+      savePlayersState();
       updateUI();
     }
   }
@@ -328,6 +367,7 @@
     document.querySelectorAll('.match-type__opt').forEach(function (b) {
       b.classList.toggle('match-type__opt--active', parseInt(b.getAttribute('data-size'), 10) === 2);
     });
+    savePlayersState();
     updateUI();
   }
 
@@ -360,7 +400,8 @@
       const li = document.createElement('li');
       li.className = 'player-list__item animate__animated animate__fadeIn';
       li.style.animationDelay = `${i * 30}ms`;
-      const badge = player.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+      const badge = player.gender === 'male' ? t('players.badgeMale') : (player.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
+      const removeBtnHTML = isReadOnly ? '' : `<button class="player-list__remove" aria-label="${escapeHTML(t('players.remove', { name: player.name }))}" data-id="${player.id}">&times;</button>`;
       li.innerHTML = `
         <span class="player-list__info">
           <span class="player-list__name">${escapeHTML(player.name)}</span>
@@ -368,9 +409,12 @@
             ${badge}
           </span>
         </span>
-        <button class="player-list__remove" aria-label="${escapeHTML(t('players.remove', { name: player.name }))}" data-id="${player.id}">&times;</button>
+        ${removeBtnHTML}
       `;
-      li.querySelector('.player-list__remove').addEventListener('click', () => removePlayer(player.id));
+      const removeBtn = li.querySelector('.player-list__remove');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', () => removePlayer(player.id));
+      }
       playerList.appendChild(li);
     });
   }
@@ -378,6 +422,7 @@
   function renderCounts() {
     const maleCount = players.filter(p => p.gender === 'male').length;
     const femaleCount = players.filter(p => p.gender === 'female').length;
+    const unspecifiedCount = players.filter(p => p.gender !== 'male' && p.gender !== 'female').length;
 
     // Reconstruct heading with translatable text and a live count span
     playersHeading.textContent = '';
@@ -392,7 +437,7 @@
       playersHeading.appendChild(document.createTextNode(parts[1]));
     }
 
-    genderCounts.textContent = t('players.genderCounts', { males: maleCount, females: femaleCount });
+    genderCounts.textContent = t('players.genderCounts', { males: maleCount, females: femaleCount, unspecified: unspecifiedCount });
   }
 
   function updateActionButtons() {
@@ -461,7 +506,7 @@
       let playersHTML = '';
       const teamPlayers = team.players || [team.player1, team.player2];
       teamPlayers.forEach(player => {
-        const badge = player.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        const badge = player.gender === 'male' ? t('players.badgeMale') : (player.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
         playersHTML += `
           <p class="couple-card__player">
             ${escapeHTML(player.name)}
@@ -487,7 +532,7 @@
       let unmatchedHTML = '';
       if (unmatchedList.length === 1) {
         const u = unmatchedList[0];
-        const badge = u.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        const badge = u.gender === 'male' ? t('players.badgeMale') : (u.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
         unmatchedHTML = `
           <p class="unmatched__title">${escapeHTML(t('results.unmatched', { name: u.name }))}
             <span class="player-list__badge player-list__badge--${u.gender}">
@@ -500,7 +545,7 @@
         // Multiple unmatched players (for 3vs3 and 4vs4)
         unmatchedHTML = `<p class="unmatched__title">${escapeHTML(t('results.unmatchedMultiple'))}</p>`;
         unmatchedList.forEach(u => {
-          const badge = u.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+          const badge = u.gender === 'male' ? t('players.badgeMale') : (u.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
           unmatchedHTML += `
             <p class="unmatched__player" style="margin-top: 6px;">
               ${escapeHTML(u.name)}
@@ -575,7 +620,7 @@
     const numGroups = getSelectedGroupCount();
     const groups = createGroups(teams, numGroups);
     const matches = generateMatches(groups);
-    tournamentState = { teams: teams, groups: groups, matches: matches };
+    tournamentState = { teams: teams, groups: groups, matches: matches, players: players };
     activeMatchId = null;
     saveTournamentState();
     if (db) {
@@ -740,6 +785,7 @@
         teams: tournamentState.teams,
         groups: tournamentState.groups,
         matches: newMatches,
+        players: tournamentState.players || players,
       };
       activeMatchId = null;
       saveTournamentState();
@@ -759,6 +805,14 @@
   function saveTournamentState() {
     try {
       localStorage.setItem('bv-tournament', JSON.stringify(tournamentState));
+    } catch (e) {
+      // localStorage may be unavailable; fail silently
+    }
+  }
+
+  function savePlayersState() {
+    try {
+      localStorage.setItem('bv-players', JSON.stringify(players));
     } catch (e) {
       // localStorage may be unavailable; fail silently
     }
@@ -833,9 +887,14 @@
       var data = snapshot.val();
       if (!data || !data.state) return;
       tournamentState = data.state;
+      if (data.state.players) {
+        players.length = 0;
+        players.push.apply(players, data.state.players);
+      }
       saveTournamentState();
       tournamentSection.hidden = false;
       renderTournament();
+      updateUI();
     });
   }
 

@@ -320,6 +320,11 @@ select {
   color: #ad1457;
 }
 
+.player-list__badge--unspecified {
+  background-color: rgba(158, 158, 158, 0.2);
+  color: #616161;
+}
+
 .player-list__remove {
   background: none;
   border: none;

@@ -37,10 +37,12 @@ function generateTeams(playerList, teamSize) {
   // Step 1: Separate players by gender
   const males = playerList.filter(p => p.gender === 'male');
   const females = playerList.filter(p => p.gender === 'female');
+  const unspecified = playerList.filter(p => p.gender !== 'male' && p.gender !== 'female');
 
-  // Step 2: Shuffle both lists for true randomization
+  // Step 2: Shuffle all lists for true randomization
   shuffle(males);
   shuffle(females);
+  shuffle(unspecified);
 
   const teams = [];
 
@@ -71,7 +73,7 @@ function generateTeams(playerList, teamSize) {
     });
   }
 
-  // Priority 2: Create same-gender teams of size teamSize from remaining
+  // Priority 2: Create same-gender teams of size teamSize from remaining males
   while (males.length >= teamSize) {
     const teamPlayers = [];
     for (let i = 0; i < teamSize; i++) {
@@ -83,6 +85,7 @@ function generateTeams(playerList, teamSize) {
     });
   }
 
+  // Priority 2b: Create same-gender teams of size teamSize from remaining females
   while (females.length >= teamSize) {
     const teamPlayers = [];
     for (let i = 0; i < teamSize; i++) {
@@ -94,8 +97,27 @@ function generateTeams(playerList, teamSize) {
     });
   }
 
-  // Priority 3: Remaining players are unmatched
-  const unmatched = [...males, ...females];
+  // Priority 3: Combine all remaining players (leftover males, females, and all unspecified)
+  // and pair them into teams.
+  const leftovers = [...males, ...females, ...unspecified];
+  shuffle(leftovers);
+
+  while (leftovers.length >= teamSize) {
+    const teamPlayers = [];
+    for (let i = 0; i < teamSize; i++) {
+      teamPlayers.push(leftovers.shift());
+    }
+    const hasMale = teamPlayers.some(p => p.gender === 'male');
+    const hasFemale = teamPlayers.some(p => p.gender === 'female');
+    const type = (hasMale && hasFemale) ? 'mixed' : 'same';
+    teams.push({
+      players: teamPlayers,
+      type: type,
+    });
+  }
+
+  // Priority 4: Remaining players in leftovers are unmatched
+  const unmatched = leftovers;
 
   return { teams, unmatched };
 }
