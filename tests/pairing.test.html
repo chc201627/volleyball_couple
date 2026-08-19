@@ -23,11 +23,37 @@
     let passed = 0;
     let failed = 0;
 
-    function makePlayers(maleCount, femaleCount) {
+    function makePlayers(maleCount, femaleCount, levels) {
       const players = [];
-      for (let i = 1; i <= maleCount; i++) players.push({ name: `M${i}`, gender: 'male' });
-      for (let i = 1; i <= femaleCount; i++) players.push({ name: `F${i}`, gender: 'female' });
+      for (let i = 1; i <= maleCount; i++) {
+        const p = { name: `M${i}`, gender: 'male' };
+        if (levels && typeof levels[`M${i}`] === 'number') p.level = levels[`M${i}`];
+        players.push(p);
+      }
+      for (let i = 1; i <= femaleCount; i++) {
+        const p = { name: `F${i}`, gender: 'female' };
+        if (levels && typeof levels[`F${i}`] === 'number') p.level = levels[`F${i}`];
+        players.push(p);
+      }
       return players;
+    }
+
+    function teamAverages(teams) {
+      return teams.map(function (team) {
+        const sum = team.players.reduce(function (acc, p) {
+          return acc + (typeof p.level === 'number' ? p.level : 2);
+        }, 0);
+        return sum / team.players.length;
+      });
+    }
+
+    function variance(averages) {
+      const mean = averages.reduce(function (a, b) { return a + b; }, 0) / averages.length;
+      return averages.reduce(function (acc, avg) { return acc + (avg - mean) * (avg - mean); }, 0);
+    }
+
+    function teamTypeSignature(teams) {
+      return teams.map(function (t) { return t.type; }).sort().join(',');
     }
 
     function assert(condition, testName, detail) {
@@ -236,6 +262,106 @@
       assert(teams.length === 2, '4vs4 matching: 8 players → 2 same-gender teams of 4');
       assert(teams.every(t => t.type === 'same'), '4vs4 matching: all teams are same-gender');
       assert(unmatched.length === 0, '4vs4 matching: no unmatched players');
+    })();
+
+    // --- Level Balancing: no-op when no player has an explicit level (legacy roster) ---
+    (function () {
+      [2, 3, 4].forEach(function (size) {
+        const teamA = { players: [], type: 'same' };
+        const teamB = { players: [], type: 'same' };
+        for (let i = 0; i < size; i++) {
+          teamA.players.push({ name: `A${i}`, gender: 'unspecified' });
+          teamB.players.push({ name: `B${i}`, gender: 'unspecified' });
+        }
+        const teams = [teamA, teamB];
+        assert(hasExplicitLevel(teams) === false, `Level no-op: hasExplicitLevel false for legacy roster (teamSize ${size})`);
+        const before = JSON.stringify(teams);
+        balanceTeamsByLevel(teams);
+        const after = JSON.stringify(teams);
+        assert(before === after, `Level no-op: balanceTeamsByLevel makes no changes without explicit levels (teamSize ${size})`);
+      });
+    })();
+
+    // --- Level Balancing: variance of team averages not increased vs pre-balance baseline ---
+    (function () {
+      [2, 3, 4].forEach(function (size) {
+        const teamA = { players: [], type: 'same' };
+        const teamB = { players: [], type: 'same' };
+        for (let i = 0; i < size; i++) {
+          teamA.players.push({ name: `A${i}`, gender: 'unspecified', level: 3 });
+          teamB.players.push({ name: `B${i}`, gender: 'unspecified', level: 1 });
+        }
+        const teams = [teamA, teamB];
+        const beforeVar = variance(teamAverages(teams));
+        balanceTeamsByLevel(teams);
+        const afterVar = variance(teamAverages(teams));
+        assert(afterVar <= beforeVar + 1e-9, `Level balance: variance not increased (teamSize ${size})`,
+          `before=${beforeVar} after=${afterVar}`);
+        assert(afterVar < beforeVar - 1e-9, `Level balance: variance strictly reduced when imbalance exists (teamSize ${size})`,
+          `before=${beforeVar} after=${afterVar}`);
+      });
+    })();
+
+    // --- Level Balancing: unleveled players contribute value 2 (Intermediate) to team average ---
+    (function () {
+      const team = { players: [
+        { name: 'A1', gender: 'unspecified', level: 3 },
+        { name: 'A2', gender: 'unspecified' } // no level → counts as 2
+      ], type: 'same' };
+      assert(teamLevelAverage(team) === 2.5, 'Level balance: unleveled player counted as level 2 in team average',
+        `Got ${teamLevelAverage(team)}`);
+    })();
+
+    // --- Level Balancing: team type and unmatched count identical before/after balancing ---
+    (function () {
+      const players = makePlayers(4, 4, { M1: 3, M2: 1, M3: 3, M4: 1, F1: 3, F2: 1, F3: 3, F4: 1 });
+      const { teams, unmatched } = generateTeams(players, 2);
+      teams.forEach(function (team) {
+        const hasMale = team.players.some(function (p) { return p.gender === 'male'; });
+        const hasFemale = team.players.some(function (p) { return p.gender === 'female'; });
+        const expectedType = (hasMale && hasFemale) ? 'mixed' : 'same';
+        assert(team.type === expectedType, 'Level balance: team.type matches actual gender composition after balancing',
+          `type=${team.type} expected=${expectedType}`);
+      });
+      assert(unmatched.length === 0, 'Level balance: unmatched count unchanged (8 players, teamSize 2 → 0 unmatched)');
+    })();
+
+    // --- Level Balancing: repeated regenerate on leveled roster yields varied assignments ---
+    (function () {
+      const players = makePlayers(6, 6, {
+        M1: 3, M2: 1, M3: 3, M4: 1, M5: 2, M6: 2,
+        F1: 3, F2: 1, F3: 3, F4: 1, F5: 2, F6: 2
+      });
+      const orderings = new Set();
+      for (let i = 0; i < 50; i++) {
+        const { teams } = generateTeams(players, 2);
+        const key = teams.map(function (team) {
+          return team.players.map(function (p) { return p.name; }).sort().join('+');
+        }).sort().join('|');
+        orderings.add(key);
+      }
+      assert(orderings.size >= 2, `Level balance: ${orderings.size} unique team compositions in 50 runs on leveled roster`);
+    })();
+
+    // --- Level Balancing: uneven team sizes (3v3/4v4 leftovers) balance by AVERAGE not SUM ---
+    (function () {
+      const teamA = { players: [
+        { name: 'A1', gender: 'unspecified', level: 3 },
+        { name: 'A2', gender: 'unspecified', level: 3 },
+        { name: 'A3', gender: 'unspecified', level: 3 }
+      ], type: 'same' }; // size 3, avg 3
+      const teamB = { players: [
+        { name: 'B1', gender: 'unspecified', level: 1 },
+        { name: 'B2', gender: 'unspecified', level: 1 }
+      ], type: 'same' }; // size 2, avg 1
+      const teams = [teamA, teamB];
+      const beforeVar = variance(teamAverages(teams));
+      balanceTeamsByLevel(teams);
+      const afterVar = variance(teamAverages(teams));
+      assert(afterVar < beforeVar - 1e-9, 'Level balance: uneven team sizes reduce variance of AVERAGES',
+        `before=${beforeVar} after=${afterVar}`);
+      assert(teams[0].players.length === 3 && teams[1].players.length === 2,
+        'Level balance: team sizes unchanged by balancing');
     })();
 
     // --- Summary ---
