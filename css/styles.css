@@ -325,6 +325,23 @@ select {
   color: #616161;
 }
 
+/* Skill level: one purple hue, deeper as skill rises — avoids reusing
+   the gender blue/pink and the error red already carrying meaning */
+.player-list__badge--level-1 {
+  background-color: rgba(126, 87, 194, 0.12);
+  color: #7e57c2;
+}
+
+.player-list__badge--level-2 {
+  background-color: rgba(126, 87, 194, 0.22);
+  color: #5e35b1;
+}
+
+.player-list__badge--level-3 {
+  background-color: rgba(126, 87, 194, 0.34);
+  color: #4527a0;
+}
+
 .player-list__remove {
   background: none;
   border: none;
@@ -1062,7 +1079,11 @@ select {
   }
 
   .form__submit {
+    /* Lift the button by the reserved .form__error slot height plus the
+       group's 4px gap so it bottom-aligns with the inputs, not with the
+       error space below them */
     align-self: flex-end;
+    margin-bottom: calc(1.25 * 0.8125rem + 4px);
   }
 
   .actions {

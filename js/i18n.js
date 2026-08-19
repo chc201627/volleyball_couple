@@ -29,6 +29,11 @@ var t, setLanguage, getLanguage;
       'form.genderMale': 'Male',
       'form.genderFemale': 'Female',
       'form.genderUnspecified': 'Unspecified / No Gender',
+      'form.levelLabel': 'Skill Level (optional)',
+      'form.levelDefault': 'Select Level',
+      'form.level1': 'Beginner',
+      'form.level2': 'Intermediate',
+      'form.level3': 'Proficient',
       'form.submit': 'Add Player',
       // Validation
       'error.nameEmpty': 'Please enter a player name',
@@ -44,6 +49,9 @@ var t, setLanguage, getLanguage;
       'players.badgeMale': 'M',
       'players.badgeFemale': 'F',
       'players.badgeUnspecified': 'U',
+      'players.badgeLevel1': 'L1',
+      'players.badgeLevel2': 'L2',
+      'players.badgeLevel3': 'L3',
       // Actions
       'actions.generate': 'Generate Couples',
       'actions.generateTeams': 'Generate Teams',
@@ -148,6 +156,11 @@ var t, setLanguage, getLanguage;
       'form.genderMale': 'Masculino',
       'form.genderFemale': 'Femenino',
       'form.genderUnspecified': 'Sin especificar',
+      'form.levelLabel': 'Nivel de Habilidad (opcional)',
+      'form.levelDefault': 'Seleccionar Nivel',
+      'form.level1': 'Principiante',
+      'form.level2': 'Intermedio',
+      'form.level3': 'Avanzado',
       'form.submit': 'Agregar Jugador',
       // Validaci\u00f3n
       'error.nameEmpty': 'Por favor ingresa un nombre',
@@ -163,6 +176,9 @@ var t, setLanguage, getLanguage;
       'players.badgeMale': 'M',
       'players.badgeFemale': 'F',
       'players.badgeUnspecified': 'U',
+      'players.badgeLevel1': 'L1',
+      'players.badgeLevel2': 'L2',
+      'players.badgeLevel3': 'L3',
       // Acciones
       'actions.generate': 'Generar Parejas',
       'actions.generateTeams': 'Generar Equipos',

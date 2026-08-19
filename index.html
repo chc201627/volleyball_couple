@@ -47,6 +47,16 @@
           </select>
           <span class="form__error" id="gender-error" role="alert" aria-live="polite"></span>
         </div>
+        <div class="form__group">
+          <label class="form__label" for="player-level" data-i18n="form.levelLabel">Skill Level (optional)</label>
+          <select class="form__select" id="player-level" name="playerLevel">
+            <option value="" disabled selected data-i18n="form.levelDefault">Select Level</option>
+            <option value="1" data-i18n="form.level1">Beginner</option>
+            <option value="2" data-i18n="form.level2">Intermediate</option>
+            <option value="3" data-i18n="form.level3">Proficient</option>
+          </select>
+          <span class="form__error" aria-hidden="true"></span>
+        </div>
         <button class="btn btn--primary form__submit" type="submit" id="add-player-btn" disabled data-i18n="form.submit">
           Add Player
         </button>
