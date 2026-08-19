@@ -636,10 +636,17 @@
     activeMatchId = null;
     saveTournamentState();
     if (db && authUid) {
-      sessionId = generateSessionId();
-      markSessionOwner(sessionId);
-      history.replaceState(null, '', '#s=' + sessionId);
-      writeToFirebase(tournamentState);
+      // Only publish a live #s= share link once the write actually lands in
+      // Firebase; otherwise viewers would open a session that never persisted.
+      var candidateSid = generateSessionId();
+      writeToFirebase(tournamentState, candidateSid).then(function () {
+        sessionId = candidateSid;
+        markSessionOwner(candidateSid);
+        history.replaceState(null, '', '#s=' + candidateSid);
+      }).catch(function (e) {
+        console.warn('Live session write failed; using snapshot share link.', e && e.code);
+        pushShareURL();
+      });
     } else {
       pushShareURL();
     }
@@ -802,7 +809,9 @@
       activeMatchId = null;
       saveTournamentState();
       if (db && sessionId) {
-        writeToFirebase(tournamentState);
+        writeToFirebase(tournamentState).catch(function () {
+          // Local state already saved; the next update or reload will resync.
+        });
       } else {
         pushShareURL();
       }
@@ -895,14 +904,16 @@
     } catch (e) {}
   }
 
-  function writeToFirebase(state) {
-    if (!db || !sessionId || !authUid) return;
-    db.ref('tournaments/' + sessionId).set({
+  function writeToFirebase(state, sid) {
+    sid = sid || sessionId;
+    if (!db || !sid || !authUid) return Promise.reject(new Error('firebase-not-ready'));
+    return db.ref('tournaments/' + sid).set({
       state: state,
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
       ownerUid: authUid,
     }).catch(function (e) {
       console.warn('Firebase write rejected.', e && e.code);
+      throw e;
     });
   }
 
