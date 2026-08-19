@@ -455,8 +455,8 @@
     // Mode toggle: only for the session creator with enough players
     pairingToggle.hidden = isReadOnly || !hasEnough;
 
-    // Random/manual controls
-    generateBtn.hidden   = pairingMode !== 'random';
+    // Random/manual controls — never shown to a read-only viewer
+    generateBtn.hidden   = isReadOnly || pairingMode !== 'random';
     generateBtn.disabled = !hasEnough;
 
     if (teamSize === 2) {
@@ -469,8 +469,8 @@
       generateHint.textContent = t('actions.hintTeams', { n: teamSize });
     }
 
-    generateHint.hidden  = hasEnough || pairingMode !== 'random';
-    regenerateBtn.hidden = !couplesGenerated || pairingMode !== 'random';
+    generateHint.hidden  = isReadOnly || hasEnough || pairingMode !== 'random';
+    regenerateBtn.hidden = isReadOnly || !couplesGenerated || pairingMode !== 'random';
 
     // Manual mode panel
     manualPairingPanel.hidden = pairingMode !== 'manual' || !hasEnough;
@@ -479,7 +479,7 @@
       renderManualPairsList();
     }
 
-    clearBtn.hidden = players.length === 0;
+    clearBtn.hidden = isReadOnly || players.length === 0;
     tournamentSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     kingSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     // Keep max selectable groups in sync with available teams
