@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Player Import Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+  </style>
+</head>
+<body>
+  <h1>Player Import Tests</h1>
+  <div id="test-results"></div>
+  <script src="../js/player-import.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      var out = document.getElementById('test-results');
+      var passed = 0;
+      var failed = 0;
+
+      function assert(condition, name, detail) {
+        var item = document.createElement('p');
+        item.className = condition ? 'pass' : 'fail';
+        item.textContent = (condition ? '\u2713 ' : '\u2717 ') + name + (detail ? ' — ' + detail : '');
+        out.appendChild(item);
+        condition ? passed++ : failed++;
+      }
+      function hasCode(issues, code) {
+        return issues.some(function (issue) { return issue.code === code; });
+      }
+      function analyze(text, locale, existingCount) {
+        var parsed = parsePlayerImport(text);
+        return {
+          parsed: parsed,
+          validated: validatePlayerImport(parsed.rows, {
+            locale: locale || 'en',
+            existingCount: existingCount || 0,
+            maxPlayers: 200,
+          }),
+        };
+      }
+
+      function finish() {
+        var total = passed + failed;
+        var summary = document.createElement('div');
+        summary.id = 'summary';
+        summary.className = 'summary ' + (failed ? 'summary--fail' : 'summary--pass');
+        summary.dataset.passed = String(passed);
+        summary.dataset.failed = String(failed);
+        summary.textContent = passed + '/' + total + ' tests passed' + (failed ? ' — ' + failed + ' FAILED' : ' — ALL PASSED');
+        out.appendChild(summary);
+        document.documentElement.dataset.status = failed ? 'failed' : 'passed';
+      }
+
+      var interfaceReady = typeof parsePlayerImport === 'function' && typeof validatePlayerImport === 'function';
+      assert(interfaceReady, 'exposes the two-function global interface');
+      if (!interfaceReady) { finish(); return; }
+      assert(!Object.isFrozen || (Object.isFrozen(parsePlayerImport) && Object.isFrozen(validatePlayerImport)), 'freezes the public function contract');
+
+      var names = analyze('Ana Maria\nJohn Smith', 'en');
+      assert(names.parsed.dialect === 'name' && names.parsed.rows.length === 2, 'parses name-only rows without splitting spaces');
+
+      ['Ana,F,1\nBob,M,3', 'Ana;F;1\nBob;M;3', 'Ana\tF\t1\nBob\tM\t3'].forEach(function (input, i) {
+        var expected = ['comma', 'semicolon', 'tab'][i];
+        var result = analyze(input, 'en');
+        assert(result.parsed.dialect === expected && result.validated.summary.validCount === 2, 'parses ' + expected + ' batches');
+      });
+
+      var quoted = analyze('Name,Gender,Level\r\n"Pérez, Ana",F,2\r\n"Sam ""Ace""",M,3', 'en');
+      assert(quoted.parsed.headerSkipped && quoted.parsed.rows.length === 2, 'omits a recognized English header');
+      assert(quoted.validated.rows[0].player.name === 'Pérez, Ana', 'preserves a quoted delimiter');
+      assert(quoted.validated.rows[1].player.name === 'Sam "Ace"', 'decodes escaped quotes and CRLF');
+
+      var spanishHeader = analyze('Nombre;Género;Nivel\nAna;M;2', 'es');
+      assert(spanishHeader.parsed.headerSkipped && spanishHeader.parsed.rows.length === 1, 'omits a recognized Spanish header');
+
+      var malformed = parsePlayerImport('Ana,F,2\nBob;M;3\nCara,F,1,extra\n"Open,F,2');
+      assert(hasCode(malformed.rows[1].structuralIssues, 'mixedDelimiter'), 'flags a mixed row dialect');
+      assert(hasCode(malformed.rows[2].structuralIssues, 'tooManyColumns'), 'flags rows over three columns');
+      assert(hasCode(malformed.rows[3].structuralIssues, 'unclosedQuote'), 'flags an unclosed quote');
+      var delimitedThenName = analyze('Ana,F,2\nBob', 'en');
+      assert(hasCode(delimitedThenName.parsed.rows[1].structuralIssues, 'mixedDelimiter') && !delimitedThenName.validated.summary.canCommit, 'rejects name-only rows after delimited rows');
+      var nameThenDelimited = analyze('Ana\nBob,F,2', 'en');
+      assert(hasCode(nameThenDelimited.parsed.rows[1].structuralIssues, 'mixedDelimiter') && !nameThenDelimited.validated.summary.canCommit, 'rejects delimited rows after name-only rows');
+      var esM = analyze('Ana,M,2', 'es').validated.rows[0];
+      var enM = analyze('Alex,M,2', 'en').validated.rows[0];
+      assert(esM.player.gender === 'female' && hasCode(esM.notices, 'ambiguousM'), 'maps Spanish M to female with notice');
+      assert(enM.player.gender === 'male' && hasCode(enM.notices, 'ambiguousM'), 'maps English M to male with notice');
+
+      ['H', 'hombre', 'masculino', 'male', 'man'].forEach(function (token) {
+        assert(analyze('Player,' + token + ',2', 'en').validated.rows[0].player.gender === 'male', 'normalizes male token ' + token);
+      });
+      ['F', 'female', 'woman', 'mujer', 'femenino'].forEach(function (token) {
+        assert(analyze('Player,' + token + ',2', 'en').validated.rows[0].player.gender === 'female', 'normalizes female token ' + token);
+      });
+      ['U', 'unspecified', 'sin especificar', 'no especificado', '-'].forEach(function (token) {
+        assert(analyze('Player,' + token + ',2', 'en').validated.rows[0].player.gender === 'unspecified', 'normalizes unspecified token ' + token);
+      });
+
+      var optional = analyze('Alex,,\nTaylor,,1', 'en').validated;
+      assert(optional.rows[0].player.gender === 'unspecified' && !Object.prototype.hasOwnProperty.call(optional.rows[0].player, 'level'), 'defaults empty gender and omits empty level');
+      assert(optional.rows[1].player.level === 1, 'accepts level-only input with an empty gender column');
+
+      ['1', '2', '3'].forEach(function (level) {
+        assert(analyze('Player,F,' + level, 'en').validated.rows[0].player.level === Number(level), 'stores numeric level ' + level);
+      });
+      var badTokens = analyze('Player,other,4', 'en').validated.rows[0];
+      assert(hasCode(badTokens.issues, 'invalidGender') && hasCode(badTokens.issues, 'invalidLevel') && !badTokens.player, 'blocks unknown gender and invalid level');
+
+      var minName = analyze(' A \n' + 'B'.repeat(50), 'en').validated;
+      assert(hasCode(minName.rows[0].issues, 'nameTooShort'), 'rejects one-character trimmed names');
+      assert(minName.rows[1].player.name.length === 50, 'accepts a 50-character name');
+      assert(hasCode(analyze('C'.repeat(51), 'en').validated.rows[0].issues, 'nameTooLong'), 'rejects a 51-character name');
+
+      var duplicates = analyze('Same,F,1\nSame,F,1', 'en').validated;
+      assert(duplicates.summary.validCount === 2 && duplicates.summary.canCommit, 'preserves duplicate names as valid rows');
+      assert(analyze('One\nTwo', 'en', 198).validated.summary.canCommit, 'allows a combined total of 200');
+      var overLimit = analyze('One\nTwo', 'en', 199).validated;
+      assert(!overLimit.summary.canCommit && hasCode(overLimit.batchIssues, 'playerLimitExceeded'), 'blocks a combined total above 200');
+
+      var empty = analyze('\n  \r\n', 'en').validated;
+      assert(!empty.summary.canCommit && hasCode(empty.batchIssues, 'emptyBatch'), 'blocks an empty batch');
+
+      finish();
+    })();
+  </script>
+</body>
+</html>

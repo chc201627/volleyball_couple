@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Integration Tests — User Workflow</title>
+  <link rel="stylesheet" href="../css/styles.css">
   <style>
     body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
     h1 { color: #569cd6; }
@@ -33,7 +34,11 @@
       <!-- Input Section -->
       <section class="section section--input" aria-labelledby="input-heading">
         <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
-        <form class="form" id="player-form" novalidate>
+        <div class="entry-tabs" role="tablist" aria-label="Player entry mode" data-i18n-aria-label="import.modeLabel">
+          <button class="entry-tab entry-tab--active" id="single-mode-tab" role="tab" aria-selected="true" aria-controls="player-form" data-i18n="import.singleMode">One player</button>
+          <button class="entry-tab" id="import-mode-tab" role="tab" aria-selected="false" aria-controls="import-panel" tabindex="-1" data-i18n="import.pasteMode">Paste list</button>
+        </div>
+        <form class="form" id="player-form" role="tabpanel" aria-labelledby="single-mode-tab" novalidate>
           <div class="form__group">
             <label class="form__label" for="player-name" data-i18n="form.nameLabel">Player Name</label>
             <input
@@ -58,10 +63,26 @@
             </select>
             <span class="form__error" id="gender-error" role="alert" aria-live="polite"></span>
           </div>
+          <select id="player-level"><option value="">Level</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
           <button class="btn btn--primary form__submit" type="submit" id="add-player-btn" disabled data-i18n="form.submit">
             Add Player
           </button>
         </form>
+        <div class="import-panel" id="import-panel" role="tabpanel" aria-labelledby="import-mode-tab" hidden>
+          <label class="form__label" for="import-text" data-i18n="import.label">Player list</label>
+          <textarea class="form__input import-panel__text" id="import-text" rows="5" data-i18n-placeholder="import.placeholder"></textarea>
+          <p class="import-panel__hint" data-i18n="import.hint">Name, Gender, Level — one player per line</p>
+          <button class="btn btn--primary" id="review-import-btn" type="button" data-i18n="import.review">Review list</button>
+          <div id="import-review" hidden>
+            <p id="import-summary" class="import-summary" role="status" aria-live="polite"></p>
+            <ol id="import-preview" class="import-preview"></ol>
+            <button class="btn btn--success" id="confirm-import-btn" type="button" disabled></button>
+          </div>
+        </div>
+        <div class="import-feedback" id="import-feedback" role="status" aria-live="polite" hidden>
+          <span id="import-feedback-text"></span>
+          <button class="btn btn--warning" id="undo-import-btn" type="button" data-i18n="import.undo">Undo import</button>
+        </div>
       </section>
 
       <!-- Player List Section -->
@@ -259,6 +280,7 @@
   </div>
 
   <script src="../js/pairing.js"></script>
+  <script src="../js/player-import.js"></script>
   <script src="../js/i18n.js"></script>
   <script src="../js/app.js"></script>
   <script>
@@ -305,6 +327,89 @@
       assert(document.getElementById('regenerate-btn').hidden, 'Initial: regenerate button is hidden');
       assert(document.getElementById('clear-btn').hidden, 'Initial: clear button is hidden');
       assert(document.getElementById('results-section').hidden, 'Initial: results section is hidden');
+
+      // ===== BULK REVIEW: preview is editable, safe, localized, and mobile-first =====
+      var appFrame = document.getElementById('app-frame');
+      appFrame.style.cssText = 'display:block;width:320px';
+      setLanguage('es');
+      document.getElementById('import-mode-tab').click();
+      assert(!document.getElementById('import-panel').hidden && document.getElementById('player-form').hidden, 'Import: mode switch opens paste panel');
+      document.getElementById('import-text').value = 'Ana,M,2\n<img src=x>,other,4';
+      document.getElementById('review-import-btn').click();
+      var importRows = document.querySelectorAll('.import-row');
+      assert(importRows.length === 2 && getPlayerItems().length === 0, 'Import: review creates preview without changing roster');
+      assert(document.getElementById('confirm-import-btn').disabled, 'Import: invalid preview cannot commit');
+      assert(!document.querySelector('#import-preview img') && importRows[1].querySelector('.import-row__name').value === '<img src=x>', 'Import: user text is assigned safely');
+      if (importRows.length === 2) {
+        assert(importRows[0].querySelector('.import-row__gender').value === 'female', 'Import: Spanish M is captured as female');
+        assert(document.activeElement === importRows[1].querySelector('.import-row__gender'), 'Import: first invalid control receives focus');
+        setLanguage('en');
+        assert(importRows[0].querySelector('.import-row__gender').value === 'female', 'Import: language change does not reparse canonical preview');
+        var badGender = document.querySelectorAll('.import-row')[1].querySelector('.import-row__gender');
+        badGender.value = 'male'; badGender.dispatchEvent(new Event('change', { bubbles: true }));
+        var badLevel = document.querySelectorAll('.import-row')[1].querySelector('.import-row__level');
+        badLevel.value = '2'; badLevel.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelectorAll('.import-row__delete')[0].click();
+        assert(document.querySelectorAll('.import-row').length === 1 && !document.getElementById('confirm-import-btn').disabled, 'Import: edits and deletion refresh eligibility');
+      }
+      assert(document.getElementById('import-summary').getAttribute('aria-live') === 'polite', 'Import: summary is announced');
+      var deleteTarget = document.querySelector('.import-row__delete');
+      assert(appFrame.scrollWidth <= appFrame.clientWidth && deleteTarget && deleteTarget.getBoundingClientRect().height >= 44, 'Import: 320px preview has no overflow and touch target is 44px');
+      appFrame.style.cssText = '';
+      document.getElementById('single-mode-tab').click();
+      assert(getPlayerItems().length === 0, 'Import: leaving unconfirmed preview preserves roster');
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('confirm-import-btn').click();
+      assert(getPlayerItems().length === 1 && getPlayerItems()[0].textContent.includes('<img src=x>') && !document.querySelector('#player-list img, #player-list script'), 'Import: markup-like name commits as literal text without injected DOM');
+      document.getElementById('undo-import-btn').click();
+      assert(getPlayerItems().length === 0 && !document.querySelector('#player-list img, #player-list script'), 'Import: markup-like player undo leaves later cases clean');
+
+      // ===== BULK COMMIT: append once, preserve duplicates, exact undo =====
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = Array.from({ length: 201 }, (_, i) => 'Player ' + i).join('\n');
+      document.getElementById('review-import-btn').click();
+      assert(document.getElementById('confirm-import-btn').disabled, 'Import: combined total above 200 cannot commit');
+      document.getElementById('single-mode-tab').click();
+      addPlayer('Existing', 'male');
+      var originalSetItem = Storage.prototype.setItem;
+      var playerWrites = 0;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === 'bv-players') playerWrites++;
+        return originalSetItem.call(this, key, value);
+      };
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = 'Existing,F,1\nExisting,F,2';
+      document.getElementById('review-import-btn').click();
+      document.getElementById('confirm-import-btn').click();
+      Storage.prototype.setItem = originalSetItem;
+      var storedAfterImport = JSON.parse(localStorage.getItem('bv-players') || '[]');
+      assert(getPlayerItems().length === 3 && storedAfterImport.length === 3, 'Import: batch appends without replacing existing roster');
+      assert(playerWrites === 1, 'Import: batch persists exactly once');
+      assert(storedAfterImport.length === 3 && storedAfterImport[1].id !== storedAfterImport[2].id, 'Import: duplicate names receive fresh IDs');
+      assert(!document.getElementById('import-feedback').hidden, 'Import: success and undo are announced');
+      var undoWasReady = getPlayerItems().length === 3 && !document.getElementById('import-feedback').hidden;
+      document.getElementById('undo-import-btn').click();
+      assert(undoWasReady && getPlayerItems().length === 1 && getPlayerItems()[0].textContent.includes('Existing'), 'Import: undo removes exactly imported IDs');
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = 'Temporary,F,2';
+      document.getElementById('review-import-btn').click();
+      document.getElementById('confirm-import-btn').click();
+      var laterUndoWasReady = getPlayerItems().length === 2 && !document.getElementById('import-feedback').hidden;
+      document.getElementById('single-mode-tab').click();
+      addPlayer('Later', 'male');
+      assert(laterUndoWasReady && document.getElementById('import-feedback').hidden && getPlayerItems().length === 3, 'Import: later roster mutation invalidates undo');
+      var resetConfirm = window.confirm; window.confirm = function () { return true; };
+      document.getElementById('clear-btn').click(); window.confirm = resetConfirm;
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = Array.from({ length: 20 }, (_, i) => 'Mobile Player ' + i + ',,2').join('\n');
+      document.getElementById('review-import-btn').click();
+      assert(document.querySelectorAll('.import-row').length === 20 && appFrame.scrollWidth <= appFrame.clientWidth, 'Import: 20-player preview fits 320px');
+      document.getElementById('confirm-import-btn').click();
+      assert(getPlayerItems().length === 20, 'Import: 20-player mobile batch commits atomically');
+      document.getElementById('undo-import-btn').click();
+      assert(getPlayerItems().length === 0, 'Import: 20-player mobile batch undoes exactly');
+      appFrame.style.cssText = '';
 
       // ===== TEST 2: Add players =====
       addPlayer('Alice', 'female');

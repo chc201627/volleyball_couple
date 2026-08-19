@@ -35,6 +35,30 @@ var t, setLanguage, getLanguage;
       'form.level2': 'Intermediate',
       'form.level3': 'Proficient',
       'form.submit': 'Add Player',
+      'import.modeLabel': 'Player entry mode',
+      'import.singleMode': 'One player',
+      'import.pasteMode': 'Paste list',
+      'import.label': 'Player list',
+      'import.placeholder': 'Ana Perez, F, 2\nCarlos Ruiz, M, 3',
+      'import.hint': 'Name, Gender, Level — one player per line',
+      'import.review': 'Review list',
+      'import.summary': '{valid} valid · {errors} need attention · {existing} existing',
+      'import.confirm': 'Import {count} players',
+      'import.player': 'Player {n}',
+      'import.delete': 'Remove player {n}',
+      'import.genderBlank': 'Unspecified',
+      'import.levelBlank': 'No level',
+      'import.mixedDelimiter': 'This row uses a different separator',
+      'import.tooManyColumns': 'Use at most Name, Gender, Level',
+      'import.unclosedQuote': 'Close the quoted value',
+      'import.invalidGender': 'Choose a recognized gender',
+      'import.invalidLevel': 'Choose level 1, 2, or 3',
+      'import.emptyBatch': 'Paste at least one player',
+      'import.playerLimitExceeded': 'The roster cannot exceed {maxPlayers} players',
+      'import.ambiguousM': 'M was interpreted using {locale}',
+      'import.success': '{count} players imported',
+      'import.undo': 'Undo import',
+      'import.undone': '{count} imported players removed',
       // Validation
       'error.nameEmpty': 'Please enter a player name',
       'error.nameMin': 'Name must be at least 2 characters',
@@ -145,7 +169,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.5.1'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.6.0'
 
     },
     es: {
@@ -167,6 +191,30 @@ var t, setLanguage, getLanguage;
       'form.level2': 'Intermedio',
       'form.level3': 'Avanzado',
       'form.submit': 'Agregar Jugador',
+      'import.modeLabel': 'Modo de registro de jugadores',
+      'import.singleMode': 'Un jugador',
+      'import.pasteMode': 'Pegar lista',
+      'import.label': 'Lista de jugadores',
+      'import.placeholder': 'Ana Pérez, M, 2\nCarlos Ruiz, H, 3',
+      'import.hint': 'Nombre, Género, Nivel — un jugador por línea',
+      'import.review': 'Revisar lista',
+      'import.summary': '{valid} válidos · {errors} requieren atención · {existing} existentes',
+      'import.confirm': 'Importar {count} jugadores',
+      'import.player': 'Jugador {n}',
+      'import.delete': 'Eliminar jugador {n}',
+      'import.genderBlank': 'Sin especificar',
+      'import.levelBlank': 'Sin nivel',
+      'import.mixedDelimiter': 'Esta fila usa un separador diferente',
+      'import.tooManyColumns': 'Use como máximo Nombre, Género, Nivel',
+      'import.unclosedQuote': 'Cierre el valor entre comillas',
+      'import.invalidGender': 'Seleccione un género reconocido',
+      'import.invalidLevel': 'Seleccione un nivel entre 1 y 3',
+      'import.emptyBatch': 'Pegue al menos un jugador',
+      'import.playerLimitExceeded': 'La lista no puede superar {maxPlayers} jugadores',
+      'import.ambiguousM': 'M se interpretó según {locale}',
+      'import.success': 'Se importaron {count} jugadores',
+      'import.undo': 'Deshacer importación',
+      'import.undone': 'Se eliminaron {count} jugadores importados',
       // Validaci\u00f3n
       'error.nameEmpty': 'Por favor ingresa un nombre',
       'error.nameMin': 'El nombre debe tener al menos 2 caracteres',
@@ -277,7 +325,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.5.1'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.6.0'
 
     }
   };
@@ -317,6 +365,9 @@ var t, setLanguage, getLanguage;
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
       el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+    });
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(function (el) {
+      el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
     });
   }
 
