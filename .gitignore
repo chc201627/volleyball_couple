@@ -13,6 +13,10 @@ Thumbs.db
 node_modules/
 package-lock.json
 
+# Firebase local emulators
+*-debug.log
+.firebase/
+
 # Environment
 .env
 .env.local
