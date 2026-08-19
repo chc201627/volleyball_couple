@@ -16,3 +16,6 @@ package-lock.json
 # Environment
 .env
 .env.local
+
+# Playwright MCP run artifacts
+.playwright-mcp/
