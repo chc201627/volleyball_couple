@@ -226,6 +226,23 @@
       assert(validIds, 'generateMatches: match IDs start with group ID');
     })();
 
+    (function () {
+      const teams = createTeams(makeCouplesResult(4));
+      const groups = [{ id: 'A', teams }];
+      const first = generateMatches(groups);
+      const second = generateMatches(groups);
+      const metadata = first.map(m => ({ id: m.id, round: m.round, order: m.order }));
+      const repeated = second.map(m => ({ id: m.id, round: m.round, order: m.order }));
+      assert(JSON.stringify(metadata) === JSON.stringify(repeated),
+        'generateMatches: identity, round, and order are stable');
+      assert(first.every(m => Number.isInteger(m.round) && m.round >= 1),
+        'generateMatches: every match exposes a one-based round');
+      assert(first.every((m, index) => m.order === index + 1),
+        'generateMatches: every match exposes a stable global order');
+      assert(first.every(m => m.status === 'pending' && m.revision === 0),
+        'generateMatches: every match starts Pending at revision zero');
+    })();
+
     // ─── calculateStandings ──────────────────────────────────────────────────────
 
     heading('calculateStandings');
@@ -293,6 +310,34 @@
         `Got ${standings.size}`);
     })();
 
+    (function () {
+      const teams = createTeams(makeCouplesResult(2));
+      const groups = [{ id: 'A', teams }];
+      const pending = generateMatches(groups);
+      const live = projectMatchResults(pending, {
+        [pending[0].id]: { score1: 10, score2: 10, status: 'live', revision: 1, updatedBy: 'scorer', updatedAt: 100 },
+      });
+      const liveStandings = calculateStandings(groups, live).get('A');
+      assert(live[0].status === 'live' && live[0].played === false,
+        'projectMatchResults: Live progress does not finalize a match');
+      assert(liveStandings.every(row => row.played === 0),
+        'calculateStandings: Live progress does not affect standings');
+
+      const result = {
+        [pending[0].id]: { score1: 21, score2: 18, status: 'finished', revision: 2, updatedBy: 'scorer', updatedAt: 200 },
+      };
+      const finished = projectMatchResults(pending, result);
+      const repeated = projectMatchResults(finished, result);
+      const once = calculateStandings(groups, finished).get('A');
+      const twice = calculateStandings(groups, repeated).get('A');
+      assert(finished[0].status === 'finished' && finished[0].played === true,
+        'projectMatchResults: final result moves a match to Finished');
+      assert(once.reduce((sum, row) => sum + row.played, 0) === 2,
+        'calculateStandings: a final result updates both teams once');
+      assert(JSON.stringify(once) === JSON.stringify(twice),
+        'calculateStandings: projecting the same final result remains standings-once');
+    })();
+
     // ─── recordMatchScore ─────────────────────────────────────────────────────────
 
     heading('recordMatchScore');
@@ -307,6 +352,10 @@
         'recordMatchScore: scores are saved correctly');
       assert(match.played === true,
         'recordMatchScore: match marked as played');
+      assert(match.status === 'finished' && match.revision === 1,
+        'recordMatchScore: compatibility path records a Finished revision');
+      assert(original[0].status === 'pending' && original[0].revision === 0,
+        'recordMatchScore: immutable metadata leaves the original Pending');
     })();
 
     (function () {

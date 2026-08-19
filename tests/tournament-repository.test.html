@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tournament Repository Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    .pass, .summary--pass { color: #4ec9b0; } .fail, .summary--fail { color: #f44747; }
+  </style>
+</head>
+<body>
+  <h1>Tournament Repository — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/tournament.js"></script>
+  <script src="../js/tournament-repository.js"></script>
+  <script>
+    (async function () {
+      'use strict';
+      const out = document.getElementById('results');
+      let passed = 0;
+      let failed = 0;
+      function assert(condition, name, detail) {
+        const item = document.createElement('p');
+        item.className = condition ? 'pass' : 'fail';
+        item.textContent = (condition ? '\u2713 ' : '\u2717 ') + name + (detail ? ' — ' + detail : '');
+        out.appendChild(item);
+        condition ? passed++ : failed++;
+      }
+      function tournamentFixture() {
+        const players = [
+          { id: 'p1', name: 'A' }, { id: 'p2', name: 'B' },
+          { id: 'p3', name: 'C' }, { id: 'p4', name: 'D' },
+        ];
+        const teams = [
+          { id: 't0', name: 'A & B', players: players.slice(0, 2), player1: players[0], player2: players[1] },
+          { id: 't1', name: 'C & D', players: players.slice(2), player1: players[2], player2: players[3] },
+        ];
+        const groups = [{ id: 'A', teams }];
+        return { players, teams, groups, matches: generateMatches(groups) };
+      }
+      try {
+        const repo = createInMemoryTournamentRepository({ uid: 'owner-1', now: () => 1000 });
+        const methods = ['createSession', 'watchSession', 'requestAccess', 'setAccess', 'saveResult', 'removeSession'];
+        assert(methods.every(name => typeof repo[name] === 'function'), 'repository exposes the six-method interface');
+        const created = await repo.createSession(tournamentFixture());
+        let snapshot;
+        const unsubscribe = repo.watchSession(created.sessionId, value => { snapshot = value; });
+        assert(typeof unsubscribe === 'function', 'watchSession returns an unsubscribe function');
+        assert(snapshot.schemaVersion === 2 && snapshot.legacy === false, 'createSession exposes a schema-v2 snapshot');
+        assert(snapshot.tournament.matches.every(match => match.status === 'pending' && match.revision === 0),
+          'v2 projection supplies Pending revision-zero results');
+        const firstId = snapshot.tournament.matches[0].id;
+        const beforeOther = JSON.stringify(snapshot.tournament.matches[1]);
+        const saved = await repo.saveResult(created.sessionId, {
+          matchId: firstId,
+          score1: 21,
+          score2: 18,
+          status: 'finished',
+          expectedRevision: 0,
+        });
+        assert(saved.status === 'synced' && saved.result.revision === 1, 'saveResult confirms one synchronized result revision');
+        assert(snapshot.tournament.matches[0].status === 'finished' && snapshot.tournament.matches[0].played,
+          'v2 result is joined into the addressed match');
+        assert(JSON.stringify(snapshot.tournament.matches[1]) === beforeOther,
+          'v2 result save leaves every other match unchanged');
+        unsubscribe();
+        const legacyState = tournamentFixture();
+        legacyState.matches = recordMatchScore(legacyState.matches, legacyState.matches[0].id, 21, 17);
+        const legacyRepo = createInMemoryTournamentRepository({
+          uid: 'viewer-1',
+          sessions: { legacy: { state: legacyState, ownerUid: 'old-owner' } },
+        });
+        let legacySnapshot;
+        legacyRepo.watchSession('legacy', value => { legacySnapshot = value; });
+        assert(legacySnapshot.schemaVersion === 1 && legacySnapshot.legacy === true, 'v1 codec recognizes a legacy state wrapper');
+        assert(legacySnapshot.tournament.matches[0].score1 === 21 && legacySnapshot.tournament.matches[0].played,
+          'v1 codec preserves readable teams, matches, and scores');
+        const legacyStandings = calculateStandings(legacySnapshot.tournament.groups, legacySnapshot.tournament.matches);
+        assert(legacyStandings.get('A')[0].points === 3,
+          'v1 codec preserves readable standings');
+        const denied = await legacyRepo.saveResult('legacy', {
+          matchId: legacySnapshot.tournament.matches[0].id,
+          score1: 21,
+          score2: 19,
+          status: 'finished',
+          expectedRevision: 1,
+        });
+        assert(denied.status === 'denied' && denied.reason === 'legacy-read-only', 'v1 sessions remain read-only');
+      } catch (error) {
+        assert(false, 'repository suite completes without an unexpected error', error && error.message);
+      }
+      const total = passed + failed;
+      const summary = document.createElement('div');
+      summary.id = 'summary';
+      summary.className = 'summary ' + (failed ? 'summary--fail' : 'summary--pass');
+      summary.dataset.passed = String(passed);
+      summary.dataset.failed = String(failed);
+      summary.textContent = passed + '/' + total + ' tests passed' + (failed ? ' — ' + failed + ' FAILED' : ' — ALL PASSED');
+      out.appendChild(summary);
+      document.documentElement.dataset.status = failed ? 'failed' : 'passed';
+    })();
+  </script>
+</body>
+</html>
