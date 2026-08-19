@@ -755,7 +755,7 @@
       li.className = 'king-queue__item animate__animated animate__fadeIn';
       li.style.animationDelay = (idx * 30) + 'ms';
       if (idx === 0) li.classList.add('king-queue__item--next');
-      li.textContent = escapeHTML(team.name);
+      li.textContent = team.name;
       kingQueueList.appendChild(li);
     });
   }
