@@ -56,6 +56,9 @@ var t, setLanguage, getLanguage;
       'import.emptyBatch': 'Paste at least one player',
       'import.playerLimitExceeded': 'The roster cannot exceed {maxPlayers} players',
       'import.ambiguousM': 'M was interpreted using {locale}',
+      'import.success': '{count} players imported',
+      'import.undo': 'Undo import',
+      'import.undone': '{count} imported players removed',
       // Validation
       'error.nameEmpty': 'Please enter a player name',
       'error.nameMin': 'Name must be at least 2 characters',
@@ -166,7 +169,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.5.1'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.6.0'
 
     },
     es: {
@@ -209,6 +212,9 @@ var t, setLanguage, getLanguage;
       'import.emptyBatch': 'Pegue al menos un jugador',
       'import.playerLimitExceeded': 'La lista no puede superar {maxPlayers} jugadores',
       'import.ambiguousM': 'M se interpretó según {locale}',
+      'import.success': 'Se importaron {count} jugadores',
+      'import.undo': 'Deshacer importación',
+      'import.undone': 'Se eliminaron {count} jugadores importados',
       // Validaci\u00f3n
       'error.nameEmpty': 'Por favor ingresa un nombre',
       'error.nameMin': 'El nombre debe tener al menos 2 caracteres',
@@ -319,7 +325,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.5.1'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.6.0'
 
     }
   };

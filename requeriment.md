@@ -54,6 +54,18 @@ The application will include player registration, gender-aware random pairing al
 
 **REQ-FR-06:** The system shall display a count of male and female players currently registered.
 
+### 3.1.1 Bulk Player Import
+
+**REQ-FR-20:** The system shall retain single-player registration as the default and provide a Paste list mode.
+
+**REQ-FR-21:** The system shall parse comma, semicolon, tab, or name-only rows and require an editable validated preview before import.
+
+**REQ-FR-22:** The system shall append one fully valid batch with fresh IDs, preserve duplicate names, and reject totals above 200 players.
+
+**REQ-FR-23:** The system shall allow undoing exactly the latest imported batch by player ID until another roster mutation or reload.
+
+**REQ-FR-24:** The import preview shall localize EN/ES gender tokens, disclose locale-dependent M interpretation, announce errors, and avoid horizontal overflow at 320px.
+
 ### 3.2 Couple Matching Algorithm
 
 **REQ-FR-07:** The system shall randomly pair players into couples when requested by the user.

@@ -421,6 +421,25 @@
 
 ---
 
+## Phase 11: Bulk Player Import
+
+### TASK-11.1 — Parse and review pasted rosters
+- [x] **Priority:** P0
+- **Requirements:** REQ-FR-20, REQ-FR-21, REQ-FR-24
+- **Acceptance Criteria:** Quote-aware EN/ES parsing; editable stacked preview; safe text rendering; accessible 320px layout.
+
+### TASK-11.2 — Commit and undo imported batches
+- [x] **Priority:** P0
+- **Requirements:** REQ-FR-22, REQ-FR-23
+- **Acceptance Criteria:** Append once, persist/render once, fresh IDs, duplicate preservation, exact latest-batch undo.
+
+### TASK-11.3 — Verify and release bulk import
+- [x] **Priority:** P0
+- **Requirements:** REQ-FR-20–REQ-FR-24
+- **Acceptance Criteria:** Five browser harnesses pass; 20-player mobile import/undo passes; cache/footer version is 1.6.0.
+
+---
+
 ## Requirements Traceability Matrix
 
 | Requirement | Task(s) |
@@ -444,6 +463,11 @@
 | REQ-FR-17 | TASK-4.2 |
 | REQ-FR-18 | TASK-5.3 |
 | REQ-FR-19 | TASK-5.2 |
+| REQ-FR-20 | TASK-11.1 |
+| REQ-FR-21 | TASK-11.1 |
+| REQ-FR-22 | TASK-11.2 |
+| REQ-FR-23 | TASK-11.2 |
+| REQ-FR-24 | TASK-11.1, TASK-11.3 |
 | REQ-NFR-01 | TASK-7.5 |
 | REQ-NFR-02 | TASK-7.5 |
 | REQ-NFR-03 | TASK-1.4, TASK-7.1 |

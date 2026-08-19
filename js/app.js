@@ -29,6 +29,7 @@
   let importRows = [];
   let importAnalysis = null;
   let importLocale = 'es';
+  let lastImportIds = [];
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -47,6 +48,9 @@
   const importSummary = document.getElementById('import-summary');
   const importPreview = document.getElementById('import-preview');
   const confirmImportBtn = document.getElementById('confirm-import-btn');
+  const importFeedback = document.getElementById('import-feedback');
+  const importFeedbackText = document.getElementById('import-feedback-text');
+  const undoImportBtn = document.getElementById('undo-import-btn');
 
   const playerList = document.getElementById('player-list');
   const playerCount = document.getElementById('player-count');
@@ -112,6 +116,8 @@
     singleModeTab.addEventListener('click', function () { setEntryMode('single'); });
     importModeTab.addEventListener('click', function () { setEntryMode('import'); });
     reviewImportBtn.addEventListener('click', handleReviewImport);
+    confirmImportBtn.addEventListener('click', handleConfirmImport);
+    undoImportBtn.addEventListener('click', handleUndoImport);
     importPreview.addEventListener('input', handleImportEdit);
     importPreview.addEventListener('change', handleImportEdit);
     importPreview.addEventListener('click', handleImportDelete);
@@ -279,6 +285,48 @@
       maxPlayers: 200,
     });
     renderImportPreview();
+  }
+
+  function showImportFeedback(message, canUndo) {
+    importFeedbackText.textContent = message;
+    undoImportBtn.hidden = !canUndo;
+    importFeedback.hidden = false;
+  }
+
+  function commitRosterMutation(mutator, importedIds) {
+    mutator(players);
+    lastImportIds = importedIds ? importedIds.slice() : [];
+    importFeedback.hidden = true;
+    savePlayersState();
+    updateUI();
+  }
+
+  function handleConfirmImport() {
+    revalidateImport();
+    if (!importAnalysis.summary.canCommit) return;
+    var batch = importAnalysis.rows.map(function (row, index) {
+      return Object.assign({ id: Date.now() + index + Math.random() }, row.player);
+    });
+    var ids = batch.map(function (player) { return player.id; });
+    commitRosterMutation(function (roster) { roster.push.apply(roster, batch); }, ids);
+    importRows = [];
+    importAnalysis = null;
+    importText.value = '';
+    importReview.hidden = true;
+    showImportFeedback(t('import.success', { count: batch.length }), true);
+    setEntryMode('single');
+  }
+
+  function handleUndoImport() {
+    if (!lastImportIds.length) return;
+    var ids = new Set(lastImportIds);
+    var count = ids.size;
+    commitRosterMutation(function (roster) {
+      for (var i = roster.length - 1; i >= 0; i--) {
+        if (ids.has(roster[i].id)) roster.splice(i, 1);
+      }
+    });
+    showImportFeedback(t('import.undone', { count: count }), false);
   }
 
   function handleImportEdit(e) {
@@ -488,10 +536,8 @@
       player.level = Number(lvl);
     }
 
-    players.push(player);
     resetForm();
-    savePlayersState();
-    updateUI();
+    commitRosterMutation(function (roster) { roster.push(player); });
   }
 
   function resetForm() {
@@ -524,14 +570,13 @@
       item.classList.remove('animate__fadeIn');
       item.classList.add('animate__fadeOut');
       item.addEventListener('animationend', () => {
-        players.splice(players.findIndex(p => p.id === id), 1);
-        savePlayersState();
-        updateUI();
+        commitRosterMutation(function (roster) {
+          var removeIndex = roster.findIndex(function (player) { return player.id === id; });
+          if (removeIndex !== -1) roster.splice(removeIndex, 1);
+        });
       }, { once: true });
     } else {
-      players.splice(idx, 1);
-      savePlayersState();
-      updateUI();
+      commitRosterMutation(function (roster) { roster.splice(idx, 1); });
     }
   }
 
@@ -539,7 +584,6 @@
 
   function handleClearAll() {
     if (!confirm(t('actions.confirmClear'))) return;
-    players.length = 0;
     couplesGenerated = false;
     lastResult = null;
     manualPairs = [];
@@ -550,8 +594,7 @@
     document.querySelectorAll('.match-type__opt').forEach(function (b) {
       b.classList.toggle('match-type__opt--active', parseInt(b.getAttribute('data-size'), 10) === 2);
     });
-    savePlayersState();
-    updateUI();
+    commitRosterMutation(function (roster) { roster.length = 0; });
   }
 
   // --- Generate Couples/Teams ---

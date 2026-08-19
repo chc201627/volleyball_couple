@@ -79,6 +79,10 @@
             <button class="btn btn--success" id="confirm-import-btn" type="button" disabled></button>
           </div>
         </div>
+        <div class="import-feedback" id="import-feedback" role="status" aria-live="polite" hidden>
+          <span id="import-feedback-text"></span>
+          <button class="btn btn--warning" id="undo-import-btn" type="button" data-i18n="import.undo">Undo import</button>
+        </div>
       </section>
 
       <!-- Player List Section -->
@@ -334,17 +338,18 @@
       document.getElementById('review-import-btn').click();
       var importRows = document.querySelectorAll('.import-row');
       assert(importRows.length === 2 && getPlayerItems().length === 0, 'Import: review creates preview without changing roster');
-      assert(!document.querySelector('#import-preview img') && document.querySelector('.import-row__name') && document.querySelector('.import-row__name').value === 'Ana', 'Import: user text is assigned safely');
+      assert(document.getElementById('confirm-import-btn').disabled, 'Import: invalid preview cannot commit');
+      assert(!document.querySelector('#import-preview img') && importRows[1].querySelector('.import-row__name').value === '<img src=x>', 'Import: user text is assigned safely');
       if (importRows.length === 2) {
         assert(importRows[0].querySelector('.import-row__gender').value === 'female', 'Import: Spanish M is captured as female');
         assert(document.activeElement === importRows[1].querySelector('.import-row__gender'), 'Import: first invalid control receives focus');
         setLanguage('en');
         assert(importRows[0].querySelector('.import-row__gender').value === 'female', 'Import: language change does not reparse canonical preview');
-        var badGender = importRows[1].querySelector('.import-row__gender');
-        var badLevel = importRows[1].querySelector('.import-row__level');
+        var badGender = document.querySelectorAll('.import-row')[1].querySelector('.import-row__gender');
         badGender.value = 'male'; badGender.dispatchEvent(new Event('change', { bubbles: true }));
+        var badLevel = document.querySelectorAll('.import-row')[1].querySelector('.import-row__level');
         badLevel.value = '2'; badLevel.dispatchEvent(new Event('change', { bubbles: true }));
-        document.querySelectorAll('.import-row__delete')[1].click();
+        document.querySelectorAll('.import-row__delete')[0].click();
         assert(document.querySelectorAll('.import-row').length === 1 && !document.getElementById('confirm-import-btn').disabled, 'Import: edits and deletion refresh eligibility');
       }
       assert(document.getElementById('import-summary').getAttribute('aria-live') === 'polite', 'Import: summary is announced');
@@ -353,6 +358,58 @@
       appFrame.style.cssText = '';
       document.getElementById('single-mode-tab').click();
       assert(getPlayerItems().length === 0, 'Import: leaving unconfirmed preview preserves roster');
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('confirm-import-btn').click();
+      assert(getPlayerItems().length === 1 && getPlayerItems()[0].textContent.includes('<img src=x>') && !document.querySelector('#player-list img, #player-list script'), 'Import: markup-like name commits as literal text without injected DOM');
+      document.getElementById('undo-import-btn').click();
+      assert(getPlayerItems().length === 0 && !document.querySelector('#player-list img, #player-list script'), 'Import: markup-like player undo leaves later cases clean');
+
+      // ===== BULK COMMIT: append once, preserve duplicates, exact undo =====
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = Array.from({ length: 201 }, (_, i) => 'Player ' + i).join('\n');
+      document.getElementById('review-import-btn').click();
+      assert(document.getElementById('confirm-import-btn').disabled, 'Import: combined total above 200 cannot commit');
+      document.getElementById('single-mode-tab').click();
+      addPlayer('Existing', 'male');
+      var originalSetItem = Storage.prototype.setItem;
+      var playerWrites = 0;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === 'bv-players') playerWrites++;
+        return originalSetItem.call(this, key, value);
+      };
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = 'Existing,F,1\nExisting,F,2';
+      document.getElementById('review-import-btn').click();
+      document.getElementById('confirm-import-btn').click();
+      Storage.prototype.setItem = originalSetItem;
+      var storedAfterImport = JSON.parse(localStorage.getItem('bv-players') || '[]');
+      assert(getPlayerItems().length === 3 && storedAfterImport.length === 3, 'Import: batch appends without replacing existing roster');
+      assert(playerWrites === 1, 'Import: batch persists exactly once');
+      assert(storedAfterImport.length === 3 && storedAfterImport[1].id !== storedAfterImport[2].id, 'Import: duplicate names receive fresh IDs');
+      assert(!document.getElementById('import-feedback').hidden, 'Import: success and undo are announced');
+      var undoWasReady = getPlayerItems().length === 3 && !document.getElementById('import-feedback').hidden;
+      document.getElementById('undo-import-btn').click();
+      assert(undoWasReady && getPlayerItems().length === 1 && getPlayerItems()[0].textContent.includes('Existing'), 'Import: undo removes exactly imported IDs');
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = 'Temporary,F,2';
+      document.getElementById('review-import-btn').click();
+      document.getElementById('confirm-import-btn').click();
+      var laterUndoWasReady = getPlayerItems().length === 2 && !document.getElementById('import-feedback').hidden;
+      document.getElementById('single-mode-tab').click();
+      addPlayer('Later', 'male');
+      assert(laterUndoWasReady && document.getElementById('import-feedback').hidden && getPlayerItems().length === 3, 'Import: later roster mutation invalidates undo');
+      var resetConfirm = window.confirm; window.confirm = function () { return true; };
+      document.getElementById('clear-btn').click(); window.confirm = resetConfirm;
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.getElementById('import-mode-tab').click();
+      document.getElementById('import-text').value = Array.from({ length: 20 }, (_, i) => 'Mobile Player ' + i + ',,2').join('\n');
+      document.getElementById('review-import-btn').click();
+      assert(document.querySelectorAll('.import-row').length === 20 && appFrame.scrollWidth <= appFrame.clientWidth, 'Import: 20-player preview fits 320px');
+      document.getElementById('confirm-import-btn').click();
+      assert(getPlayerItems().length === 20, 'Import: 20-player mobile batch commits atomically');
+      document.getElementById('undo-import-btn').click();
+      assert(getPlayerItems().length === 0, 'Import: 20-player mobile batch undoes exactly');
+      appFrame.style.cssText = '';
 
       // ===== TEST 2: Add players =====
       addPlayer('Alice', 'female');
