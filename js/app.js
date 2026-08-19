@@ -16,6 +16,7 @@
   let activeMatchId = null;     // which match card has the score form open
   let isReadOnly = false;       // true when viewing a shared URL (no editing)
   var db = null;                // Firebase Database instance (null = not configured)
+  var authUid = null;           // Anonymous auth UID (null until sign-in completes; writes require it)
   var sessionId = null;         // Active session ID written to / read from Firebase
   let pairingMode = 'random';  // 'random' | 'manual'
   let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
@@ -634,7 +635,7 @@
     tournamentState = { teams: teams, groups: groups, matches: matches, players: players };
     activeMatchId = null;
     saveTournamentState();
-    if (db) {
+    if (db && authUid) {
       sessionId = generateSessionId();
       markSessionOwner(sessionId);
       history.replaceState(null, '', '#s=' + sessionId);
@@ -851,6 +852,16 @@
         firebase.initializeApp(FIREBASE_CONFIG);
       }
       db = firebase.database();
+      // Database rules only accept writes from authenticated (anonymous) users;
+      // reads stay public so viewers work even if sign-in fails.
+      if (firebase.auth) {
+        firebase.auth().onAuthStateChanged(function (user) {
+          authUid = user ? user.uid : null;
+        });
+        firebase.auth().signInAnonymously().catch(function (e) {
+          console.warn('Anonymous sign-in unavailable; sharing falls back to URL snapshots.', e && e.code);
+        });
+      }
       return true;
     } catch (e) {
       return false;
@@ -885,10 +896,13 @@
   }
 
   function writeToFirebase(state) {
-    if (!db || !sessionId) return;
+    if (!db || !sessionId || !authUid) return;
     db.ref('tournaments/' + sessionId).set({
       state: state,
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      ownerUid: authUid,
+    }).catch(function (e) {
+      console.warn('Firebase write rejected.', e && e.code);
     });
   }
 
