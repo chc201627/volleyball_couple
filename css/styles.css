@@ -250,6 +250,7 @@ textarea {
 .import-row [aria-invalid="true"] { border-color: var(--color-error); }
 .import-row__issues { margin-top: 8px; color: var(--color-error); font-size: 0.8125rem; }
 .import-row__notices { margin-top: 6px; color: var(--color-text-secondary); font-size: 0.8125rem; }
+.import-feedback { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 10px; background: #e8f5e9; border-radius: var(--radius); }
 
 /* --- Buttons --- */
 .btn {
