@@ -38,12 +38,23 @@ function normGender(player) {
 }
 
 /**
+ * Whether a value is a valid skill level. Restored state (localStorage,
+ * Firebase) may carry arbitrary numbers, so membership in {1,2,3} is
+ * required — a bare typeof check is not enough.
+ * @param {*} level
+ * @returns {boolean}
+ */
+function isValidLevel(level) {
+  return level === 1 || level === 2 || level === 3;
+}
+
+/**
  * Get a player's skill level, defaulting unleveled players to Intermediate (2).
  * @param {object} player
  * @returns {number} 1|2|3
  */
 function getPlayerLevel(player) {
-  return typeof player.level === 'number' ? player.level : DEFAULT_LEVEL;
+  return isValidLevel(player.level) ? player.level : DEFAULT_LEVEL;
 }
 
 /**
@@ -73,7 +84,7 @@ function levelSpreadScore(averages) {
  * @returns {boolean}
  */
 function hasExplicitLevel(teams) {
-  return teams.some(team => team.players.some(p => typeof p.level === 'number'));
+  return teams.some(team => team.players.some(p => isValidLevel(p.level)));
 }
 
 /**
