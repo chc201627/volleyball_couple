@@ -1054,6 +1054,9 @@
   function renderTournament() {
     tournamentGroupsEl.innerHTML = '';
 
+    // Share is an owner-only action; read-only viewers already hold the link
+    shareTournamentBtn.hidden = isReadOnly;
+
     // Add multi-group grid class when there are 2+ groups
     if (tournamentState.groups.length >= 2) {
       tournamentGroupsEl.classList.add('tournament-groups--multi');
