@@ -28,6 +28,7 @@
   const form = document.getElementById('player-form');
   const nameInput = document.getElementById('player-name');
   const genderSelect = document.getElementById('player-gender');
+  const levelSelect = document.getElementById('player-level');
   const addBtn = document.getElementById('add-player-btn');
   const nameError = document.getElementById('name-error');
   const genderError = document.getElementById('gender-error');
@@ -300,6 +301,13 @@
       gender: genderSelect.value || 'unspecified',
     };
 
+    // Level is optional — omit the key entirely when unset (Firebase set()
+    // rejects undefined, and omission keeps balancing's typeof check simple).
+    var lvl = levelSelect.value;
+    if (lvl) {
+      player.level = Number(lvl);
+    }
+
     players.push(player);
     resetForm();
     savePlayersState();
@@ -309,6 +317,7 @@
   function resetForm() {
     nameInput.value = '';
     genderSelect.selectedIndex = 0;
+    levelSelect.selectedIndex = 0;
     updateAddButtonState();
     nameInput.focus();
   }
@@ -395,6 +404,9 @@
       li.className = 'player-list__item animate__animated animate__fadeIn';
       li.style.animationDelay = `${i * 30}ms`;
       const badge = player.gender === 'male' ? t('players.badgeMale') : (player.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
+      const levelBadgeHTML = typeof player.level === 'number'
+        ? `<span class="player-list__badge player-list__badge--level-${player.level}">${t('players.badgeLevel' + player.level)}</span>`
+        : '';
       const removeBtnHTML = isReadOnly ? '' : `<button class="player-list__remove" aria-label="${escapeHTML(t('players.remove', { name: player.name }))}" data-id="${player.id}">&times;</button>`;
       li.innerHTML = `
         <span class="player-list__info">
@@ -402,6 +414,7 @@
           <span class="player-list__badge player-list__badge--${player.gender}">
             ${badge}
           </span>
+          ${levelBadgeHTML}
         </span>
         ${removeBtnHTML}
       `;
@@ -501,12 +514,16 @@
       const teamPlayers = team.players || [team.player1, team.player2];
       teamPlayers.forEach(player => {
         const badge = player.gender === 'male' ? t('players.badgeMale') : (player.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
+        const levelBadgeHTML = typeof player.level === 'number'
+          ? `<span class="player-list__badge player-list__badge--level-${player.level}">${t('players.badgeLevel' + player.level)}</span>`
+          : '';
         playersHTML += `
           <p class="couple-card__player">
             ${escapeHTML(player.name)}
             <span class="player-list__badge player-list__badge--${player.gender}">
               ${badge}
             </span>
+            ${levelBadgeHTML}
           </p>
         `;
       });
@@ -527,11 +544,15 @@
       if (unmatchedList.length === 1) {
         const u = unmatchedList[0];
         const badge = u.gender === 'male' ? t('players.badgeMale') : (u.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
+        const levelBadgeHTML = typeof u.level === 'number'
+          ? `<span class="player-list__badge player-list__badge--level-${u.level}">${t('players.badgeLevel' + u.level)}</span>`
+          : '';
         unmatchedHTML = `
           <p class="unmatched__title">${escapeHTML(t('results.unmatched', { name: u.name }))}
             <span class="player-list__badge player-list__badge--${u.gender}">
               ${badge}
             </span>
+            ${levelBadgeHTML}
           </p>
           <p class="unmatched__text">${escapeHTML(t('results.unmatchedExplain'))}</p>
         `;
@@ -540,12 +561,16 @@
         unmatchedHTML = `<p class="unmatched__title">${escapeHTML(t('results.unmatchedMultiple'))}</p>`;
         unmatchedList.forEach(u => {
           const badge = u.gender === 'male' ? t('players.badgeMale') : (u.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
+          const levelBadgeHTML = typeof u.level === 'number'
+            ? `<span class="player-list__badge player-list__badge--level-${u.level}">${t('players.badgeLevel' + u.level)}</span>`
+            : '';
           unmatchedHTML += `
             <p class="unmatched__player" style="margin-top: 6px;">
               ${escapeHTML(u.name)}
               <span class="player-list__badge player-list__badge--${u.gender}">
                 ${badge}
               </span>
+              ${levelBadgeHTML}
             </p>
           `;
         });
@@ -1352,11 +1377,15 @@
       var html = '';
       playersInTeam.forEach(function (player, pIdx) {
         var badge = player.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
+        var levelBadgeHTML = typeof player.level === 'number'
+          ? ' <span class="player-list__badge player-list__badge--level-' + player.level + '">' + t('players.badgeLevel' + player.level) + '</span>'
+          : '';
         if (pIdx > 0) {
           html += ' <span class="manual-pairing__pair-sep">&amp;</span> ';
         }
         html += escapeHTML(player.name) +
-          ' <span class="player-list__badge player-list__badge--' + player.gender + '">' + badge + '</span>';
+          ' <span class="player-list__badge player-list__badge--' + player.gender + '">' + badge + '</span>' +
+          levelBadgeHTML;
       });
       namesEl.innerHTML = html;
 

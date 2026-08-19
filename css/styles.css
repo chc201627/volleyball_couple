@@ -325,6 +325,21 @@ select {
   color: #616161;
 }
 
+.player-list__badge--level-1 {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #2e7d32;
+}
+
+.player-list__badge--level-2 {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #e65100;
+}
+
+.player-list__badge--level-3 {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #b71c2c;
+}
+
 .player-list__remove {
   background: none;
   border: none;
