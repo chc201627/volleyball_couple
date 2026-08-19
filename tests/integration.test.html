@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Integration Tests — User Workflow</title>
+  <link rel="stylesheet" href="../css/styles.css">
   <style>
     body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
     h1 { color: #569cd6; }
@@ -33,7 +34,11 @@
       <!-- Input Section -->
       <section class="section section--input" aria-labelledby="input-heading">
         <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
-        <form class="form" id="player-form" novalidate>
+        <div class="entry-tabs" role="tablist" aria-label="Player entry mode" data-i18n-aria-label="import.modeLabel">
+          <button class="entry-tab entry-tab--active" id="single-mode-tab" role="tab" aria-selected="true" aria-controls="player-form" data-i18n="import.singleMode">One player</button>
+          <button class="entry-tab" id="import-mode-tab" role="tab" aria-selected="false" aria-controls="import-panel" tabindex="-1" data-i18n="import.pasteMode">Paste list</button>
+        </div>
+        <form class="form" id="player-form" role="tabpanel" aria-labelledby="single-mode-tab" novalidate>
           <div class="form__group">
             <label class="form__label" for="player-name" data-i18n="form.nameLabel">Player Name</label>
             <input
@@ -58,10 +63,22 @@
             </select>
             <span class="form__error" id="gender-error" role="alert" aria-live="polite"></span>
           </div>
+          <select id="player-level"><option value="">Level</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
           <button class="btn btn--primary form__submit" type="submit" id="add-player-btn" disabled data-i18n="form.submit">
             Add Player
           </button>
         </form>
+        <div class="import-panel" id="import-panel" role="tabpanel" aria-labelledby="import-mode-tab" hidden>
+          <label class="form__label" for="import-text" data-i18n="import.label">Player list</label>
+          <textarea class="form__input import-panel__text" id="import-text" rows="5" data-i18n-placeholder="import.placeholder"></textarea>
+          <p class="import-panel__hint" data-i18n="import.hint">Name, Gender, Level — one player per line</p>
+          <button class="btn btn--primary" id="review-import-btn" type="button" data-i18n="import.review">Review list</button>
+          <div id="import-review" hidden>
+            <p id="import-summary" class="import-summary" role="status" aria-live="polite"></p>
+            <ol id="import-preview" class="import-preview"></ol>
+            <button class="btn btn--success" id="confirm-import-btn" type="button" disabled></button>
+          </div>
+        </div>
       </section>
 
       <!-- Player List Section -->
@@ -259,6 +276,7 @@
   </div>
 
   <script src="../js/pairing.js"></script>
+  <script src="../js/player-import.js"></script>
   <script src="../js/i18n.js"></script>
   <script src="../js/app.js"></script>
   <script>
@@ -305,6 +323,36 @@
       assert(document.getElementById('regenerate-btn').hidden, 'Initial: regenerate button is hidden');
       assert(document.getElementById('clear-btn').hidden, 'Initial: clear button is hidden');
       assert(document.getElementById('results-section').hidden, 'Initial: results section is hidden');
+
+      // ===== BULK REVIEW: preview is editable, safe, localized, and mobile-first =====
+      var appFrame = document.getElementById('app-frame');
+      appFrame.style.cssText = 'display:block;width:320px';
+      setLanguage('es');
+      document.getElementById('import-mode-tab').click();
+      assert(!document.getElementById('import-panel').hidden && document.getElementById('player-form').hidden, 'Import: mode switch opens paste panel');
+      document.getElementById('import-text').value = 'Ana,M,2\n<img src=x>,other,4';
+      document.getElementById('review-import-btn').click();
+      var importRows = document.querySelectorAll('.import-row');
+      assert(importRows.length === 2 && getPlayerItems().length === 0, 'Import: review creates preview without changing roster');
+      assert(!document.querySelector('#import-preview img') && document.querySelector('.import-row__name') && document.querySelector('.import-row__name').value === 'Ana', 'Import: user text is assigned safely');
+      if (importRows.length === 2) {
+        assert(importRows[0].querySelector('.import-row__gender').value === 'female', 'Import: Spanish M is captured as female');
+        assert(document.activeElement === importRows[1].querySelector('.import-row__gender'), 'Import: first invalid control receives focus');
+        setLanguage('en');
+        assert(importRows[0].querySelector('.import-row__gender').value === 'female', 'Import: language change does not reparse canonical preview');
+        var badGender = importRows[1].querySelector('.import-row__gender');
+        var badLevel = importRows[1].querySelector('.import-row__level');
+        badGender.value = 'male'; badGender.dispatchEvent(new Event('change', { bubbles: true }));
+        badLevel.value = '2'; badLevel.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelectorAll('.import-row__delete')[1].click();
+        assert(document.querySelectorAll('.import-row').length === 1 && !document.getElementById('confirm-import-btn').disabled, 'Import: edits and deletion refresh eligibility');
+      }
+      assert(document.getElementById('import-summary').getAttribute('aria-live') === 'polite', 'Import: summary is announced');
+      var deleteTarget = document.querySelector('.import-row__delete');
+      assert(appFrame.scrollWidth <= appFrame.clientWidth && deleteTarget && deleteTarget.getBoundingClientRect().height >= 44, 'Import: 320px preview has no overflow and touch target is 44px');
+      appFrame.style.cssText = '';
+      document.getElementById('single-mode-tab').click();
+      assert(getPlayerItems().length === 0, 'Import: leaving unconfirmed preview preserves roster');
 
       // ===== TEST 2: Add players =====
       addPlayer('Alice', 'female');

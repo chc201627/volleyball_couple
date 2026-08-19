@@ -26,6 +26,9 @@
   let kingWinCondition = 'consecutive'; // 'consecutive' | 'total'
   let kingTargetWins = 5;      // 5 | 7 | 10
   let teamSize = 2;            // 2 | 3 | 4 - target size of teams
+  let importRows = [];
+  let importAnalysis = null;
+  let importLocale = 'es';
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -35,6 +38,15 @@
   const addBtn = document.getElementById('add-player-btn');
   const nameError = document.getElementById('name-error');
   const genderError = document.getElementById('gender-error');
+  const singleModeTab = document.getElementById('single-mode-tab');
+  const importModeTab = document.getElementById('import-mode-tab');
+  const importPanel = document.getElementById('import-panel');
+  const importText = document.getElementById('import-text');
+  const reviewImportBtn = document.getElementById('review-import-btn');
+  const importReview = document.getElementById('import-review');
+  const importSummary = document.getElementById('import-summary');
+  const importPreview = document.getElementById('import-preview');
+  const confirmImportBtn = document.getElementById('confirm-import-btn');
 
   const playerList = document.getElementById('player-list');
   const playerCount = document.getElementById('player-count');
@@ -97,6 +109,12 @@
     form.addEventListener('submit', handleAddPlayer);
     nameInput.addEventListener('input', updateAddButtonState);
     genderSelect.addEventListener('change', updateAddButtonState);
+    singleModeTab.addEventListener('click', function () { setEntryMode('single'); });
+    importModeTab.addEventListener('click', function () { setEntryMode('import'); });
+    reviewImportBtn.addEventListener('click', handleReviewImport);
+    importPreview.addEventListener('input', handleImportEdit);
+    importPreview.addEventListener('change', handleImportEdit);
+    importPreview.addEventListener('click', handleImportDelete);
     generateBtn.addEventListener('click', handleGenerate);
     regenerateBtn.addEventListener('click', handleGenerate);
     clearBtn.addEventListener('click', handleClearAll);
@@ -227,7 +245,165 @@
     if (kingState) {
       renderKing();
     }
+    if (importAnalysis) renderImportPreview();
   };
+
+  // --- Bulk import preview (commit is wired in Phase 3) ---
+
+  function setEntryMode(mode) {
+    var importing = mode === 'import';
+    form.hidden = importing;
+    importPanel.hidden = !importing;
+    singleModeTab.classList.toggle('entry-tab--active', !importing);
+    importModeTab.classList.toggle('entry-tab--active', importing);
+    singleModeTab.setAttribute('aria-selected', String(!importing));
+    importModeTab.setAttribute('aria-selected', String(importing));
+    singleModeTab.tabIndex = importing ? -1 : 0;
+    importModeTab.tabIndex = importing ? 0 : -1;
+    (importing ? importText : nameInput).focus();
+  }
+
+  function handleReviewImport() {
+    importRows = parsePlayerImport(importText.value).rows;
+    importLocale = getLanguage();
+    revalidateImport();
+    importReview.hidden = false;
+    var firstError = importPreview.querySelector('[aria-invalid="true"]');
+    (firstError || (confirmImportBtn.disabled ? importSummary : confirmImportBtn)).focus();
+  }
+
+  function revalidateImport() {
+    importAnalysis = validatePlayerImport(importRows, {
+      locale: importLocale,
+      existingCount: players.length,
+      maxPlayers: 200,
+    });
+    renderImportPreview();
+  }
+
+  function handleImportEdit(e) {
+    var field = e.target.getAttribute('data-field');
+    var key = e.target.getAttribute('data-key');
+    if (!field || !key) return;
+    var row = importRows.find(function (item) { return item.key === key; });
+    if (!row) return;
+    row.draft[field] = e.target.value;
+    revalidateImport();
+    var replacement = importPreview.querySelector('[data-key="' + key + '"][data-field="' + field + '"]');
+    if (replacement) replacement.focus();
+  }
+
+  function handleImportDelete(e) {
+    var button = e.target.closest('.import-row__delete');
+    if (!button) return;
+    var key = button.getAttribute('data-key');
+    importRows = importRows.filter(function (row) { return row.key !== key; });
+    revalidateImport();
+    importSummary.focus();
+  }
+
+  function importIssueText(issue) {
+    var keys = {
+      nameEmpty: 'error.nameEmpty', nameTooShort: 'error.nameMin', nameTooLong: 'error.nameMax',
+      mixedDelimiter: 'import.mixedDelimiter', tooManyColumns: 'import.tooManyColumns', unclosedQuote: 'import.unclosedQuote',
+      invalidGender: 'import.invalidGender', invalidLevel: 'import.invalidLevel', playerLimitExceeded: 'import.playerLimitExceeded',
+      ambiguousM: 'import.ambiguousM', emptyBatch: 'import.emptyBatch',
+    };
+    var params = Object.assign({}, issue.params || {});
+    if (issue.code === 'ambiguousM') params.locale = params.locale === 'es' ? 'ES' : 'EN';
+    return t(keys[issue.code] || issue.code, params);
+  }
+
+  function makeImportOption(select, value, label) {
+    var option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  }
+
+  function canonicalGender(row) {
+    if (row.player) return row.player.gender;
+    var notice = row.notices.find(function (item) { return item.code === 'ambiguousM'; });
+    if (notice) return notice.params.resolvedGender;
+    var token = String(row.draft.genderToken || '').trim().toLowerCase();
+    if (!token) return 'unspecified';
+    if (['h', 'hombre', 'masculino', 'male', 'man'].indexOf(token) !== -1) return 'male';
+    if (['f', 'female', 'woman', 'mujer', 'femenino'].indexOf(token) !== -1) return 'female';
+    if (['u', 'unspecified', 'sin especificar', 'no especificado', '-'].indexOf(token) !== -1) return 'unspecified';
+    return token;
+  }
+
+  function appendImportField(container, row, index, field, className) {
+    var label = document.createElement('label');
+    var labels = { name: 'form.nameLabel', genderToken: 'form.genderLabel', levelToken: 'form.levelLabel' };
+    var control = document.createElement(field === 'name' ? 'input' : 'select');
+    label.className = 'import-row__field';
+    label.appendChild(document.createTextNode(t(labels[field])));
+    control.className = className;
+    control.setAttribute('data-key', row.key);
+    control.setAttribute('data-field', field);
+    if (field === 'name') {
+      control.value = row.draft.name;
+    } else if (field === 'genderToken') {
+      var gender = canonicalGender(row);
+      if (['male', 'female', 'unspecified'].indexOf(gender) === -1) makeImportOption(control, gender, gender);
+      makeImportOption(control, 'unspecified', t('import.genderBlank'));
+      makeImportOption(control, 'male', t('form.genderMale'));
+      makeImportOption(control, 'female', t('form.genderFemale'));
+      control.value = gender;
+    } else {
+      var level = String(row.draft.levelToken || '');
+      if (level && !/^[123]$/.test(level)) makeImportOption(control, level, level);
+      makeImportOption(control, '', t('import.levelBlank'));
+      ['1', '2', '3'].forEach(function (value) { makeImportOption(control, value, value); });
+      control.value = level;
+    }
+    var issueField = row.issues.some(function (issue) { return issue.field === field.replace('Token', '') || (field === 'name' && issue.field === 'row'); });
+    if (issueField) control.setAttribute('aria-invalid', 'true');
+    if (row.issues.length || row.notices.length) control.setAttribute('aria-describedby', 'import-message-' + index);
+    label.appendChild(control);
+    container.appendChild(label);
+  }
+
+  function renderImportPreview() {
+    if (!importAnalysis) return;
+    importPreview.textContent = '';
+    importSummary.setAttribute('tabindex', '-1');
+    importSummary.textContent = t('import.summary', {
+      valid: importAnalysis.summary.validCount,
+      errors: importAnalysis.summary.errorCount,
+      existing: players.length,
+    }) + (importAnalysis.batchIssues.length ? ' · ' + importAnalysis.batchIssues.map(importIssueText).join(' · ') : '');
+    confirmImportBtn.textContent = t('import.confirm', { count: importAnalysis.summary.validCount });
+    confirmImportBtn.disabled = !importAnalysis.summary.canCommit;
+    importAnalysis.rows.forEach(function (row, index) {
+      var item = document.createElement('li');
+      var header = document.createElement('div');
+      var title = document.createElement('strong');
+      var remove = document.createElement('button');
+      var fields = document.createElement('div');
+      item.className = 'import-row';
+      header.className = 'import-row__header';
+      title.textContent = t('import.player', { n: index + 1 });
+      remove.className = 'import-row__delete';
+      remove.type = 'button';
+      remove.textContent = '\u00d7';
+      remove.setAttribute('data-key', row.key);
+      remove.setAttribute('aria-label', t('import.delete', { n: index + 1 }));
+      header.appendChild(title); header.appendChild(remove); item.appendChild(header);
+      fields.className = 'import-row__fields';
+      appendImportField(fields, row, index, 'name', 'import-row__name');
+      appendImportField(fields, row, index, 'genderToken', 'import-row__gender');
+      appendImportField(fields, row, index, 'levelToken', 'import-row__level');
+      item.appendChild(fields);
+      var messages = document.createElement('p');
+      messages.id = 'import-message-' + index;
+      messages.className = row.issues.length ? 'import-row__issues' : 'import-row__notices';
+      messages.textContent = row.issues.concat(row.notices).map(importIssueText).join(' · ');
+      item.appendChild(messages);
+      importPreview.appendChild(item);
+    });
+  }
 
   // --- Validation ---
 

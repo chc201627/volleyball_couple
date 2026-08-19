@@ -24,7 +24,11 @@
     <!-- Input Section -->
     <section class="section section--input" aria-labelledby="input-heading">
       <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
-      <form class="form" id="player-form" novalidate>
+      <div class="entry-tabs" role="tablist" aria-label="Player entry mode" data-i18n-aria-label="import.modeLabel">
+        <button class="entry-tab entry-tab--active" id="single-mode-tab" type="button" role="tab" aria-selected="true" aria-controls="player-form" data-i18n="import.singleMode">One player</button>
+        <button class="entry-tab" id="import-mode-tab" type="button" role="tab" aria-selected="false" aria-controls="import-panel" tabindex="-1" data-i18n="import.pasteMode">Paste list</button>
+      </div>
+      <form class="form" id="player-form" role="tabpanel" aria-labelledby="single-mode-tab" novalidate>
         <div class="form__group">
           <label class="form__label" for="player-name" data-i18n="form.nameLabel">Player Name</label>
           <input
@@ -63,6 +67,17 @@
           Add Player
         </button>
       </form>
+      <div class="import-panel" id="import-panel" role="tabpanel" aria-labelledby="import-mode-tab" hidden>
+        <label class="form__label" for="import-text" data-i18n="import.label">Player list</label>
+        <textarea class="form__input import-panel__text" id="import-text" rows="5" data-i18n-placeholder="import.placeholder"></textarea>
+        <p class="import-panel__hint" data-i18n="import.hint">Name, Gender, Level — one player per line</p>
+        <button class="btn btn--primary" id="review-import-btn" type="button" data-i18n="import.review">Review list</button>
+        <div id="import-review" hidden>
+          <p id="import-summary" class="import-summary" role="status" aria-live="polite"></p>
+          <ol id="import-preview" class="import-preview"></ol>
+          <button class="btn btn--success" id="confirm-import-btn" type="button" disabled></button>
+        </div>
+      </div>
     </section>
 
     <!-- Player List Section -->
@@ -273,6 +288,7 @@
   <script src="js/firebase-config.js?v=1.5.1"></script>
 
   <script src="js/pairing.js?v=1.5.1"></script>
+  <script src="js/player-import.js?v=1.5.1"></script>
   <script src="js/i18n.js?v=1.5.1"></script>
   <script src="js/tournament.js?v=1.5.1"></script>
   <script src="js/king-of-court.js?v=1.5.1"></script>
