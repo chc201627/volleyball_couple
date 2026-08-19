@@ -458,8 +458,8 @@
     // Mode toggle: only for the session creator with enough players
     pairingToggle.hidden = isReadOnly || !hasEnough;
 
-    // Random/manual controls
-    generateBtn.hidden   = pairingMode !== 'random';
+    // Random/manual controls — never shown to a read-only viewer
+    generateBtn.hidden   = isReadOnly || pairingMode !== 'random';
     generateBtn.disabled = !hasEnough;
 
     if (teamSize === 2) {
@@ -472,8 +472,8 @@
       generateHint.textContent = t('actions.hintTeams', { n: teamSize });
     }
 
-    generateHint.hidden  = hasEnough || pairingMode !== 'random';
-    regenerateBtn.hidden = !couplesGenerated || pairingMode !== 'random';
+    generateHint.hidden  = isReadOnly || hasEnough || pairingMode !== 'random';
+    regenerateBtn.hidden = isReadOnly || !couplesGenerated || pairingMode !== 'random';
 
     // Manual mode panel
     manualPairingPanel.hidden = pairingMode !== 'manual' || !hasEnough;
@@ -482,7 +482,7 @@
       renderManualPairsList();
     }
 
-    clearBtn.hidden = players.length === 0;
+    clearBtn.hidden = isReadOnly || players.length === 0;
     tournamentSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     kingSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     // Keep max selectable groups in sync with available teams
@@ -641,10 +641,17 @@
     liveScore = { score1: 0, score2: 0 };
     saveTournamentState();
     if (db && authUid) {
-      sessionId = generateSessionId();
-      markSessionOwner(sessionId);
-      history.replaceState(null, '', '#s=' + sessionId);
-      writeToFirebase(tournamentState);
+      // Only publish a live #s= share link once the write actually lands in
+      // Firebase; otherwise viewers would open a session that never persisted.
+      var candidateSid = generateSessionId();
+      writeToFirebase(tournamentState, candidateSid).then(function () {
+        sessionId = candidateSid;
+        markSessionOwner(candidateSid);
+        history.replaceState(null, '', '#s=' + candidateSid);
+      }).catch(function (e) {
+        console.warn('Live session write failed; using snapshot share link.', e && e.code);
+        pushShareURL();
+      });
     } else {
       pushShareURL();
     }
@@ -813,7 +820,9 @@
       liveScore = { score1: 0, score2: 0 };
       saveTournamentState();
       if (db && sessionId) {
-        writeToFirebase(tournamentState);
+        writeToFirebase(tournamentState).catch(function () {
+          // Local state already saved; the next update or reload will resync.
+        });
       } else {
         pushShareURL();
       }
@@ -928,14 +937,16 @@
     } catch (e) {}
   }
 
-  function writeToFirebase(state) {
-    if (!db || !sessionId || !authUid) return;
-    db.ref('tournaments/' + sessionId).set({
+  function writeToFirebase(state, sid) {
+    sid = sid || sessionId;
+    if (!db || !sid || !authUid) return Promise.reject(new Error('firebase-not-ready'));
+    return db.ref('tournaments/' + sid).set({
       state: state,
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
       ownerUid: authUid,
     }).catch(function (e) {
       console.warn('Firebase write rejected.', e && e.code);
+      throw e;
     });
   }
 
