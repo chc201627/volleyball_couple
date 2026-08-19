@@ -892,6 +892,10 @@ select {
   min-width: 0;
 }
 
+.match-card__row:has(.match-card__btn-group) {
+  align-items: center;
+}
+
 .match-card__teams {
   flex: 1;
   min-width: 0;
@@ -1027,6 +1031,211 @@ select {
   font-weight: 700;
   font-size: 1.125rem;
   color: #388e3c;
+}
+
+/* --- Live Scoreboard Panel --- */
+.scoreboard-panel {
+  margin-top: 24px;
+}
+
+.scoreboard {
+  background: var(--color-white);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  padding: 20px 16px 16px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.scoreboard__heading {
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.scoreboard__match-label {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 20px;
+}
+
+.scoreboard__team-tag {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.scoreboard__vs {
+  font-size: 0.75rem;
+}
+
+.scoreboard__teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.scoreboard__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: #f0f7ff;
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius);
+  padding: 16px 12px;
+}
+
+.scoreboard__team-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.scoreboard__score {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1;
+  min-width: 2ch;
+  text-align: center;
+}
+
+.scoreboard__controls {
+  display: flex;
+  gap: 12px;
+}
+
+.scoreboard__dec,
+.scoreboard__inc {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: opacity var(--transition), transform var(--transition);
+  min-height: 44px;
+}
+
+.scoreboard__dec {
+  background-color: #ffebee;
+  color: var(--color-error);
+  border: 1.5px solid var(--color-error);
+}
+
+.scoreboard__dec:hover {
+  background-color: var(--color-error);
+  color: var(--color-white);
+}
+
+.scoreboard__inc {
+  background-color: #e8f5e9;
+  color: var(--color-success);
+  border: 1.5px solid var(--color-success);
+}
+
+.scoreboard__inc:hover {
+  background-color: var(--color-success);
+  color: var(--color-white);
+}
+
+.scoreboard__dec:active,
+.scoreboard__inc:active {
+  transform: scale(0.93);
+}
+
+.scoreboard__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.scoreboard__cancel {
+  flex: 1;
+  max-width: 160px;
+  padding: 10px 16px;
+  background-color: #ffebee;
+  color: var(--color-error);
+  border: 1.5px solid var(--color-error);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition);
+  min-height: 44px;
+}
+
+.scoreboard__cancel:hover {
+  background-color: var(--color-error);
+  color: var(--color-white);
+}
+
+.scoreboard__save {
+  flex: 1;
+  max-width: 160px;
+  padding: 10px 16px;
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition);
+  min-height: 44px;
+}
+
+.scoreboard__save:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.scoreboard__error {
+  width: 100%;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--color-error);
+  margin-top: 8px;
+  min-height: 1.2em;
+}
+
+/* Second button in match card */
+.match-card__btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.match-card__btn-group .match-card__btn {
+  width: 100%;
+  text-align: center;
+}
+
+.match-card__btn--track {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.match-card__btn--track:hover {
+  background-color: var(--color-success);
+  color: var(--color-white);
+}
+
+.match-card__btn--track-active {
+  background-color: var(--color-success);
+  color: var(--color-white);
 }
 
 /* --- Footer --- */

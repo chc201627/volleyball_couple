@@ -14,6 +14,8 @@
   let lastResult = null;
   let tournamentState = null;   // { teams, groups, matches }
   let activeMatchId = null;     // which match card has the score form open
+  let scoreboardMatchId = null; // which match is open in live scoreboard mode
+  let liveScore = { score1: 0, score2: 0 }; // live scores being tracked
   let isReadOnly = false;       // true when viewing a shared URL (no editing)
   var db = null;                // Firebase Database instance (null = not configured)
   var authUid = null;           // Anonymous auth UID (null until sign-in completes; writes require it)
@@ -68,6 +70,7 @@
   const readonlyBanner = document.getElementById('readonly-banner');
   const tournamentSection = document.getElementById('tournament-section');
   const tournamentGroupsEl = document.getElementById('tournament-groups');
+  const scoreboardPanelEl = document.getElementById('scoreboard-panel');
 
   const kingSetup              = document.getElementById('king-setup');
   const startKingBtn           = document.getElementById('start-king-btn');
@@ -634,6 +637,8 @@
     const matches = generateMatches(groups);
     tournamentState = { teams: teams, groups: groups, matches: matches, players: players };
     activeMatchId = null;
+    scoreboardMatchId = null;
+    liveScore = { score1: 0, score2: 0 };
     saveTournamentState();
     if (db && authUid) {
       sessionId = generateSessionId();
@@ -657,10 +662,14 @@
     }
     tournamentState = null;
     activeMatchId = null;
+    scoreboardMatchId = null;
+    liveScore = { score1: 0, score2: 0 };
     localStorage.removeItem('bv-tournament');
     history.replaceState(null, '', window.location.pathname + window.location.search);
     tournamentSection.hidden = true;
     tournamentGroupsEl.innerHTML = '';
+    scoreboardPanelEl.hidden = true;
+    scoreboardPanelEl.innerHTML = '';
     // Reset group selector to default (1 group / A)
     groupCountOptions.querySelectorAll('.tournament-setup__opt').forEach(function (b) {
       b.classList.remove('tournament-setup__opt--active');
@@ -785,14 +794,14 @@
       return;
     }
     activeMatchId = matchId;
+    scoreboardMatchId = null;
+    liveScore = { score1: 0, score2: 0 };
     renderTournament();
   }
 
-  function handleSaveScore(matchId, input1El, input2El, errorEl) {
-    var s1 = input1El.value.trim();
-    var s2 = input2El.value.trim();
+  function commitScore(matchId, s1val, s2val, errorEl) {
     try {
-      var newMatches = recordMatchScore(tournamentState.matches, matchId, s1, s2);
+      var newMatches = recordMatchScore(tournamentState.matches, matchId, s1val, s2val);
       tournamentState = {
         teams: tournamentState.teams,
         groups: tournamentState.groups,
@@ -800,6 +809,8 @@
         players: tournamentState.players || players,
       };
       activeMatchId = null;
+      scoreboardMatchId = null;
+      liveScore = { score1: 0, score2: 0 };
       saveTournamentState();
       if (db && sessionId) {
         writeToFirebase(tournamentState);
@@ -808,8 +819,30 @@
       }
       renderTournament();
     } catch (e) {
-      errorEl.textContent = t(e.message) || e.message;
+      if (errorEl) errorEl.textContent = t(e.message) || e.message;
     }
+  }
+
+  function handleSaveScore(matchId, input1El, input2El, errorEl) {
+    commitScore(matchId, input1El.value.trim(), input2El.value.trim(), errorEl);
+  }
+
+  function handleScoreboard(matchId) {
+    if (scoreboardMatchId === matchId) {
+      scoreboardMatchId = null;
+      liveScore = { score1: 0, score2: 0 };
+      renderTournament();
+      return;
+    }
+    activeMatchId = null;
+    scoreboardMatchId = matchId;
+    var match = tournamentState.matches.find(function (m) { return m.id === matchId; });
+    liveScore = {
+      score1: (match && match.played) ? match.score1 : 0,
+      score2: (match && match.played) ? match.score2 : 0,
+    };
+    renderTournament();
+    scoreboardPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // --- Tournament Persistence ---
@@ -1031,6 +1064,135 @@
       banner.textContent = t('tournament.complete');
       tournamentGroupsEl.appendChild(banner);
     }
+
+    // Live scoreboard panel
+    if (!isReadOnly && scoreboardMatchId) {
+      renderScoreboardPanel();
+      scoreboardPanelEl.hidden = false;
+    } else {
+      scoreboardPanelEl.hidden = true;
+      scoreboardPanelEl.innerHTML = '';
+    }
+  }
+
+  function renderScoreboardPanel() {
+    scoreboardPanelEl.innerHTML = '';
+
+    var match = tournamentState.matches.find(function (m) { return m.id === scoreboardMatchId; });
+    if (!match) return;
+
+    var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
+    var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
+    var name1 = team1 ? team1.name : match.team1Id;
+    var name2 = team2 ? team2.name : match.team2Id;
+
+    var panel = document.createElement('div');
+    panel.className = 'scoreboard animate__animated animate__fadeInUp';
+
+    // Heading
+    var heading = document.createElement('h3');
+    heading.className = 'scoreboard__heading';
+    heading.textContent = t('tournament.scoreboard.heading');
+    panel.appendChild(heading);
+
+    // Match label
+    var matchLabel = document.createElement('p');
+    matchLabel.className = 'scoreboard__match-label';
+    matchLabel.innerHTML =
+      '<span class="scoreboard__team-tag">' + escapeHTML(name1) + '</span>' +
+      ' <span class="scoreboard__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+      '<span class="scoreboard__team-tag">' + escapeHTML(name2) + '</span>';
+    panel.appendChild(matchLabel);
+
+    var errorEl = document.createElement('p');
+    errorEl.className = 'scoreboard__error';
+
+    // Teams grid
+    var teamsGrid = document.createElement('div');
+    teamsGrid.className = 'scoreboard__teams';
+
+    [
+      { name: name1, scoreKey: 'score1' },
+      { name: name2, scoreKey: 'score2' },
+    ].forEach(function (side) {
+      var teamPanel = document.createElement('div');
+      teamPanel.className = 'scoreboard__team';
+
+      var teamName = document.createElement('p');
+      teamName.className = 'scoreboard__team-name';
+      teamName.textContent = side.name;
+      teamPanel.appendChild(teamName);
+
+      var scoreDisplay = document.createElement('p');
+      scoreDisplay.className = 'scoreboard__score';
+      scoreDisplay.textContent = liveScore[side.scoreKey];
+
+      var controls = document.createElement('div');
+      controls.className = 'scoreboard__controls';
+
+      var decBtn = document.createElement('button');
+      decBtn.type = 'button';
+      decBtn.className = 'scoreboard__dec';
+      decBtn.textContent = '−'; // −
+      decBtn.setAttribute('aria-label', '− ' + side.name);
+      decBtn.addEventListener('click', (function (key, display) {
+        return function () {
+          if (liveScore[key] > 0) {
+            liveScore[key]--;
+            display.textContent = liveScore[key];
+          }
+        };
+      })(side.scoreKey, scoreDisplay));
+
+      var incBtn = document.createElement('button');
+      incBtn.type = 'button';
+      incBtn.className = 'scoreboard__inc';
+      incBtn.textContent = '+';
+      incBtn.setAttribute('aria-label', '+ ' + side.name);
+      incBtn.addEventListener('click', (function (key, display) {
+        return function () {
+          liveScore[key]++;
+          display.textContent = liveScore[key];
+        };
+      })(side.scoreKey, scoreDisplay));
+
+      controls.appendChild(decBtn);
+      controls.appendChild(incBtn);
+      teamPanel.appendChild(scoreDisplay);
+      teamPanel.appendChild(controls);
+      teamsGrid.appendChild(teamPanel);
+    });
+
+    panel.appendChild(teamsGrid);
+
+    // Actions: Cancel + Save
+    var actions = document.createElement('div');
+    actions.className = 'scoreboard__actions';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'scoreboard__cancel';
+    cancelBtn.textContent = t('tournament.match.cancel');
+    cancelBtn.addEventListener('click', function () {
+      scoreboardMatchId = null;
+      liveScore = { score1: 0, score2: 0 };
+      renderTournament();
+    });
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'scoreboard__save';
+    saveBtn.textContent = t('tournament.match.save');
+    saveBtn.addEventListener('click', function () {
+      commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl);
+    });
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+    panel.appendChild(actions);
+    panel.appendChild(errorEl);
+
+    scoreboardPanelEl.appendChild(panel);
   }
 
   function renderGroupPanel(group, idx, standings) {
@@ -1138,8 +1300,11 @@
       row.appendChild(teamsEl);
       row.appendChild(scoreEl);
 
-      // Show Enter/Edit button only when the form is NOT open
+      // Show Enter/Edit + Track Score buttons only when the form is NOT open
       if (!isReadOnly && !isActive) {
+        var btnGroup = document.createElement('div');
+        btnGroup.className = 'match-card__btn-group';
+
         var btn = document.createElement('button');
         btn.className = 'match-card__btn';
         btn.type = 'button';
@@ -1147,7 +1312,19 @@
         btn.addEventListener('click', (function (mid) {
           return function () { handleScoreEntry(mid); };
         })(match.id));
-        row.appendChild(btn);
+
+        var trackBtn = document.createElement('button');
+        trackBtn.className = 'match-card__btn match-card__btn--track' +
+          (scoreboardMatchId === match.id ? ' match-card__btn--track-active' : '');
+        trackBtn.type = 'button';
+        trackBtn.textContent = t('tournament.match.trackScore');
+        trackBtn.addEventListener('click', (function (mid) {
+          return function () { handleScoreboard(mid); };
+        })(match.id));
+
+        btnGroup.appendChild(btn);
+        btnGroup.appendChild(trackBtn);
+        row.appendChild(btnGroup);
       }
 
       li.appendChild(row);
