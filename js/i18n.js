@@ -93,9 +93,12 @@ var t, setLanguage, getLanguage;
       'tournament.col.setsAgainst': 'SA',
       'tournament.match.vs': 'vs',
       'tournament.match.enterScore': 'Enter Score',
+      'tournament.match.trackScore': 'Track Score',
       'tournament.match.edit': 'Edit',
       'tournament.match.save': 'Save',
       'tournament.match.cancel': 'Cancel',
+      'tournament.scoreboard.heading': 'Match Score',
+      'tournament.scoreboard.team': 'Team',
       'tournament.error.scoreEmpty': 'Please enter both scores',
       'tournament.error.scoreNegative': 'Scores must be 0 or higher',
       'tournament.error.scoreDraw': 'Scores cannot be equal (no draws in volleyball)',
@@ -141,7 +144,9 @@ var t, setLanguage, getLanguage;
       'king.winnerTitle':          'Champion!',
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
       // Footer
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.4.3'
+
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.5.0'
+
     },
     es: {
       // P\u00e1gina
@@ -220,9 +225,12 @@ var t, setLanguage, getLanguage;
       'tournament.col.setsAgainst': 'SC',
       'tournament.match.vs': 'vs',
       'tournament.match.enterScore': 'Ingresar Resultado',
+      'tournament.match.trackScore': 'Llevar Marcador',
       'tournament.match.edit': 'Editar',
       'tournament.match.save': 'Guardar',
       'tournament.match.cancel': 'Cancelar',
+      'tournament.scoreboard.heading': 'Resultado Partido',
+      'tournament.scoreboard.team': 'Equipo',
       'tournament.error.scoreEmpty': 'Por favor ingresa ambos resultados',
       'tournament.error.scoreNegative': 'Los resultados deben ser 0 o mayores',
       'tournament.error.scoreDraw': 'Los resultados no pueden ser iguales (no hay empates en v\u00f3ley)',
@@ -268,7 +276,9 @@ var t, setLanguage, getLanguage;
       'king.winnerTitle':          '\u00a1Campe\u00f3n!',
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
       // Pie de p\u00e1gina
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.4.3'
+
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.5.0'
+
     }
   };
 
