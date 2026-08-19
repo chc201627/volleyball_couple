@@ -312,6 +312,20 @@
         `Got ${teamLevelAverage(team)}`);
     })();
 
+    // --- Level whitelist: values outside {1,2,3} are treated as unleveled ---
+    (function () {
+      assert(isValidLevel(1) && isValidLevel(2) && isValidLevel(3),
+        'Level whitelist: 1, 2 and 3 are valid levels');
+      [0, 4, 7, -1, 2.5, NaN, '2', null, undefined].forEach(function (bad) {
+        assert(!isValidLevel(bad), 'Level whitelist: invalid value rejected', `Value: ${String(bad)}`);
+      });
+      assert(getPlayerLevel({ name: 'X', level: 7 }) === 2,
+        'Level whitelist: out-of-range level defaults to Intermediate in averages');
+      const teams = [{ players: [{ name: 'X', gender: 'male', level: 7 }], type: 'same' }];
+      assert(hasExplicitLevel(teams) === false,
+        'Level whitelist: out-of-range level does not activate balancing');
+    })();
+
     // --- Level Balancing: team type and unmatched count identical before/after balancing ---
     (function () {
       const players = makePlayers(4, 4, { M1: 3, M2: 1, M3: 3, M4: 1, F1: 3, F2: 1, F3: 3, F4: 1 });

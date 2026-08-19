@@ -404,9 +404,7 @@
       li.className = 'player-list__item animate__animated animate__fadeIn';
       li.style.animationDelay = `${i * 30}ms`;
       const badge = player.gender === 'male' ? t('players.badgeMale') : (player.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
-      const levelBadgeHTML = typeof player.level === 'number'
-        ? `<span class="player-list__badge player-list__badge--level-${player.level}">${t('players.badgeLevel' + player.level)}</span>`
-        : '';
+      const levelBadgeHTML = getLevelBadgeHTML(player.level);
       const removeBtnHTML = isReadOnly ? '' : `<button class="player-list__remove" aria-label="${escapeHTML(t('players.remove', { name: player.name }))}" data-id="${player.id}">&times;</button>`;
       li.innerHTML = `
         <span class="player-list__info">
@@ -514,9 +512,7 @@
       const teamPlayers = team.players || [team.player1, team.player2];
       teamPlayers.forEach(player => {
         const badge = player.gender === 'male' ? t('players.badgeMale') : (player.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
-        const levelBadgeHTML = typeof player.level === 'number'
-          ? `<span class="player-list__badge player-list__badge--level-${player.level}">${t('players.badgeLevel' + player.level)}</span>`
-          : '';
+        const levelBadgeHTML = getLevelBadgeHTML(player.level);
         playersHTML += `
           <p class="couple-card__player">
             ${escapeHTML(player.name)}
@@ -544,9 +540,7 @@
       if (unmatchedList.length === 1) {
         const u = unmatchedList[0];
         const badge = u.gender === 'male' ? t('players.badgeMale') : (u.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
-        const levelBadgeHTML = typeof u.level === 'number'
-          ? `<span class="player-list__badge player-list__badge--level-${u.level}">${t('players.badgeLevel' + u.level)}</span>`
-          : '';
+        const levelBadgeHTML = getLevelBadgeHTML(u.level);
         unmatchedHTML = `
           <p class="unmatched__title">${escapeHTML(t('results.unmatched', { name: u.name }))}
             <span class="player-list__badge player-list__badge--${u.gender}">
@@ -561,9 +555,7 @@
         unmatchedHTML = `<p class="unmatched__title">${escapeHTML(t('results.unmatchedMultiple'))}</p>`;
         unmatchedList.forEach(u => {
           const badge = u.gender === 'male' ? t('players.badgeMale') : (u.gender === 'female' ? t('players.badgeFemale') : t('players.badgeUnspecified'));
-          const levelBadgeHTML = typeof u.level === 'number'
-            ? `<span class="player-list__badge player-list__badge--level-${u.level}">${t('players.badgeLevel' + u.level)}</span>`
-            : '';
+          const levelBadgeHTML = getLevelBadgeHTML(u.level);
           unmatchedHTML += `
             <p class="unmatched__player" style="margin-top: 6px;">
               ${escapeHTML(u.name)}
@@ -1377,9 +1369,8 @@
       var html = '';
       playersInTeam.forEach(function (player, pIdx) {
         var badge = player.gender === 'male' ? t('players.badgeMale') : t('players.badgeFemale');
-        var levelBadgeHTML = typeof player.level === 'number'
-          ? ' <span class="player-list__badge player-list__badge--level-' + player.level + '">' + t('players.badgeLevel' + player.level) + '</span>'
-          : '';
+        var levelBadge = getLevelBadgeHTML(player.level);
+        var levelBadgeHTML = levelBadge ? ' ' + levelBadge : '';
         if (pIdx > 0) {
           html += ' <span class="manual-pairing__pair-sep">&amp;</span> ';
         }
@@ -1483,6 +1474,14 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // Renders a level badge only for whitelisted values; restored state
+  // (localStorage/Firebase) may carry numbers outside 1|2|3.
+  function getLevelBadgeHTML(level) {
+    return isValidLevel(level)
+      ? `<span class="player-list__badge player-list__badge--level-${level}">${t('players.badgeLevel' + level)}</span>`
+      : '';
   }
 
   // --- Boot ---
