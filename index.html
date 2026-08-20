@@ -7,7 +7,7 @@
   <meta name="description" content="Randomly match beach volleyball players into couples with gender-balanced pairing.">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
 
-  <link rel="stylesheet" href="css/styles.css?v=1.7.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.8.0">
 
 </head>
 <body>
@@ -172,6 +172,30 @@
             <button class="tournament-setup__opt" data-groups="3" type="button">A–C</button>
             <button class="tournament-setup__opt" data-groups="4" type="button">A–D</button>
           </div>
+          <div class="format-setup" id="format-setup">
+            <span class="tournament-setup__label" data-i18n="tournament.format.presetLabel">Format:</span>
+            <div class="format-setup__presets" id="format-preset-options">
+              <button class="format-setup__opt format-setup__opt--active" data-preset="classic" type="button"
+                      data-i18n="tournament.format.preset.classic">Classic</button>
+              <button class="format-setup__opt" data-preset="groupsTo" type="button"
+                      data-i18n="tournament.format.preset.groupsTo">Groups Only</button>
+              <button class="format-setup__opt" data-preset="groupsFinal" type="button"
+                      data-i18n="tournament.format.preset.groupsFinal">Groups + Final</button>
+              <button class="format-setup__opt" id="format-preset-crossover" data-preset="crossover" type="button" hidden
+                      data-i18n="tournament.format.preset.crossover">Reference (Top 4)</button>
+            </div>
+            <div class="format-editor" id="format-editor" hidden>
+              <div class="format-editor__stages" id="format-stages"></div>
+              <div class="format-editor__group">
+                <label class="form__label" for="format-custom-rules"
+                       data-i18n="tournament.format.customRules">Custom rules note (optional)</label>
+                <textarea class="form__input format-editor__textarea" id="format-custom-rules" maxlength="500" rows="3"
+                          data-i18n-placeholder="tournament.format.customRulesHint"></textarea>
+                <p class="format-editor__hint" id="format-custom-rules-count">0 / 500</p>
+              </div>
+            </div>
+            <p class="form__error" id="format-error" role="alert" aria-live="polite"></p>
+          </div>
           <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
             Start Tournament
           </button>
@@ -286,8 +310,15 @@
         <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
         <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
       </div>
+      <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
+        <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
+        <p class="tournament-custom-rules__text" id="tournament-custom-rules-text"></p>
+      </details>
       <div class="tournament-groups" id="tournament-groups">
         <!-- Group panels rendered by JS -->
+      </div>
+      <div class="tournament-stages" id="tournament-stages" hidden>
+        <!-- Knockout stage panels rendered by JS (formatted sessions only) -->
       </div>
       <div class="scoreboard-panel" id="scoreboard-panel" hidden>
         <!-- Live scoreboard rendered by JS -->
@@ -296,7 +327,7 @@
   </main>
 
   <footer class="footer">
-    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.7.0</p>
+    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.8.0</p>
   </footer>
 
   <!-- Firebase Realtime Database (compat SDK v10) -->
@@ -304,15 +335,16 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
-  <script src="js/firebase-config.js?v=1.7.0"></script>
+  <script src="js/firebase-config.js?v=1.8.0"></script>
 
-  <script src="js/pairing.js?v=1.7.0"></script>
-  <script src="js/player-import.js?v=1.7.0"></script>
-  <script src="js/i18n.js?v=1.7.0"></script>
-  <script src="js/tournament.js?v=1.7.0"></script>
-  <script src="js/tournament-repository.js?v=1.7.0"></script>
-  <script src="js/king-of-court.js?v=1.7.0"></script>
-  <script src="js/app.js?v=1.7.0"></script>
+  <script src="js/pairing.js?v=1.8.0"></script>
+  <script src="js/player-import.js?v=1.8.0"></script>
+  <script src="js/i18n.js?v=1.8.0"></script>
+  <script src="js/tournament.js?v=1.8.0"></script>
+  <script src="js/tournament-format.js?v=1.8.0"></script>
+  <script src="js/tournament-repository.js?v=1.8.0"></script>
+  <script src="js/king-of-court.js?v=1.8.0"></script>
+  <script src="js/app.js?v=1.8.0"></script>
 
 </body>
 </html>

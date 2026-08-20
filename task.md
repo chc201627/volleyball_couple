@@ -507,6 +507,24 @@
 | REQ-TECH-04 | TASK-1.2 |
 | REQ-TECH-05 | TASK-1.4 |
 | REQ-TECH-06 | TASK-12.2, TASK-12.3 |
+| REQ-FMT-01 | TASK-13.1 |
+| REQ-FMT-02 | TASK-13.3 |
+| REQ-FMT-03 | TASK-13.1 |
+| REQ-FMT-04 | TASK-13.1 |
+| REQ-FMT-05 | TASK-13.1, TASK-13.4 |
+| REQ-FMT-06 | TASK-13.1, TASK-13.3 |
+| REQ-FMT-07 | TASK-13.3 |
+| REQ-FMT-08 | TASK-13.3, TASK-13.4 |
+| REQ-FMT-09 | TASK-13.3, TASK-13.4 |
+| REQ-FMT-10 | TASK-13.1, TASK-13.3 |
+| REQ-FMT-20 | TASK-13.3 |
+| REQ-FMT-21 | TASK-13.3 |
+| REQ-FMT-22 | TASK-13.1 |
+| REQ-FMT-23 | TASK-13.1, TASK-13.4 |
+| REQ-FMT-30 | TASK-13.2 |
+| REQ-FMT-31 | TASK-13.2 |
+| REQ-FMT-32 | TASK-13.2 |
+| REQ-FMT-33 | TASK-13.2, TASK-13.3 |
 
 ## Phase 12: Collaborative Tournament Scoring
 
@@ -518,3 +536,17 @@
 
 ### TASK-12.3 — Mobile verification and release
 - [x] Three-role mobile UI, recoverable sync states, emulator regression, Playwright multi-context proof, and v1.7.0 release runbooks.
+
+## Phase 13: Configurable Tournament Formats
+
+### TASK-13.1 — Format engine
+- [x] `js/tournament-format.js`: format schema, `validateFormat`, stage/knockout match generation with slot descriptors, deterministic `resolveFormat` projection, `rulesForMatch`, `matchOutcome`; opt-in deterministic standings tiebreaker in `js/tournament.js`.
+
+### TASK-13.2 — Schema v3 persistence and Rules
+- [x] `tournament-repository.js` schema-v3 codecs and session selection (v2 classic unchanged, v1 read-only, unknown fails closed); `firebase-rules.json` widened to accept schema 2/3 with an owner-only `structure/format` node and unchanged scorer/spectator boundaries.
+
+### TASK-13.3 — Owner setup UI and scoreboard rule enforcement
+- [x] Preset picker and collapsible format editor (points target, overtime, ≤500-char custom-rules note); scoreboard caps/overtime enforcement with auto-finish through the existing revision-safe transaction; EN/ES strings and 320px/44px verified controls.
+
+### TASK-13.4 — Bracket rendering and release
+- [x] Per-stage knockout panels driven by `resolveFormat`, localized slot placeholders, reference-format end-to-end integration test, and v1.8.0 release documentation/version bumps.

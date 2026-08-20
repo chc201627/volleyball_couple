@@ -1,8 +1,33 @@
 # Firebase Realtime Database — Implementation Plan
 
-> **Current release:** schema v2 supersedes the original public-write v1 plan
+> **Current release:** schema v3 adds owner-configurable tournament formats on
+> top of schema v2, which itself superseded the original public-write v1 plan
 > preserved below for historical context. Production behavior is defined by
 > `firebase-rules.json` and `js/tournament-repository.js`.
+
+## Schema v3 Operations (Configurable Tournament Formats)
+
+- A session uses schema v3 **only when the owner selects a non-classic format**
+  at creation time; classic (formatless) sessions keep writing schema v2
+  unchanged — schema selection is `tournament.format ? 3 : 2`.
+- The format is stored under `tournaments/<sid>/structure/format`
+  (`{ version, preset, stagesById, customRules? }`), owner-only writable, and
+  frozen after creation — no client ever writes to this node again.
+- Knockout matches are pre-created under the existing
+  `tournaments/<sid>/structure/matchesById` alongside round-robin matches.
+  Their `team1Id`/`team2Id` fields hold slot descriptors (`slot:A1`,
+  `winner:k-qf-1`) instead of real team IDs; each match also carries a
+  `stageId`. Real team IDs are never persisted for knockout matches — every
+  client resolves the current pairing locally and deterministically from the
+  format plus confirmed results.
+- `results/<matchId>` transactions are **unchanged**: knockout matches
+  pre-exist in `matchesById`, so an approved scorer saves a knockout result
+  through the same per-match `expectedRevision` transaction used for
+  round-robin matches.
+- Point-target (`pointsTo`) and overtime enforcement stay client-side; this is
+  a documented trust boundary (scorers are owner-approved, not anonymous
+  writers). Rules validate only structural invariants (no draws, no negative
+  scores) — never the numeric target.
 
 ## Schema v2 Operations
 
@@ -12,8 +37,9 @@
 - Anonymous devices request access under the private
   `tournamentAccess/<sid>/members/<uid>` roster. Only the owner can approve or revoke.
 - Tournament data remains publicly readable; the access roster is never public.
-- Missing/schema-v1 sessions remain readable and cannot be edited. Unknown future
-  schema versions fail closed with an unsupported-schema result.
+- Missing/schema-v1 sessions remain readable and cannot be edited. Schema v3
+  (see above) is accepted alongside v2. Unknown future schema versions fail
+  closed with an unsupported-schema result.
 
 ## Local Emulator Runbook
 
@@ -35,17 +61,28 @@ loopback hosts.
 1. Run every `tests/*.test.html` harness and `npm run test:rules`.
 2. Verify organizer approval, scorer save/revocation, spectator live updates,
    same-match conflicts, different-match writes, offline recovery, and v1 read-only.
-3. Deploy `firebase-rules.json` and the static v1.7.0 assets in the same release.
+3. Deploy `firebase-rules.json` and the static v1.8.0 assets in the same release.
 4. Confirm anonymous authentication is enabled in the Firebase project.
-5. Smoke-test one new `#s=` link and one retained schema-v1 link after deployment.
+5. Smoke-test one new `#s=` link (classic, schema v2), one new format link
+   (schema v3, e.g. the crossover reference format), and one retained
+   schema-v1 link after deployment.
 
 ## Migration and Rollback
 
-There is no destructive migration. New sessions write schema v2; legacy v1 data is
-decoded read-only in place. To roll back, restore the previous UI, repository, and
-Rules together. Do not rewrite or delete retained v2 data: it remains available for
-recovery after the forward fix. If Rules deploy fails, stop the web deployment so
-client and authorization contracts never diverge.
+There is no destructive migration. New classic sessions keep writing schema v2;
+new format sessions write schema v3 only when the owner selects a non-classic
+preset; legacy v1 data is decoded read-only in place. No existing session is
+rewritten by this release.
+
+To roll back this release, restore the previous UI, repository, and Rules
+together. Do not rewrite or delete retained v2 or v3 data: it remains available
+for recovery after the forward fix. If the Rules revert lands (dropping schema-3
+acceptance and the `format` node) while the static assets do not, existing v3
+sessions fail closed with the unsupported-schema state for every client — this
+is the intended fail-closed behavior, not data loss; the underlying `format`
+and `matchesById` data is retained and becomes readable again once the v3-aware
+Rules and assets are redeployed. If Rules deploy fails, stop the web deployment
+so client and authorization contracts never diverge.
 
 ## Goal
 Replace the static URL-hash sharing approach with Firebase Realtime Database so that viewers of a shared tournament link see score updates in real time without any manual re-sharing.

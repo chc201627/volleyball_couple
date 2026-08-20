@@ -338,6 +338,65 @@
         'calculateStandings: projecting the same final result remains standings-once');
     })();
 
+    // ─── calculateStandings: deterministic extended tiebreak (options) ────────────
+
+    function permutations(arr) {
+      if (arr.length <= 1) return [arr];
+      const result = [];
+      arr.forEach((item, i) => {
+        const rest = arr.slice(0, i).concat(arr.slice(i + 1));
+        permutations(rest).forEach((perm) => result.push([item].concat(perm)));
+      });
+      return result;
+    }
+
+    (function () {
+      // t0 and t1 finish exactly tied on points/diff/setsFor; t1 beat t0 head-to-head.
+      const groups = [{ id: 'A', teams: [{ id: 't0' }, { id: 't1' }, { id: 't2' }, { id: 't3' }] }];
+      const matches = [
+        { id: 'm1', groupId: 'A', team1Id: 't1', team2Id: 't0', score1: 21, score2: 18, played: true },
+        { id: 'm2', groupId: 'A', team1Id: 't1', team2Id: 't2', score1: 15, score2: 21, played: true },
+        { id: 'm3', groupId: 'A', team1Id: 't1', team2Id: 't3', score1: 21, score2: 12, played: true },
+        { id: 'm4', groupId: 'A', team1Id: 't0', team2Id: 't2', score1: 21, score2: 15, played: true },
+        { id: 'm5', groupId: 'A', team1Id: 't0', team2Id: 't3', score1: 18, score2: 15, played: true },
+      ];
+
+      const classic = calculateStandings(groups, matches).get('A');
+      assert(classic[0].teamId === 't0' && classic[0].h2hWins === undefined,
+        'calculateStandings: classic 2-arg call keeps today\'s stable order on a full tie and adds no extra keys');
+
+      const extended = calculateStandings(groups, matches, { extendedTiebreak: true }).get('A');
+      assert(extended[0].teamId === 't1', 'calculateStandings: extended mode breaks a 2-way tie by head-to-head result',
+        JSON.stringify(extended.map((s) => s.teamId)));
+    })();
+
+    (function () {
+      // 3-way circular tie: t0 beats t1, t1 beats t2, t2 beats t0 — identical points/diff/setsFor.
+      const groups = [{ id: 'A', teams: [{ id: 't0' }, { id: 't1' }, { id: 't2' }] }];
+      const matches = [
+        { id: 'm1', groupId: 'A', team1Id: 't0', team2Id: 't1', score1: 21, score2: 19, played: true },
+        { id: 'm2', groupId: 'A', team1Id: 't1', team2Id: 't2', score1: 21, score2: 19, played: true },
+        { id: 'm3', groupId: 'A', team1Id: 't2', team2Id: 't0', score1: 21, score2: 19, played: true },
+      ];
+
+      const standingsA = calculateStandings(groups, matches, { extendedTiebreak: true }).get('A');
+      assert(standingsA.map((s) => s.teamId).join(',') === 't0,t1,t2',
+        'calculateStandings: 3-way circular tie (all h2hWins=1) falls back to stable entryIndex',
+        JSON.stringify(standingsA.map((s) => s.teamId)));
+
+      const standingsB = calculateStandings(groups, matches, { extendedTiebreak: true }).get('A');
+      assert(JSON.stringify(standingsA) === JSON.stringify(standingsB),
+        'calculateStandings: repeated runs of a 3-way circular tie are identical');
+
+      // Comparator consistency: every insertion order of the tied matches yields
+      // one identical ranking (no ECMA-262 implementation-defined behavior, D8).
+      const orders = permutations(matches).map((perm) =>
+        calculateStandings(groups, perm, { extendedTiebreak: true }).get('A').map((s) => s.teamId).join(','));
+      assert(orders.every((o) => o === orders[0]),
+        'calculateStandings: every permutation of match-array order yields one identical ranking',
+        orders.join(' | '));
+    })();
+
     // ─── recordMatchScore ─────────────────────────────────────────────────────────
 
     heading('recordMatchScore');
