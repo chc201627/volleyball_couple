@@ -102,6 +102,23 @@ var t, setLanguage, getLanguage;
       'tournament.share': '🔗 Share',
       'tournament.shareCopied': '✓ Copied!',
       'tournament.readonlyBanner': '👁 View only — updates in real time',
+      'tournament.access.owner': 'Organizer · manage scorer access',
+      'tournament.access.scorer': '✓ Approved scorer',
+      'tournament.access.viewer': 'View only · request access to enter scores',
+      'tournament.access.authPending': '⏳ Checking device identity…',
+      'tournament.access.pending': '⏳ Scoring access request pending',
+      'tournament.access.revoked': '⚠ Scoring access revoked · request again',
+      'tournament.access.label': 'Device label (for example, Court 1)',
+      'tournament.access.request': 'Request scoring access',
+      'tournament.access.approve': 'Approve',
+      'tournament.access.revoke': 'Revoke',
+      'tournament.access.state.pending': 'pending',
+      'tournament.access.state.approved': 'approved',
+      'tournament.access.state.revoked': 'revoked',
+      'tournament.filter.label': 'Filter matches by status',
+      'tournament.filter.pending': 'Pending',
+      'tournament.filter.live': 'Live',
+      'tournament.filter.finished': 'Finished',
       'tournament.start': 'Start Tournament',
       'tournament.heading': 'Tournament',
       'tournament.reset': 'Reset Tournament',
@@ -120,6 +137,8 @@ var t, setLanguage, getLanguage;
       'tournament.match.trackScore': 'Track Score',
       'tournament.match.edit': 'Edit',
       'tournament.match.save': 'Save',
+      'tournament.match.saveProgress': 'Save progress',
+      'tournament.match.finish': 'Finish',
       'tournament.match.cancel': 'Cancel',
       'tournament.scoreboard.heading': 'Match Score',
       'tournament.scoreboard.team': 'Team',
@@ -127,6 +146,13 @@ var t, setLanguage, getLanguage;
       'tournament.error.scoreNegative': 'Scores must be 0 or higher',
       'tournament.error.scoreDraw': 'Scores cannot be equal (no draws in volleyball)',
       'tournament.error.scoreNotInt': 'Scores must be whole numbers',
+      'tournament.sync.saving': '⏳ Saving…',
+      'tournament.sync.synced': '✓ Synced with server',
+      'tournament.sync.offline': '⚠ Offline · result not synced',
+      'tournament.sync.denied': '⛔ Access denied · confirmed result kept',
+      'tournament.sync.conflict': '⚠ Newer result found · review and retry',
+      'tournament.sync.invalid': '⚠ Check the score and retry',
+      'tournament.sync.retry': 'Retry',
       // Match Type
       'matchType.label': 'Match Type',
       'matchType.2v2': '2vs2 (Couples)',
@@ -169,7 +195,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.6.0'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.7.0'
 
     },
     es: {
@@ -258,6 +284,23 @@ var t, setLanguage, getLanguage;
       'tournament.share': '🔗 Compartir',
       'tournament.shareCopied': '✓ ¡Copiado!',
       'tournament.readonlyBanner': '👁 Solo lectura — se actualiza en tiempo real',
+      'tournament.access.owner': 'Organizador · gestiona acceso de anotadores',
+      'tournament.access.scorer': '✓ Anotador aprobado',
+      'tournament.access.viewer': 'Solo lectura · solicita acceso para anotar',
+      'tournament.access.authPending': '⏳ Verificando la identidad del dispositivo…',
+      'tournament.access.pending': '⏳ Solicitud de acceso pendiente',
+      'tournament.access.revoked': '⚠ Acceso revocado · solicita de nuevo',
+      'tournament.access.label': 'Nombre del dispositivo (por ejemplo, Cancha 1)',
+      'tournament.access.request': 'Solicitar acceso para anotar',
+      'tournament.access.approve': 'Aprobar',
+      'tournament.access.revoke': 'Revocar',
+      'tournament.access.state.pending': 'pendiente',
+      'tournament.access.state.approved': 'aprobado',
+      'tournament.access.state.revoked': 'revocado',
+      'tournament.filter.label': 'Filtrar partidos por estado',
+      'tournament.filter.pending': 'Pendientes',
+      'tournament.filter.live': 'En vivo',
+      'tournament.filter.finished': 'Finalizados',
       'tournament.start': 'Iniciar Torneo',
       'tournament.heading': 'Torneo',
       'tournament.reset': 'Reiniciar Torneo',
@@ -276,6 +319,8 @@ var t, setLanguage, getLanguage;
       'tournament.match.trackScore': 'Llevar Marcador',
       'tournament.match.edit': 'Editar',
       'tournament.match.save': 'Guardar',
+      'tournament.match.saveProgress': 'Guardar avance',
+      'tournament.match.finish': 'Finalizar',
       'tournament.match.cancel': 'Cancelar',
       'tournament.scoreboard.heading': 'Resultado Partido',
       'tournament.scoreboard.team': 'Equipo',
@@ -283,6 +328,13 @@ var t, setLanguage, getLanguage;
       'tournament.error.scoreNegative': 'Los resultados deben ser 0 o mayores',
       'tournament.error.scoreDraw': 'Los resultados no pueden ser iguales (no hay empates en v\u00f3ley)',
       'tournament.error.scoreNotInt': 'Los resultados deben ser n\u00fameros enteros',
+      'tournament.sync.saving': '⏳ Guardando…',
+      'tournament.sync.synced': '✓ Sincronizado con el servidor',
+      'tournament.sync.offline': '⚠ Sin conexión · resultado no sincronizado',
+      'tournament.sync.denied': '⛔ Acceso denegado · se conserva el resultado confirmado',
+      'tournament.sync.conflict': '⚠ Hay un resultado más reciente · revisa y reintenta',
+      'tournament.sync.invalid': '⚠ Revisa el marcador e intenta de nuevo',
+      'tournament.sync.retry': 'Reintentar',
       // Tipo de Partido
       'matchType.label': 'Tipo de Partido',
       'matchType.2v2': '2vs2 (Parejas)',
@@ -325,7 +377,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.6.0'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.7.0'
 
     }
   };

@@ -1,5 +1,52 @@
 # Firebase Realtime Database — Implementation Plan
 
+> **Current release:** schema v2 supersedes the original public-write v1 plan
+> preserved below for historical context. Production behavior is defined by
+> `firebase-rules.json` and `js/tournament-repository.js`.
+
+## Schema v2 Operations
+
+- New sessions store owner-controlled structure under `tournaments/<sid>/structure`.
+- Each match result is transacted independently under `results/<matchId>` with
+  an exact revision, actor UID, server timestamp, and Live/Finished status.
+- Anonymous devices request access under the private
+  `tournamentAccess/<sid>/members/<uid>` roster. Only the owner can approve or revoke.
+- Tournament data remains publicly readable; the access roster is never public.
+- Missing/schema-v1 sessions remain readable and cannot be edited. Unknown future
+  schema versions fail closed with an unsupported-schema result.
+
+## Local Emulator Runbook
+
+```bash
+npm install
+npm run test:rules
+# Interactive multi-device verification:
+npx firebase emulators:start --project demo-volleyball-couple --only auth,database
+python3 -m http.server 4173 --bind 127.0.0.1
+```
+
+Open `http://127.0.0.1:4173/?firebaseEmulator=1`. Use isolated browser contexts
+for organizer, scorer, and spectator so every context receives a separate anonymous
+UID. Never use the emulator query parameter on a deployed URL; it is ignored outside
+loopback hosts.
+
+## Deployment Runbook
+
+1. Run every `tests/*.test.html` harness and `npm run test:rules`.
+2. Verify organizer approval, scorer save/revocation, spectator live updates,
+   same-match conflicts, different-match writes, offline recovery, and v1 read-only.
+3. Deploy `firebase-rules.json` and the static v1.7.0 assets in the same release.
+4. Confirm anonymous authentication is enabled in the Firebase project.
+5. Smoke-test one new `#s=` link and one retained schema-v1 link after deployment.
+
+## Migration and Rollback
+
+There is no destructive migration. New sessions write schema v2; legacy v1 data is
+decoded read-only in place. To roll back, restore the previous UI, repository, and
+Rules together. Do not rewrite or delete retained v2 data: it remains available for
+recovery after the forward fix. If Rules deploy fails, stop the web deployment so
+client and authorization contracts never diverge.
+
 ## Goal
 Replace the static URL-hash sharing approach with Firebase Realtime Database so that viewers of a shared tournament link see score updates in real time without any manual re-sharing.
 

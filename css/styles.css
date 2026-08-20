@@ -589,11 +589,12 @@ textarea {
 /* --- Couples Grid --- */
 .couples-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 .couple-card {
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 16px;
@@ -781,6 +782,49 @@ textarea {
   color: var(--color-primary-dark);
   margin-bottom: 16px;
 }
+
+.tournament-ops {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+.tournament-ops > * { min-width: 0; max-width: 100%; }
+
+.tournament-ops__status,
+.sync-status {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.sync-status:empty { display: none; }
+.sync-status[data-state="synced"] { border-color: var(--color-success); }
+.sync-status[data-state="offline"],
+.sync-status[data-state="conflict"],
+.sync-status[data-state="invalid"] { border-color: var(--color-warning); }
+.sync-status[data-state="denied"] { border-color: var(--color-error); }
+
+.access-request { display: grid; gap: 8px; }
+.access-members { display: grid; gap: 8px; list-style: none; }
+.access-members__item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.access-members__label { flex: 1; min-width: 120px; overflow-wrap: anywhere; }
+
+.match-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.match-filters__btn {
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-white);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius);
+  font-weight: 600;
+  cursor: pointer;
+}
+.match-filters__btn--active { background: var(--color-primary); color: var(--color-white); }
+.access-request .btn, .access-members .btn, #retry-score-btn,
+.match-card__btn, .score-form__save, .score-form__cancel { min-height: 44px; }
 
 .tournament-groups {
   display: flex;
