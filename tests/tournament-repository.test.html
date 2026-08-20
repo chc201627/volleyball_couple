@@ -12,6 +12,7 @@
   <h1>Tournament Repository — Test Suite</h1>
   <div id="results"></div>
   <script src="../js/tournament.js"></script>
+  <script src="../js/tournament-format.js"></script>
   <script src="../js/tournament-repository.js"></script>
   <script>
     (async function () {
@@ -130,6 +131,53 @@
           'identity loss requires the replacement device to request access again');
         assert(typeof createFirebaseTournamentRepository === 'function',
           'exposes the Firebase adapter factory');
+
+        // Schema v3 (format sessions) — REQ-FMT-30..32
+        const formatFixture = tournamentFixture();
+        formatFixture.format = {
+          version: 1, preset: 'groupsFinal',
+          stagesById: {
+            group: { id: 'group', kind: 'roundRobin', order: 1, pointsTo: 21, overtime: false },
+            final: { id: 'final', kind: 'knockout', order: 2, pointsTo: 15, overtime: false, pairs: [['slot:A1', 'slot:A2']] },
+          },
+        };
+        formatFixture.matches = generateStageMatches(formatFixture.format, formatFixture.groups);
+        const formatRepo = createInMemoryTournamentRepository({ uid: 'owner-3', now: () => 3000 });
+        const formatCreated = await formatRepo.createSession(formatFixture);
+        let formatSnapshot;
+        formatRepo.watchSession(formatCreated.sessionId, value => { formatSnapshot = value; });
+        assert(formatSnapshot.schemaVersion === 3 && formatSnapshot.legacy === false,
+          'a tournament with a format creates a schema-v3 session');
+        assert(formatSnapshot.tournament.format && formatSnapshot.tournament.format.version === 1 &&
+          formatSnapshot.tournament.format.preset === 'groupsFinal',
+          'v3 round-trip decodes the format node (version/preset)');
+        assert(formatSnapshot.tournament.format.stagesById.final.pointsTo === 15 &&
+          formatSnapshot.tournament.format.stagesById.final.overtime === false,
+          'v3 round-trip preserves per-stage pointsTo/overtime');
+        assert(formatSnapshot.tournament.format.stagesById.final.pairs === undefined,
+          'the persisted format never stores authoring-time pairs (D3)');
+        const knockoutMatch = formatSnapshot.tournament.matches.filter(m => m.id.indexOf('k-') === 0)[0];
+        assert(knockoutMatch && knockoutMatch.team1Id === 'slot:A1' && knockoutMatch.team2Id === 'slot:A2',
+          'v3 round-trip preserves knockout slot descriptors');
+        assert(knockoutMatch.score1 === null && knockoutMatch.score2 === null && knockoutMatch.revision === 0 &&
+          knockoutMatch.status === 'pending' && knockoutMatch.played === false,
+          'a pre-created knockout match carries only its own local-only null result fields, never an undefined one');
+        assert(formatSnapshot.tournament.matches.every(m => typeof m.stageId === 'string'),
+          'every v3 match carries a stageId');
+        const formatAccess = await formatRepo.requestAccess(formatCreated.sessionId, 'Court three');
+        assert(formatAccess.status === 'requested', 'requestAccess accepts a schema-v3 session');
+        let malformedSnapshot;
+        createInMemoryTournamentRepository({
+          sessions: { v3bad: { schemaVersion: 3, ownerUid: 'owner', structure: { playersById: {}, teamsById: {}, groupsById: {}, matchesById: {} } } },
+        }).watchSession('v3bad', value => { malformedSnapshot = value; });
+        assert(malformedSnapshot.error === 'unsupported-schema' && !malformedSnapshot.tournament,
+          'a v3 session without a decodable format fails closed');
+        const classicRepo = createInMemoryTournamentRepository({ uid: 'owner-4', now: () => 4000 });
+        const classicCreated = await classicRepo.createSession(tournamentFixture());
+        let classicSnapshot;
+        classicRepo.watchSession(classicCreated.sessionId, value => { classicSnapshot = value; });
+        assert(classicSnapshot.schemaVersion === 2 && classicSnapshot.tournament.format === null,
+          'a classic tournament (no format) still creates a byte-identical schema-v2 session');
       } catch (error) {
         assert(false, 'repository suite completes without an unexpected error', error && error.message);
       }
