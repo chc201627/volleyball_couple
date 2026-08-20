@@ -945,6 +945,37 @@ textarea {
 .access-request .btn, .access-members .btn, #retry-score-btn,
 .match-card__btn, .score-form__save, .score-form__cancel { min-height: 44px; }
 
+/* Owner-authored custom rules note (REQ-FMT-07) — collapsible, visible to every role */
+.tournament-custom-rules {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.tournament-custom-rules__summary {
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  list-style: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.tournament-custom-rules__summary::-webkit-details-marker { display: none; }
+
+.tournament-custom-rules__text {
+  padding: 10px 14px;
+  margin: 0;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .tournament-groups {
   display: flex;
   flex-direction: column;
@@ -1108,6 +1139,13 @@ textarea {
   color: #388e3c;
 }
 
+/* Per-match Set Rules caption (REQ-FMT-01/08) — visible to every role */
+.match-card__rule {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: -4px 0 0;
+}
+
 .match-card__btn {
   flex-shrink: 0;
   background: none;
@@ -1242,6 +1280,13 @@ textarea {
 .scoreboard__match-label {
   text-align: center;
   font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.scoreboard__rule {
+  text-align: center;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
   margin-bottom: 20px;
 }

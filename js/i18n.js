@@ -182,6 +182,12 @@ var t, setLanguage, getLanguage;
       'tournament.format.error.knockoutTokenDuplicate': 'A knockout slot is used more than once',
       'tournament.format.error.knockoutToken': 'A knockout slot references an invalid group rank or match',
       'tournament.format.error.customRules': 'The custom rules note must be 500 characters or fewer',
+      // Tournament format (PR3b — scoreboard enforcement)
+      'tournament.format.rule.pointsTo': 'Set to {points}',
+      'tournament.format.rule.overtimeOn': 'overtime win by 2',
+      'tournament.format.rule.overtimeOff': 'no overtime',
+      'tournament.format.error.pointsTarget': 'Score does not meet the target for this stage',
+      'tournament.format.customRulesNote.heading': 'Custom rules',
       // Match Type
       'matchType.label': 'Match Type',
       'matchType.2v2': '2vs2 (Couples)',
@@ -393,6 +399,12 @@ var t, setLanguage, getLanguage;
       'tournament.format.error.knockoutTokenDuplicate': 'Un cupo de la eliminatoria se usa más de una vez',
       'tournament.format.error.knockoutToken': 'Un cupo de la eliminatoria hace referencia a una posición de grupo o partido inválida',
       'tournament.format.error.customRules': 'La nota de reglas personalizadas debe tener 500 caracteres o menos',
+      // Formato del torneo (PR3b — cumplimiento del marcador)
+      'tournament.format.rule.pointsTo': 'A {points} puntos',
+      'tournament.format.rule.overtimeOn': 'tiempo extra, gana por 2',
+      'tournament.format.rule.overtimeOff': 'sin tiempo extra',
+      'tournament.format.error.pointsTarget': 'El resultado no cumple con la meta de esta etapa',
+      'tournament.format.customRulesNote.heading': 'Reglas personalizadas',
       // Tipo de Partido
       'matchType.label': 'Tipo de Partido',
       'matchType.2v2': '2vs2 (Parejas)',

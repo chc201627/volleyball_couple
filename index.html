@@ -194,7 +194,7 @@
                 <p class="format-editor__hint" id="format-custom-rules-count">0 / 500</p>
               </div>
             </div>
-            <p class="form__error" id="format-error"></p>
+            <p class="form__error" id="format-error" role="alert" aria-live="polite"></p>
           </div>
           <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
             Start Tournament
@@ -310,6 +310,10 @@
         <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
         <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
       </div>
+      <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
+        <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
+        <p class="tournament-custom-rules__text" id="tournament-custom-rules-text"></p>
+      </details>
       <div class="tournament-groups" id="tournament-groups">
         <!-- Group panels rendered by JS -->
       </div>
