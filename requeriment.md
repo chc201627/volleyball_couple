@@ -514,6 +514,27 @@ The application will be considered complete when:
 - **REQ-NFR-14:** Mobile tournament operations support 320px width, 44px targets, and non-color status feedback.
 - **REQ-TECH-06:** New sessions use schema v2; schema v1 remains readable and unknown versions fail closed.
 
+## Configurable Tournament Formats (v1.8.0)
+
+- **REQ-FMT-01:** A Format is an ordered list of Stages, each `roundRobin` or `knockout`, with per-stage Set Rules: `pointsTo` (positive integer) and `overtime` (boolean).
+- **REQ-FMT-02:** Format creation offers stage presets (classic, groups+final, reference format) with light editing only (group count 1–4, teams per group, stage list, per-stage `pointsTo`/`overtime`). No free-form stage builder.
+- **REQ-FMT-03:** Validation rejects an empty stage list, non-positive/non-integer `pointsTo`, a knockout Slot referencing a nonexistent group rank or match, and cycles/forward references. Invalid formats do not create a session.
+- **REQ-FMT-04:** Knockout matches are pre-created at session creation with slot-descriptor team IDs (`slot:` group-rank, `winner:` match). No byes, no third-place match, no losers bracket.
+- **REQ-FMT-05:** Slot resolution is a pure, deterministic client-side projection: identical format + results yield identical bracket pairings on every device. Unresolved slots render a localized placeholder and the match is not scorable.
+- **REQ-FMT-06:** The Format is frozen after session creation; no edit path exists in any role's UI.
+- **REQ-FMT-07:** The owner may attach one plain-text custom-rules note, max 500 characters, in one language; it is visible to owner, scorers, and spectators.
+- **REQ-FMT-08:** Stage names, set-rule labels, overtime labels, placeholders, and all new UI strings have EN and ES entries in `js/i18n.js`.
+- **REQ-FMT-09:** New format/bracket UI shows no horizontal overflow at 320px and gives interactive controls ≥44×44px targets.
+- **REQ-FMT-10:** King of the Court remains unchanged. Classic (formatless) tournament creation remains available and behaves exactly as today.
+- **REQ-FMT-20:** The scoreboard enforces the match's stage Set Rules client-side. With `overtime=false`, the first team reaching `pointsTo` wins immediately (win by 1 at target); scores above target are impossible. With `overtime=true`, play continues past `pointsTo` until a 2-point lead (win by 2); a result cannot finish at less than a 2-point margin.
+- **REQ-FMT-21:** When a finish condition is met, the result auto-finishes via the existing `saveResult` per-match transaction with `expectedRevision` unchanged; conflicts preserve the last confirmed result.
+- **REQ-FMT-22:** Final standings ordering is fully deterministic: points → set diff → sets for → head-to-head → stable original team order. Exact ties are impossible.
+- **REQ-FMT-23:** A knockout match becomes scorable only after all its source slots resolve.
+- **REQ-FMT-30:** Format sessions use schema v3, storing the format under `structure/format` and knockout matches under `structure/matchesById` with slot-descriptor team IDs.
+- **REQ-FMT-31:** Classic sessions keep schema v2 read/write; v1 stays read-only; unknown schemas fail closed with the existing unsupported-schema state.
+- **REQ-FMT-32:** Firebase Rules accept schema `2 or 3`; `structure` (including `format`) remains owner-only writable; scorers can write only `results/{matchId}` for pre-existing match IDs; access policy remains owner-only.
+- **REQ-FMT-33:** Point-target enforcement stays client-side (documented trust boundary); rules keep structural invariants only (no draws, no negatives). No rules-language target enforcement.
+
 ## Tech Stack
 
 - **Frontend:** HTML, CSS, JavaScript, Gradient, Animate.css

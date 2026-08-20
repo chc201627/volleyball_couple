@@ -945,6 +945,37 @@ textarea {
 .access-request .btn, .access-members .btn, #retry-score-btn,
 .match-card__btn, .score-form__save, .score-form__cancel { min-height: 44px; }
 
+/* Owner-authored custom rules note (REQ-FMT-07) — collapsible, visible to every role */
+.tournament-custom-rules {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.tournament-custom-rules__summary {
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  list-style: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.tournament-custom-rules__summary::-webkit-details-marker { display: none; }
+
+.tournament-custom-rules__text {
+  padding: 10px 14px;
+  margin: 0;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .tournament-groups {
   display: flex;
   flex-direction: column;
@@ -978,6 +1009,43 @@ textarea {
   letter-spacing: 0.5px;
   color: var(--group-color, var(--color-primary));
   margin-bottom: 16px;
+}
+
+/* --- Knockout Stage Panel (REQ-FMT-05/09) --- */
+/* Vertical stage-stack: one card per knockout stage, always a single mobile-first
+   column (no grid at any breakpoint) — bracket order stays readable at 320px. */
+.tournament-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.tournament-stage {
+  background: var(--color-white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 16px;
+  border-left: 4px solid var(--color-text-secondary);
+}
+
+.tournament-stage[data-stage-status="active"] { border-left-color: var(--color-primary); }
+.tournament-stage[data-stage-status="complete"] { border-left-color: var(--color-success); }
+.tournament-stage[data-stage-status="invalid"] { border-left-color: var(--color-error); }
+
+.tournament-stage__heading {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.tournament-stage__meta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 16px;
 }
 
 /* --- Standings Table --- */
@@ -1106,6 +1174,13 @@ textarea {
 
 .match-card__score--played {
   color: #388e3c;
+}
+
+/* Per-match Set Rules caption (REQ-FMT-01/08) — visible to every role */
+.match-card__rule {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: -4px 0 0;
 }
 
 .match-card__btn {
@@ -1242,6 +1317,13 @@ textarea {
 .scoreboard__match-label {
   text-align: center;
   font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.scoreboard__rule {
+  text-align: center;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
   margin-bottom: 20px;
 }

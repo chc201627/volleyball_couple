@@ -182,6 +182,19 @@ var t, setLanguage, getLanguage;
       'tournament.format.error.knockoutTokenDuplicate': 'A knockout slot is used more than once',
       'tournament.format.error.knockoutToken': 'A knockout slot references an invalid group rank or match',
       'tournament.format.error.customRules': 'The custom rules note must be 500 characters or fewer',
+      // Tournament format (PR3b — scoreboard enforcement)
+      'tournament.format.rule.pointsTo': 'Set to {points}',
+      'tournament.format.rule.overtimeOn': 'overtime win by 2',
+      'tournament.format.rule.overtimeOff': 'no overtime',
+      'tournament.format.error.pointsTarget': 'Score does not meet the target for this stage',
+      'tournament.format.customRulesNote.heading': 'Custom rules',
+      'tournament.format.stageStatus.pending': 'Locked',
+      'tournament.format.stageStatus.active': 'In progress',
+      'tournament.format.stageStatus.complete': 'Finished',
+      'tournament.format.stageStatus.invalid': 'Invalid configuration',
+      'tournament.format.slot.groupRank': 'Rank {rank} · Group {group}',
+      'tournament.format.slot.winner': 'Winner of {match}',
+      'tournament.format.slot.tbd': 'TBD',
       // Match Type
       'matchType.label': 'Match Type',
       'matchType.2v2': '2vs2 (Couples)',
@@ -224,7 +237,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.7.0'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.8.0'
 
     },
     es: {
@@ -393,6 +406,19 @@ var t, setLanguage, getLanguage;
       'tournament.format.error.knockoutTokenDuplicate': 'Un cupo de la eliminatoria se usa más de una vez',
       'tournament.format.error.knockoutToken': 'Un cupo de la eliminatoria hace referencia a una posición de grupo o partido inválida',
       'tournament.format.error.customRules': 'La nota de reglas personalizadas debe tener 500 caracteres o menos',
+      // Formato del torneo (PR3b — cumplimiento del marcador)
+      'tournament.format.rule.pointsTo': 'A {points} puntos',
+      'tournament.format.rule.overtimeOn': 'tiempo extra, gana por 2',
+      'tournament.format.rule.overtimeOff': 'sin tiempo extra',
+      'tournament.format.error.pointsTarget': 'El resultado no cumple con la meta de esta etapa',
+      'tournament.format.customRulesNote.heading': 'Reglas personalizadas',
+      'tournament.format.stageStatus.pending': 'Bloqueada',
+      'tournament.format.stageStatus.active': 'En curso',
+      'tournament.format.stageStatus.complete': 'Finalizada',
+      'tournament.format.stageStatus.invalid': 'Configuración inválida',
+      'tournament.format.slot.groupRank': 'Puesto {rank} · Grupo {group}',
+      'tournament.format.slot.winner': 'Ganador de {match}',
+      'tournament.format.slot.tbd': 'Por definir',
       // Tipo de Partido
       'matchType.label': 'Tipo de Partido',
       'matchType.2v2': '2vs2 (Parejas)',
@@ -435,7 +461,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.7.0'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.8.0'
 
     }
   };
