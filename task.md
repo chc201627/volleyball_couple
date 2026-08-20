@@ -468,6 +468,11 @@
 | REQ-FR-22 | TASK-11.2 |
 | REQ-FR-23 | TASK-11.2 |
 | REQ-FR-24 | TASK-11.1, TASK-11.3 |
+| REQ-FR-25 | TASK-12.1, TASK-12.3 |
+| REQ-FR-26 | TASK-12.1, TASK-12.3 |
+| REQ-FR-27 | TASK-12.2, TASK-12.3 |
+| REQ-FR-28 | TASK-12.2, TASK-12.3 |
+| REQ-FR-29 | TASK-12.3 |
 | REQ-NFR-01 | TASK-7.5 |
 | REQ-NFR-02 | TASK-7.5 |
 | REQ-NFR-03 | TASK-1.4, TASK-7.1 |
@@ -481,6 +486,7 @@
 | REQ-NFR-11 | TASK-8.3 |
 | REQ-NFR-12 | TASK-6.1 |
 | REQ-NFR-13 | TASK-6.1, TASK-6.2 |
+| REQ-NFR-14 | TASK-12.3 |
 | REQ-VAL-01 | TASK-2.4, TASK-6.1 |
 | REQ-VAL-02 | TASK-2.4, TASK-6.1 |
 | REQ-VAL-03 | TASK-2.4, TASK-6.1 |
@@ -500,3 +506,15 @@
 | REQ-TECH-03 | TASK-3.2 |
 | REQ-TECH-04 | TASK-1.2 |
 | REQ-TECH-05 | TASK-1.4 |
+| REQ-TECH-06 | TASK-12.2, TASK-12.3 |
+
+## Phase 12: Collaborative Tournament Scoring
+
+### TASK-12.1 — Device-scoped scorer access
+- [x] Owner-approved anonymous requests and write-time revocation.
+
+### TASK-12.2 — Revision-safe granular results
+- [x] Schema-v2 repository, least-privilege Rules, per-match transactions, and v1 read-only codec.
+
+### TASK-12.3 — Mobile verification and release
+- [x] Three-role mobile UI, recoverable sync states, emulator regression, Playwright multi-context proof, and v1.7.0 release runbooks.

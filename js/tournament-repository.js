@@ -1,6 +1,6 @@
 /** In-memory adapter for the framework-agnostic TournamentRepository seam. */
-/* exported createInMemoryTournamentRepository */
-var createInMemoryTournamentRepository;
+/* exported createInMemoryTournamentRepository, createFirebaseTournamentRepository */
+var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
 (function () {
   'use strict';
   function clone(value) {
@@ -15,6 +15,11 @@ var createInMemoryTournamentRepository;
   }
   function values(map) {
     return Object.keys(map || {}).map(function (key) { return clone(map[key]); });
+  }
+  function toIdMap(items, encode) {
+    var result = {};
+    (items || []).forEach(function (item) { result[item.id] = encode ? encode(item) : clone(item); });
+    return result;
   }
   function collectPlayers(tournament) {
     if (Array.isArray(tournament.players)) return tournament.players;
@@ -42,7 +47,7 @@ var createInMemoryTournamentRepository;
       groupsById: toIndexedMap(tournament.groups, 'g', function (group) {
         return { id: group.id, teamIds: (group.teams || []).map(function (team) { return team.id; }) };
       }),
-      matchesById: toIndexedMap(tournament.matches, 'm', function (match) {
+      matchesById: toIdMap(tournament.matches, function (match) {
         var structureMatch = clone(match);
         delete structureMatch.score1;
         delete structureMatch.score2;
@@ -89,7 +94,9 @@ var createInMemoryTournamentRepository;
     if (!session.schemaVersion || session.schemaVersion === 1) {
       return { schemaVersion: 1, legacy: true, tournament: clone(session.state) };
     }
-    if (session.schemaVersion !== 2) return null;
+    if (session.schemaVersion !== 2) {
+      return { schemaVersion: session.schemaVersion, legacy: false, tournament: null, error: 'unsupported-schema' };
+    }
     return {
       schemaVersion: 2,
       legacy: false,
@@ -104,22 +111,25 @@ var createInMemoryTournamentRepository;
   }
   createInMemoryTournamentRepository = function (options) {
     options = options || {};
-    var uid = options.uid || 'memory-device';
+    var runtime = options.runtime || { uid: options.uid || 'memory-device', authState: 'ready', connection: 'online' };
+    if (!runtime.uid) runtime.uid = options.uid || 'memory-device';
+    if (!runtime.authState) runtime.authState = 'ready';
+    if (!runtime.connection) runtime.connection = 'online';
     var now = typeof options.now === 'function' ? options.now : Date.now;
     var sessions = clone(options.sessions || {});
     var watchers = {};
     var sequence = 0;
     function accessFor(session) {
-      return session.access && session.access[uid] ? session.access[uid].status : null;
+      return session.access && session.access[runtime.uid] ? session.access[runtime.uid].status : null;
     }
     function snapshot(session) {
       var decoded = decodeSession(session);
       if (!decoded) return null;
-      var owner = session.ownerUid === uid;
-      var ownAccess = owner ? 'approved' : accessFor(session);
+      var owner = runtime.authState === 'ready' && session.ownerUid === runtime.uid;
+      var ownAccess = runtime.authState === 'ready' ? (owner ? 'approved' : accessFor(session)) : null;
       return Object.assign(decoded, {
-        authState: 'ready',
-        connection: 'online',
+        authState: runtime.authState,
+        connection: runtime.connection,
         role: owner ? 'owner' : (ownAccess === 'approved' ? 'scorer' : 'spectator'),
         accessStatus: ownAccess,
         requests: owner ? clone(session.access || {}) : null,
@@ -134,7 +144,7 @@ var createInMemoryTournamentRepository;
         var sessionId = 'memory-' + (++sequence);
         sessions[sessionId] = {
           schemaVersion: 2,
-          ownerUid: uid,
+          ownerUid: runtime.uid,
           createdAt: now(),
           structure: encodeStructure(tournament || {}),
           results: {},
@@ -157,13 +167,13 @@ var createInMemoryTournamentRepository;
         var session = sessions[sessionId];
         if (!session || session.schemaVersion !== 2) return Promise.resolve({ status: 'denied' });
         session.access = session.access || {};
-        session.access[uid] = { label: String(label || ''), status: 'pending', requestedAt: now() };
+        session.access[runtime.uid] = { label: String(label || ''), status: 'pending', requestedAt: now() };
         notify(sessionId);
         return Promise.resolve({ status: 'requested' });
       },
       setAccess: function (sessionId, memberId, status) {
         var session = sessions[sessionId];
-        if (!session || session.ownerUid !== uid || (status !== 'approved' && status !== 'revoked')) return Promise.resolve({ status: 'denied' });
+        if (!session || session.ownerUid !== runtime.uid || (status !== 'approved' && status !== 'revoked')) return Promise.resolve({ status: 'denied' });
         session.access = session.access || {};
         var previous = session.access[memberId] || {};
         session.access[memberId] = Object.assign({}, previous, { status: status, decidedAt: now() });
@@ -176,7 +186,9 @@ var createInMemoryTournamentRepository;
         if (!session.schemaVersion || session.schemaVersion === 1) {
           return Promise.resolve({ status: 'denied', reason: 'legacy-read-only' });
         }
-        var roleAllowed = session.ownerUid === uid || accessFor(session) === 'approved';
+        if (runtime.authState !== 'ready') return Promise.resolve({ status: 'denied', reason: 'auth-pending' });
+        if (runtime.connection !== 'online') return Promise.resolve({ status: 'offline' });
+        var roleAllowed = session.ownerUid === runtime.uid || accessFor(session) === 'approved';
         if (!roleAllowed) return Promise.resolve({ status: 'denied' });
         var matchExists = values(session.structure.matchesById).some(function (match) { return match.id === command.matchId; });
         if (!matchExists || !validResult(command)) return Promise.resolve({ status: 'invalid' });
@@ -190,7 +202,7 @@ var createInMemoryTournamentRepository;
           score2: command.score2,
           status: command.status,
           revision: currentRevision + 1,
-          updatedBy: uid,
+          updatedBy: runtime.uid,
           updatedAt: now(),
         };
         session.results[command.matchId] = result;
@@ -199,10 +211,130 @@ var createInMemoryTournamentRepository;
       },
       removeSession: function (sessionId) {
         var session = sessions[sessionId];
-        if (!session || session.ownerUid !== uid) return Promise.resolve({ status: 'denied' });
+        if (!session || session.ownerUid !== runtime.uid) return Promise.resolve({ status: 'denied' });
         delete sessions[sessionId];
         notify(sessionId);
         return Promise.resolve({ status: 'synced' });
+      },
+    };
+  };
+
+  function classify(error) {
+    var code = String(error && (error.code || error.message) || '').toLowerCase();
+    if (code.indexOf('permission') !== -1) return { status: 'denied', error: error };
+    if (code.indexOf('network') !== -1 || code.indexOf('disconnect') !== -1 || code.indexOf('offline') !== -1) {
+      return { status: 'offline', error: error };
+    }
+    return { status: 'invalid', error: error };
+  }
+
+  createFirebaseTournamentRepository = function (app) {
+    var auth = app.auth();
+    var db = app.database();
+    var currentUser = auth.currentUser;
+    var authState = currentUser ? 'ready' : 'pending';
+    var connected = true;
+    var signingIn = null;
+
+    function requireUser() {
+      if (auth.currentUser) { currentUser = auth.currentUser; authState = 'ready'; return Promise.resolve(currentUser); }
+      if (!signingIn) {
+        signingIn = auth.signInAnonymously().then(function (credential) {
+          currentUser = credential.user; authState = 'ready'; signingIn = null; return currentUser;
+        }).catch(function (error) { signingIn = null; throw error; });
+      }
+      return signingIn;
+    }
+
+    function joinedSnapshot(raw, access, requests) {
+      var decoded = decodeSession(raw);
+      if (!decoded) return null;
+      var uid = currentUser && currentUser.uid;
+      var owner = !!uid && raw.ownerUid === uid;
+      var status = owner ? 'approved' : (access && access.status || null);
+      return Object.assign(decoded, {
+        authState: authState,
+        connection: connected ? 'online' : 'offline',
+        role: owner ? 'owner' : (status === 'approved' ? 'scorer' : 'spectator'),
+        accessStatus: status,
+        requests: owner ? (requests || {}) : null,
+      });
+    }
+
+    function watchSession(sessionId, onSnapshot) {
+      var raw = null, access = null, requests = null, ownRef = null, membersRef = null;
+      var sessionRef = db.ref('tournaments/' + sessionId);
+      var connectedRef = db.ref('.info/connected');
+      function emit() { if (raw) onSnapshot(joinedSnapshot(raw, access, requests)); }
+      function bindPrivate() {
+        if (ownRef) ownRef.off();
+        if (membersRef) membersRef.off();
+        ownRef = membersRef = null; access = requests = null;
+        if (!currentUser) { emit(); return; }
+        ownRef = db.ref('tournamentAccess/' + sessionId + '/members/' + currentUser.uid);
+        ownRef.on('value', function (snap) { access = snap.val(); emit(); }, function () { access = null; emit(); });
+        if (raw && raw.ownerUid === currentUser.uid) {
+          membersRef = db.ref('tournamentAccess/' + sessionId + '/members');
+          membersRef.on('value', function (snap) { requests = snap.val() || {}; emit(); });
+        }
+      }
+      var stopAuth = auth.onAuthStateChanged(function (user) {
+        currentUser = user; authState = user ? 'ready' : 'pending'; bindPrivate();
+        if (!user) requireUser().catch(function () { authState = 'error'; emit(); });
+      });
+      connectedRef.on('value', function (snap) { connected = snap.val() !== false; emit(); });
+      sessionRef.on('value', function (snap) { raw = snap.val(); bindPrivate(); emit(); });
+      return function () { sessionRef.off(); connectedRef.off(); if (ownRef) ownRef.off(); if (membersRef) membersRef.off(); stopAuth(); };
+    }
+
+    return {
+      createSession: function (tournament) {
+        return requireUser().then(function (user) {
+          var sessionRef = db.ref('tournaments').push();
+          return sessionRef.set({
+            schemaVersion: 2, ownerUid: user.uid, createdAt: { '.sv': 'timestamp' },
+            structure: encodeStructure(tournament || {}),
+          }).then(function () { return { status: 'synced', sessionId: sessionRef.key }; });
+        }).catch(classify);
+      },
+      watchSession: watchSession,
+      requestAccess: function (sessionId, label) {
+        return requireUser().then(function (user) {
+          return db.ref('tournamentAccess/' + sessionId + '/members/' + user.uid).set({
+            label: String(label || ''), status: 'pending', requestedAt: { '.sv': 'timestamp' },
+          }).then(function () { return { status: 'requested' }; });
+        }).catch(classify);
+      },
+      setAccess: function (sessionId, memberId, status) {
+        if (status !== 'approved' && status !== 'revoked') return Promise.resolve({ status: 'invalid' });
+        return requireUser().then(function () {
+          return db.ref('tournamentAccess/' + sessionId + '/members/' + memberId).update({
+            status: status, decidedAt: { '.sv': 'timestamp' },
+          }).then(function () { return { status: 'synced' }; });
+        }).catch(classify);
+      },
+      saveResult: function (sessionId, command) {
+        if (!validResult(command)) return Promise.resolve({ status: 'invalid' });
+        if (!connected) return Promise.resolve({ status: 'offline' });
+        return requireUser().then(function (user) {
+          var conflict = null;
+          var resultRef = db.ref('tournaments/' + sessionId + '/results/' + command.matchId);
+          return resultRef.transaction(function (current) {
+            var revision = current ? current.revision : 0;
+            if (revision !== command.expectedRevision) { conflict = current; return; }
+            return {
+              score1: command.score1, score2: command.score2, status: command.status,
+              revision: revision + 1, updatedBy: user.uid, updatedAt: { '.sv': 'timestamp' },
+            };
+          }, undefined, false).then(function (outcome) {
+            return outcome.committed ? { status: 'synced', result: outcome.snapshot.val() } : { status: 'conflict', current: clone(conflict) };
+          });
+        }).catch(classify);
+      },
+      removeSession: function (sessionId) {
+        return requireUser().then(function () {
+          return db.ref('tournaments/' + sessionId).remove().then(function () { return { status: 'synced' }; });
+        }).catch(classify);
       },
     };
   };
