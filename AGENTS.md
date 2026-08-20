@@ -1,67 +1,99 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents when working with code in this repository.
+Repository guidance for coding agents. The production application is currently **v1.7.0**.
 
-## Project Overview
+## Project
 
-Beach Volleyball Couple Matching — a static web app that registers players (name, optional gender, optional skill level 1–3) and generates random teams for 2vs2, 3vs3, or 4vs4 matches using a priority-based pairing algorithm (mixed-gender first, then same-gender, with unmatched player handling) plus a level-balancing pass that evens out team skill averages. Includes manual pairing, a group tournament mode, a King of the Court mode, EN/ES localization, and Firebase-backed session sharing.
+Beach Volleyball Couple Matching is a mobile-first static web app for registering or bulk-importing players, generating balanced 2vs2, 3vs3, or 4vs4 teams, running group tournaments or King of the Court, and sharing live tournament results. The UI is available in English and Spanish.
 
-## Tech Stack
+## Runtime and hosting
 
-- **Vanilla HTML/CSS/JS** (no frameworks, no build step, no Node toolchain)
-- **Animate.css** via CDN for UI transitions
-- **Firebase Realtime Database** (compat SDK via CDN) for shared live sessions
-- **Hosting**: GitHub Pages and Railway (project `volleyball-couple`, auto-deploys on push to `main`): https://volleyball-couple-production.up.railway.app
+- Vanilla HTML, CSS, and JavaScript; no framework and no production build step.
+- Firebase Authentication (anonymous) and Realtime Database compat SDKs are loaded from a CDN.
+- `package.json` is **development-only** tooling for Firebase emulator tests; Node is not a production runtime.
+- Railway auto-deploys `main` at https://volleyball-couple-production.up.railway.app.
+- Railway must retain `RAILPACK_SPA_OUTPUT_DIR=.`. Without it, the development-only `package.json` makes Railpack detect a Node service and fail because there is no start command.
 
-## Running Locally
+## Quick path
 
-Open `index.html` directly in a browser, or serve the directory with any static server. No dev server or build process required.
+Serve the repository as static files; opening `index.html` directly is also supported for non-Firebase flows.
+
+```bash
+python3 -m http.server 4173 --bind 127.0.0.1
+```
+
+For the Auth and Realtime Database security-rule suite:
+
+```bash
+npm install
+npm run test:rules
+```
+
+Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a browser or headless Chrome and inspect their pass/fail output. To exercise the app against local emulators, run the emulator command documented in `README.md` and open `http://127.0.0.1:4173/?firebaseEmulator=1`.
 
 ## Architecture
 
-- `index.html` — Single-page app: Input, Player List, Actions (match type, pairing mode, tournament/king setup), Results, King of the Court, Tournament sections
-- `js/pairing.js` — **Standalone** pairing algorithm module (global scope). Must remain framework-agnostic and independently testable (runs in bare Node, no DOM). Exports `generateCouples(playerList)`, `generateTeams(playerList, teamSize)`, `shuffle(array)`, and the level helpers (`isValidLevel`, `getPlayerLevel`, `balanceTeamsByLevel`, …).
-- `js/app.js` — UI logic wrapped in an IIFE. Manages state, DOM rendering, validation, event handling, localStorage persistence, and Firebase sync. Depends on `pairing.js` and `i18n.js` being loaded first.
-- `js/i18n.js` — EN/ES translations as flat dictionaries keyed like `form.levelLabel`; `t(key)` falls back EN → key. UI elements carry `data-i18n` attributes.
-- `js/tournament.js` — Group tournament mode (groups, match schedule, scores). Copies player objects opaquely.
-- `js/king-of-court.js` — King of the Court mode (throne/challenger queue, win conditions). Copies player objects opaquely.
-- `js/firebase-config.js` — Firebase initialization config; `firebase-rules.json` holds the database rules.
-- `css/styles.css` — Mobile-first BEM styles with CSS custom properties for the color scheme. Breakpoints: 600px (tablet), 960px (desktop).
-- `tests/*.test.html` — Browser-run test harnesses (pairing, tournament, king-of-court, integration). No CLI test runner exists; open them in a browser (or headless Chrome) and read the pass/fail list.
+| File | Responsibility |
+| --- | --- |
+| `index.html` | Single-page UI and dependency ordering. |
+| `js/pairing.js` | Framework-agnostic team generation and level balancing; independently testable without the DOM. |
+| `js/player-import.js` | Pure parser, normalizer, and validator for pasted player lists. |
+| `js/i18n.js` | Flat EN/ES dictionaries; `t(key)` falls back to English, then the key. |
+| `js/tournament.js` | Group creation, schedule, match states, scores, and standings. |
+| `js/tournament-repository.js` | Repository boundary for shared tournaments: schema codecs, in-memory tests, Firebase subscriptions, access requests, and transactional result saves. |
+| `js/king-of-court.js` | Throne/challenger queue and win conditions. |
+| `js/app.js` | IIFE-based application state, rendering, events, localStorage, localization, and repository orchestration. |
+| `js/firebase-config.js` | Firebase initialization and loopback-only emulator selection. |
+| `firebase-rules.json` | Least-privilege Realtime Database authorization and validation. |
+| `css/styles.css` | Mobile-first BEM styles and design tokens; breakpoints at 600px and 960px. |
 
-## Key Design Decisions
+Script order is contractual. Firebase CDN SDKs load first, followed by:
 
-- `pairing.js` is deliberately kept as a separate global module (not imported) so it can be tested independently per REQ-TECH-02.
-- Script load order matters: `firebase-config.js` → `pairing.js` → `i18n.js` → `tournament.js` → `king-of-court.js` → `app.js` in `index.html`.
-- Player IDs use `Date.now() + Math.random()`. State persists in localStorage (`bv-players`, `bv-tournament`, `bv-king`, `bv-owned-sessions`).
-- Skill level is optional: the `level` key is **omitted** when unset (never `undefined` — Firebase `set()` rejects it). Valid values are whitelisted to `1|2|3` via `isValidLevel`; anything else counts as Intermediate (2) and never activates balancing.
-- Level balancing (`balanceTeamsByLevel`) runs as a post-generation pass: same-gender swaps only (team `type` stays invariant), equalizes **average** team level, no-ops when no player has a valid level, keeps regenerate non-deterministic.
-- Firebase writes happen **only** when a tournament/king session is started or joined via a `#s=` URL (`sessionId` guard) — adding players and generating teams is localStorage-only.
-- All user-provided text is escaped via `escapeHTML()` before DOM insertion (XSS prevention).
-- **Cache busting**: local scripts/styles are referenced with a `?v=X.Y.Z` query string in `index.html`. On every release, bump that string together with the footer version (in `index.html` and both `footer.copyright` keys in `js/i18n.js`) — the static host sends no `Cache-Control` header, so this is the only cache invalidation.
-- Duplicate player names are allowed by spec (REQ-VAL-06) — never "fix" this.
+`firebase-config.js` → `pairing.js` → `player-import.js` → `i18n.js` → `tournament.js` → `tournament-repository.js` → `king-of-court.js` → `app.js`.
 
-## Requirements & Tasks
+## Collaborative scoring model
 
-- `requeriment.md` — Full requirements spec with IDs (REQ-FR-XX, REQ-NFR-XX, REQ-VAL-XX, REQ-ERR-XX)
-- `task.md` — Implementation task breakdown with checkboxes and requirement traceability matrix
-- `firebase-plan.md` — Firebase sync design notes
+- Firebase anonymous Auth identifies a **device/browser profile**, not a person or durable account. Clearing site data or switching browser profiles creates a new identity.
+- The session creator's UID is the **owner**. An approved device is a **scorer**. Everyone else is a **spectator** until the owner approves their request; the owner can later revoke access.
+- New sessions use schema v2: tournament structure and `results/{matchId}` are separate. Each result carries a monotonic revision, actor UID, and server timestamp.
+- `TournamentRepository.saveResult()` uses a per-match Firebase transaction with an expected revision. Conflicts must preserve the last confirmed result rather than silently overwrite it.
+- Schema-v1 links remain readable but are intentionally read-only. Unknown future schemas fail closed.
+- Keep authorization in Firebase Rules, not only in UI state. Scorers may update results for existing matches; they may not modify tournament structure or access policy.
+- Firebase writes are session-scoped. Player entry and ordinary team generation continue to persist locally.
 
-## Color Scheme (CSS Variables)
+## Product invariants
 
-Primary: `#2196F3` | Success: `#4CAF50` | Warning: `#FF9800` | Error: `#DC3545` | Male: `#64B5F6` | Female: `#F06292` | Level badges: purple ramp (`#7e57c2` → `#4527a0`) | Background: `#F5F5F5`
+- Player IDs use `Date.now() + Math.random()`.
+- Optional levels are omitted when unset; never write `undefined` to Firebase. Only `1|2|3` are valid.
+- Level balancing is a post-generation, same-gender swap pass that preserves team type and balances average level.
+- Duplicate player names are allowed by REQ-VAL-06.
+- Escape all user-provided text with `escapeHTML()` before inserting HTML.
+- Preserve opaque player properties when tournament and King of the Court modules copy players.
 
-## Git Workflow
-When completing tasks from TASKS.md:
-1. Create a new branch named `feature/<task-number>-<brief-description>` before starting work
-2. Make atomic commits with conventional commit messages:
-   - feat: for new features
-   - fix: for bug fixes
-   - docs: for documentation
-   - test: for tests
-   - refactor: for refactoring
-3. After completing a task, create a pull request with:
-   - A descriptive title matching the task
-   - A summary of changes made
-   - Any testing notes or considerations
-4. Update the task checkbox in TASKS.md to mark it complete
+## Mobile and accessibility bar
+
+- Design and verify at **320px width** first, then the 600px and 960px breakpoints; horizontal overflow at 320px is a release blocker.
+- Interactive scoring, access, import, and navigation controls must provide at least **44×44px** touch targets.
+- Preserve visible sync/error states, keyboard focus, semantic labels, and reduced-motion behavior.
+
+## Release checklist
+
+Static assets and Firebase Rules form one release and must be deployed and verified together.
+
+1. Run browser suites and `npm run test:rules`.
+2. Bump every local asset `?v=X.Y.Z` in `index.html`.
+3. Bump the footer version in `index.html` and both `footer.copyright` translations in `js/i18n.js`.
+4. Update release and requirements/task documentation when behavior changes.
+5. Deploy static assets through Railway and rules with `firebase deploy --only database`.
+6. Verify the production URL on a 320px mobile viewport and confirm Firebase permissions with separate devices/profiles.
+
+The query-string bump is mandatory because the static host does not provide reliable cache invalidation for local assets.
+
+## Requirements and workflow
+
+- `requeriment.md` — requirements and traceability IDs.
+- `task.md` — implementation tasks and completion matrix.
+- `firebase-plan.md` — Firebase schema, deployment, migration, and rollback guidance.
+- `RELEASE_NOTES.md` — shipped behavior by version.
+
+Use the repository's active branch/PR workflow, keep commits atomic, and use conventional commit messages. Never add AI attribution or `Co-Authored-By` trailers.
