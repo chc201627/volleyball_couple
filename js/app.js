@@ -17,8 +17,8 @@
   let scoreboardMatchId = null; // which match is open in live scoreboard mode
   let liveScore = { score1: 0, score2: 0 }; // live scores being tracked
   let isReadOnly = false;       // true when viewing a shared URL (no editing)
-  var db = null;                // Firebase Database instance (null = not configured)
-  var authUid = null;           // Anonymous auth UID (null until sign-in completes; writes require it)
+  var tournamentRepository = null;
+  var repositoryUnsubscribe = null;
   var sessionId = null;         // Active session ID written to / read from Firebase
   let pairingMode = 'random';  // 'random' | 'manual'
   let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
@@ -159,32 +159,12 @@
 
     if (firebaseReady && urlSid) {
       sessionId = urlSid;
-      if (!isSessionOwner(urlSid)) {
-        // Viewer: subscribe for real-time updates
-        isReadOnly = true;
-        updateUI();
-        tournamentSection.hidden = false;
-        readonlyBanner.hidden = false;
-        resetTournamentBtn.hidden = true;
-        tournamentSetup.hidden = true;
-        subscribeToSession(urlSid);
-      } else {
-        // Organizer re-opening their own session
-        loadSessionOnce(urlSid, function (state) {
-          if (state) {
-            tournamentState = state;
-            if (state.players) {
-              players.length = 0;
-              players.push.apply(players, state.players);
-              savePlayersState();
-            }
-            saveTournamentState();
-            tournamentSection.hidden = false;
-            renderTournament();
-            updateUI();
-          }
-        });
-      }
+      isReadOnly = true;
+      tournamentSection.hidden = false;
+      readonlyBanner.hidden = false;
+      resetTournamentBtn.hidden = true;
+      tournamentSetup.hidden = true;
+      subscribeToSession(urlSid);
     } else if (firebaseReady) {
       // Firebase ready but no session ID in URL — check localStorage
       tournamentState = loadTournamentState();
@@ -859,17 +839,12 @@
     scoreboardMatchId = null;
     liveScore = { score1: 0, score2: 0 };
     saveTournamentState();
-    if (db && authUid) {
-      // Only publish a live #s= share link once the write actually lands in
-      // Firebase; otherwise viewers would open a session that never persisted.
-      var candidateSid = generateSessionId();
-      writeToFirebase(tournamentState, candidateSid).then(function () {
-        sessionId = candidateSid;
-        markSessionOwner(candidateSid);
-        history.replaceState(null, '', '#s=' + candidateSid);
-      }).catch(function (e) {
-        console.warn('Live session write failed; using snapshot share link.', e && e.code);
-        pushShareURL();
+    if (tournamentRepository) {
+      tournamentRepository.createSession(tournamentState).then(function (result) {
+        if (result.status !== 'synced') { pushShareURL(); return; }
+        sessionId = result.sessionId;
+        history.replaceState(null, '', '#s=' + sessionId);
+        subscribeToSession(sessionId);
       });
     } else {
       pushShareURL();
@@ -882,8 +857,10 @@
 
   function handleResetTournament() {
     if (!confirm(t('tournament.confirmReset'))) return;
-    if (db && sessionId) {
-      db.ref('tournaments/' + sessionId).remove();
+    if (tournamentRepository && sessionId) {
+      tournamentRepository.removeSession(sessionId);
+      if (repositoryUnsubscribe) repositoryUnsubscribe();
+      repositoryUnsubscribe = null;
       sessionId = null;
     }
     tournamentState = null;
@@ -1028,6 +1005,23 @@
   function commitScore(matchId, s1val, s2val, errorEl) {
     try {
       var newMatches = recordMatchScore(tournamentState.matches, matchId, s1val, s2val);
+      var nextMatch = newMatches.find(function (match) { return match.id === matchId; });
+      var confirmedMatch = tournamentState.matches.find(function (match) { return match.id === matchId; });
+      if (tournamentRepository && sessionId) {
+        tournamentRepository.saveResult(sessionId, {
+          matchId: matchId, score1: nextMatch.score1, score2: nextMatch.score2,
+          status: 'finished', expectedRevision: confirmedMatch.revision || 0,
+        }).then(function (result) {
+          if (result.status !== 'synced') {
+            if (errorEl) errorEl.textContent = result.status;
+            return;
+          }
+          activeMatchId = null;
+          scoreboardMatchId = null;
+          liveScore = { score1: 0, score2: 0 };
+        });
+        return;
+      }
       tournamentState = {
         teams: tournamentState.teams,
         groups: tournamentState.groups,
@@ -1038,13 +1032,7 @@
       scoreboardMatchId = null;
       liveScore = { score1: 0, score2: 0 };
       saveTournamentState();
-      if (db && sessionId) {
-        writeToFirebase(tournamentState).catch(function () {
-          // Local state already saved; the next update or reload will resync.
-        });
-      } else {
-        pushShareURL();
-      }
+      pushShareURL();
       renderTournament();
     } catch (e) {
       if (errorEl) errorEl.textContent = t(e.message) || e.message;
@@ -1112,25 +1100,11 @@
       if (!firebase.apps.length) {
         firebase.initializeApp(FIREBASE_CONFIG);
       }
-      db = firebase.database();
-      // Database rules only accept writes from authenticated (anonymous) users;
-      // reads stay public so viewers work even if sign-in fails.
-      if (firebase.auth) {
-        firebase.auth().onAuthStateChanged(function (user) {
-          authUid = user ? user.uid : null;
-        });
-        firebase.auth().signInAnonymously().catch(function (e) {
-          console.warn('Anonymous sign-in unavailable; sharing falls back to URL snapshots.', e && e.code);
-        });
-      }
+      tournamentRepository = createFirebaseTournamentRepository(firebase.app());
       return true;
     } catch (e) {
       return false;
     }
-  }
-
-  function generateSessionId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
   function getSessionIdFromURL() {
@@ -1139,58 +1113,27 @@
     return hash.slice(3);
   }
 
-  function isSessionOwner(sid) {
-    try {
-      var owned = JSON.parse(localStorage.getItem('bv-owned-sessions') || '[]');
-      return owned.indexOf(sid) !== -1;
-    } catch (e) { return false; }
-  }
-
-  function markSessionOwner(sid) {
-    try {
-      var owned = JSON.parse(localStorage.getItem('bv-owned-sessions') || '[]');
-      if (owned.indexOf(sid) === -1) {
-        owned.push(sid);
-        localStorage.setItem('bv-owned-sessions', JSON.stringify(owned));
-      }
-    } catch (e) {}
-  }
-
-  function writeToFirebase(state, sid) {
-    sid = sid || sessionId;
-    if (!db || !sid || !authUid) return Promise.reject(new Error('firebase-not-ready'));
-    return db.ref('tournaments/' + sid).set({
-      state: state,
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      ownerUid: authUid,
-    }).catch(function (e) {
-      console.warn('Firebase write rejected.', e && e.code);
-      throw e;
-    });
-  }
-
   function subscribeToSession(sid) {
-    if (!db || !sid) return;
-    db.ref('tournaments/' + sid).on('value', function (snapshot) {
-      var data = snapshot.val();
-      if (!data || !data.state) return;
-      tournamentState = data.state;
-      if (data.state.players) {
+    if (!tournamentRepository || !sid) return;
+    if (repositoryUnsubscribe) repositoryUnsubscribe();
+    repositoryUnsubscribe = tournamentRepository.watchSession(sid, function (snapshot) {
+      if (!snapshot || !snapshot.tournament) {
+        if (snapshot && snapshot.error) console.warn(snapshot.error);
+        return;
+      }
+      tournamentState = snapshot.tournament;
+      isReadOnly = snapshot.legacy || (snapshot.role !== 'owner' && snapshot.role !== 'scorer');
+      readonlyBanner.hidden = !isReadOnly;
+      resetTournamentBtn.hidden = snapshot.role !== 'owner';
+      if (tournamentState.players) {
         players.length = 0;
-        players.push.apply(players, data.state.players);
+        players.push.apply(players, tournamentState.players);
+        savePlayersState();
       }
       saveTournamentState();
       tournamentSection.hidden = false;
       renderTournament();
       updateUI();
-    });
-  }
-
-  function loadSessionOnce(sid, callback) {
-    if (!db || !sid) { callback(null); return; }
-    db.ref('tournaments/' + sid).once('value', function (snapshot) {
-      var data = snapshot.val();
-      callback(data && data.state ? data.state : null);
     });
   }
 
@@ -1234,7 +1177,7 @@
   }
 
   function handleShareTournament() {
-    var url = db ? window.location.href : getShareURL();
+    var url = tournamentRepository && sessionId ? window.location.href : getShareURL();
     if (!url) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {

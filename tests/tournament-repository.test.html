@@ -86,6 +86,50 @@
           expectedRevision: 1,
         });
         assert(denied.status === 'denied' && denied.reason === 'legacy-read-only', 'v1 sessions remain read-only');
+        let futureSnapshot;
+        createInMemoryTournamentRepository({ sessions: { future: { schemaVersion: 99 } } }).watchSession('future', value => { futureSnapshot = value; });
+        assert(futureSnapshot.error === 'unsupported-schema' && !futureSnapshot.tournament, 'future schemas fail closed');
+
+        const runtime = { uid: 'owner-2', authState: 'ready', connection: 'online' };
+        const outcomeRepo = createInMemoryTournamentRepository({ runtime, now: () => 2000 });
+        const outcomeCreated = await outcomeRepo.createSession(tournamentFixture());
+        let confirmed;
+        outcomeRepo.watchSession(outcomeCreated.sessionId, value => { confirmed = value; });
+        const outcomeMatch = confirmed.tournament.matches[0];
+        await outcomeRepo.saveResult(outcomeCreated.sessionId, { matchId: outcomeMatch.id, score1: 21, score2: 18, status: 'finished', expectedRevision: 0 });
+        const confirmedJSON = JSON.stringify(confirmed.tournament.matches[0]);
+        const conflict = await outcomeRepo.saveResult(outcomeCreated.sessionId, { matchId: outcomeMatch.id, score1: 21, score2: 19, status: 'finished', expectedRevision: 0 });
+        assert(conflict.status === 'conflict' && conflict.current.revision === 1,
+          'stale saves return conflict with the current result');
+        assert(JSON.stringify(confirmed.tournament.matches[0]) === confirmedJSON,
+          'conflict preserves the last confirmed result');
+        const invalid = await outcomeRepo.saveResult(outcomeCreated.sessionId, { matchId: outcomeMatch.id, score1: -1, score2: 18, status: 'finished', expectedRevision: 1 });
+        assert(invalid.status === 'invalid' && JSON.stringify(confirmed.tournament.matches[0]) === confirmedJSON,
+          'invalid saves preserve the last confirmed result');
+        runtime.connection = 'offline';
+        const offline = await outcomeRepo.saveResult(outcomeCreated.sessionId, {
+          matchId: outcomeMatch.id, score1: 21, score2: 19, status: 'finished', expectedRevision: 1,
+        });
+        assert(offline.status === 'offline' && JSON.stringify(confirmed.tournament.matches[0]) === confirmedJSON,
+          'offline saves remain unsynced and preserve confirmation');
+        runtime.connection = 'online'; runtime.authState = 'pending';
+        let pendingSnapshot;
+        outcomeRepo.watchSession(outcomeCreated.sessionId, value => { pendingSnapshot = value; });
+        const pending = await outcomeRepo.saveResult(outcomeCreated.sessionId, {
+          matchId: outcomeMatch.id, score1: 21, score2: 19, status: 'finished', expectedRevision: 1,
+        });
+        assert(pendingSnapshot.authState === 'pending' && pending.status === 'denied',
+          'authentication pending keeps editing denied while results remain readable');
+        runtime.authState = 'ready'; runtime.uid = 'replacement-device';
+        let replacementSnapshot;
+        outcomeRepo.watchSession(outcomeCreated.sessionId, value => { replacementSnapshot = value; });
+        const identityLost = await outcomeRepo.saveResult(outcomeCreated.sessionId, {
+          matchId: outcomeMatch.id, score1: 21, score2: 19, status: 'finished', expectedRevision: 1,
+        });
+        assert(replacementSnapshot.role === 'spectator' && replacementSnapshot.accessStatus === null && identityLost.status === 'denied',
+          'identity loss requires the replacement device to request access again');
+        assert(typeof createFirebaseTournamentRepository === 'function',
+          'exposes the Firebase adapter factory');
       } catch (error) {
         assert(false, 'repository suite completes without an unexpected error', error && error.message);
       }

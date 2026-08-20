@@ -6,6 +6,11 @@ const {
   initializeTestEnvironment,
 } = require('@firebase/rules-unit-testing');
 const { get, ref, serverTimestamp, set, update } = require('firebase/database');
+const firebase = require('firebase/compat/app');
+require('firebase/compat/auth');
+require('firebase/compat/database');
+require('node:vm').runInThisContext(readFileSync('js/tournament.js', 'utf8'));
+require('node:vm').runInThisContext(readFileSync('js/tournament-repository.js', 'utf8'));
 
 const PROJECT_ID = 'demo-volleyball-couple';
 const SESSION_ID = 'session01';
@@ -152,4 +157,27 @@ test('different matches accept independent concurrent revisions', async () => {
   ]);
   const snapshot = await get(ref(owner, `tournaments/${SESSION_ID}/results`));
   if (snapshot.size !== 2) throw new Error('Expected two independent results');
+});
+
+test('Firebase repository creates schema v2 and transacts a result', async () => {
+  const tournament = {
+    players: [{ id: 'p1', name: 'One' }, { id: 'p2', name: 'Two' }],
+    teams: [{ id: 't0', name: 'One', players: [{ id: 'p1', name: 'One' }] }, { id: 't1', name: 'Two', players: [{ id: 'p2', name: 'Two' }] }],
+  };
+  tournament.teams.forEach(team => { team.player1 = team.players[0]; team.player2 = null; });
+  tournament.groups = [{ id: 'A', teams: tournament.teams }];
+  tournament.matches = [{ id: 'matchA', groupId: 'A', team1Id: 't0', team2Id: 't1', round: 1, order: 1, status: 'pending', revision: 0, played: false, score1: null, score2: null }];
+  const name = `repository-${Date.now()}`;
+  const app = firebase.initializeApp({ apiKey: 'demo-key', projectId: PROJECT_ID, databaseURL: `https://${PROJECT_ID}-default-rtdb.firebaseio.com` }, name);
+  app.auth().useEmulator('http://127.0.0.1:9099', { disableWarnings: true });
+  app.database().useEmulator('127.0.0.1', 9000);
+  const repo = globalThis.createFirebaseTournamentRepository(app);
+  const created = await repo.createSession(tournament);
+  if (created.status !== 'synced') throw new Error('Expected schema v2 creation');
+  const saved = await repo.saveResult(created.sessionId, {
+    matchId: 'matchA', score1: 21, score2: 18, status: 'finished', expectedRevision: 0,
+  });
+  if (saved.status !== 'synced' || saved.result.revision !== 1) throw new Error('Expected synced revision');
+  app.database().goOffline();
+  await app.delete();
 });
