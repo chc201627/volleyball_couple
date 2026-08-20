@@ -52,16 +52,45 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
   }
   /** Mirrors encodeFormat's shape (stagesById kept as an id-keyed map, matching every
    * tournament-format.js consumer: resolveFormat/rulesForMatch/isValidToken all do keyed
-   * `stagesById[id]` lookups, never array indexing). */
-  function decodeFormat(stored) {
+   * `stagesById[id]` lookups, never array indexing).
+   *
+   * HOTFIX (v1.8.1): `pairs` is intentionally never persisted (D3), but
+   * `isValidToken()`'s `winner:` branch reads `srcStage.pairs.length` to bound-check the
+   * ordinal, and `validateFormat()` requires every knockout stage to carry `pairs`. Both
+   * ran against the decoded (post-Firebase-sync) format with `pairs` permanently
+   * `undefined`, so every `winner:k-<stage>-<n>` token failed validation and
+   * `resolveFormat()` marked every stage after the first knockout stage `invalid` for any
+   * tournament that had round-tripped through a shared session. Knockout match team1Id/
+   * team2Id are never mutated after creation (generateStageMatches writes the slot-descriptor
+   * tokens once; resolveFormat only ever computes a projection, it never writes back onto the
+   * match), so the original `pairs` for a stage can always be rebuilt by reading those tokens
+   * back off that stage's decoded match nodes, ordered by the ordinal encoded in the match id
+   * (`k-<stageId>-<n>`). This restores the engine invariant "a runtime format always carries
+   * pairs" without persisting pairs to Firebase or touching firebase-rules.json. */
+  function rehydratePairs(stageId, matches) {
+    var prefix = 'k-' + stageId + '-';
+    return (matches || [])
+      .filter(function (m) {
+        return !!m && m.stageId === stageId && typeof m.id === 'string' && m.id.indexOf(prefix) === 0;
+      })
+      .map(function (m) {
+        return { ordinal: Number(m.id.slice(prefix.length)), pair: [m.team1Id, m.team2Id] };
+      })
+      .filter(function (item) { return Number.isInteger(item.ordinal) && item.ordinal >= 1; })
+      .sort(function (a, b) { return a.ordinal - b.ordinal; })
+      .map(function (item) { return item.pair; });
+  }
+  function decodeFormat(stored, matches) {
     if (!stored) return null;
     var stagesById = {};
     Object.keys(stored.stagesById || {}).forEach(function (id) {
       var stage = stored.stagesById[id];
-      stagesById[id] = {
+      var decoded = {
         id: stage.id, kind: stage.kind, order: stage.order,
         pointsTo: stage.pointsTo, overtime: !!stage.overtime,
       };
+      if (stage.kind === 'knockout') decoded.pairs = rehydratePairs(id, matches);
+      stagesById[id] = decoded;
     });
     var format = { version: stored.version, preset: stored.preset, stagesById: stagesById };
     if (stored.customRules != null) format.customRules = stored.customRules;
@@ -140,7 +169,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
       teams: teams,
       groups: groups,
       matches: projectMatchResults(matches, results || {}),
-      format: decodeFormat(structure.format),
+      format: decodeFormat(structure.format, matches),
     };
   }
   function decodeSession(session) {

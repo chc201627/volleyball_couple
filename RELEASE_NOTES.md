@@ -1,5 +1,12 @@
 # Release Notes
 
+## v1.8.1 — Hotfix: knockout stages breaking after online sync
+
+- Fixed a production defect where, after the Firebase session sync round-trip, Semifinal and Final stages of a formatted tournament (e.g. the crossover reference format) were incorrectly marked "Invalid configuration" and became unscorable. Quarterfinals were unaffected.
+- Root cause: knockout stage pairings are intentionally never persisted to Firebase (matches are the source of truth), but the format decoder did not rebuild them, so any stage referencing a prior stage's winner (`winner:` tokens) failed validation once the tournament synced online.
+- Fix: the format decoder now rehydrates each knockout stage's pairings from its own match nodes when a shared session is decoded. No change to what is written to Firebase or to `firebase-rules.json` — this is a client-side read-path fix only.
+- Static assets only; no rules deploy required for this release.
+
 ## v1.8.0 — Configurable Tournament Formats
 
 - Owners can pick a preset format when starting a tournament — classic, groups + final, or the crossover reference format (two groups of at least 4 teams each, including uneven groups such as 5+4; the top 4 of each group advance) — with light editing only (no free-form stage builder).
