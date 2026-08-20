@@ -504,6 +504,16 @@ The application will be considered complete when:
 - **English:** Primary language for documentation and communication
 - **Spanish:** Secondary language for documentation and communication
 
+## Collaborative Tournament Scoring (v1.7.0)
+
+- **REQ-FR-25:** A device may request scoring access and remains read-only until owner approval.
+- **REQ-FR-26:** The owner may approve or revoke a device; revocation applies before its next write.
+- **REQ-FR-27:** Owners and approved scorers may update only an existing match result.
+- **REQ-FR-28:** Result writes use exact monotonic revisions and preserve newer confirmed data on conflict.
+- **REQ-FR-29:** Spectators receive live results and standings without editing controls.
+- **REQ-NFR-14:** Mobile tournament operations support 320px width, 44px targets, and non-color status feedback.
+- **REQ-TECH-06:** New sessions use schema v2; schema v1 remains readable and unknown versions fail closed.
+
 ## Tech Stack
 
 - **Frontend:** HTML, CSS, JavaScript, Gradient, Animate.css

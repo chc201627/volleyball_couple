@@ -195,7 +195,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.6.0'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.7.0'
 
     },
     es: {
@@ -377,7 +377,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.6.0'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.7.0'
 
     }
   };

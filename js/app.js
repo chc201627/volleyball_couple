@@ -1125,8 +1125,19 @@
       return false;
     }
     try {
+      var useEmulator = (location.hostname === '127.0.0.1' || location.hostname === 'localhost') &&
+        new URLSearchParams(location.search).get('firebaseEmulator') === '1';
       if (!firebase.apps.length) {
-        firebase.initializeApp(FIREBASE_CONFIG);
+        firebase.initializeApp(useEmulator ? {
+          apiKey: 'demo-key',
+          authDomain: 'demo-volleyball-couple.firebaseapp.com',
+          databaseURL: 'http://127.0.0.1:9000/?ns=demo-volleyball-couple-default-rtdb',
+          projectId: 'demo-volleyball-couple',
+        } : FIREBASE_CONFIG);
+      }
+      if (useEmulator) {
+        firebase.app().auth().useEmulator('http://127.0.0.1:9099', { disableWarnings: true });
+        firebase.app().database().useEmulator('127.0.0.1', 9000);
       }
       tournamentRepository = createFirebaseTournamentRepository(firebase.app());
       return true;
