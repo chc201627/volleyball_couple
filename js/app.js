@@ -13,6 +13,8 @@
   let couplesGenerated = false;
   let lastResult = null;
   let tournamentState = null;   // { teams, groups, matches }
+  let selectedFormatPreset = 'classic'; // 'classic' | 'groupsTo' | 'groupsFinal' | 'crossover'
+  let formatDraft = null;       // Format object being edited in setup, null for classic (PR3a)
   let activeMatchId = null;     // which match card has the score form open
   let scoreboardMatchId = null; // which match is open in live scoreboard mode
   let liveScore = { score1: 0, score2: 0 }; // live scores being tracked
@@ -84,6 +86,13 @@
   const tournamentSetup = document.getElementById('tournament-setup');
   const startTournamentBtn = document.getElementById('start-tournament-btn');
   const groupCountOptions = document.getElementById('group-count-options');
+  const formatPresetOptions = document.getElementById('format-preset-options');
+  const formatPresetCrossoverBtn = document.getElementById('format-preset-crossover');
+  const formatEditor = document.getElementById('format-editor');
+  const formatStagesEl = document.getElementById('format-stages');
+  const formatCustomRules = document.getElementById('format-custom-rules');
+  const formatCustomRulesCount = document.getElementById('format-custom-rules-count');
+  const formatError = document.getElementById('format-error');
   const shareTournamentBtn = document.getElementById('share-tournament-btn');
   const resetTournamentBtn = document.getElementById('reset-tournament-btn');
   const readonlyBanner = document.getElementById('readonly-banner');
@@ -150,6 +159,10 @@
       if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, null, lastScoreCommand.status);
     });
     groupCountOptions.addEventListener('click', handleGroupOptClick);
+    formatPresetOptions.addEventListener('click', handleFormatPresetClick);
+    formatStagesEl.addEventListener('input', handleFormatStageInput);
+    formatStagesEl.addEventListener('change', handleFormatStageInput);
+    formatCustomRules.addEventListener('input', handleFormatCustomRulesInput);
     startKingBtn.addEventListener('click', handleStartKing);
     resetKingBtn.addEventListener('click', handleResetKing);
     kingWinsBtn.addEventListener('click', function () { handleRally('king'); });
@@ -601,6 +614,7 @@
     const result = teamSize === 2 ? generateCouples(players) : generateTeams(players, teamSize);
     couplesGenerated = true;
     lastResult = result;
+    selectFormatPreset('classic'); // couple/team shape changed — start fresh (format is immutable per session)
     renderResults(result);
     updateUI();
   }
@@ -706,6 +720,7 @@
     if (couplesGenerated && lastResult) {
       const teamCount = lastResult.teams ? lastResult.teams.length : (lastResult.couples ? lastResult.couples.length : 0);
       updateGroupOptions(teamCount);
+      updateFormatPresetVisibility();
     }
   }
 
@@ -828,6 +843,139 @@
       b.classList.remove('tournament-setup__opt--active');
     });
     btn.classList.add('tournament-setup__opt--active');
+    // Group shape changed — any in-progress format draft (slot descriptors) no longer applies.
+    selectFormatPreset('classic');
+    updateFormatPresetVisibility();
+  }
+
+  // --- Tournament Format Setup (PR3a — presets + light editing; no scoreboard/bracket wiring yet) ---
+
+  /** Shape of the groups the format editor previews, using the actual createGroups() split
+   * so preset feasibility and validateFormat() match what handleStartTournament() will build. */
+  function getSetupGroupsShape() {
+    if (!lastResult) return [];
+    var n = (lastResult.couples || lastResult.teams || []).length;
+    if (n < 2) return [];
+    var placeholderTeams = [];
+    for (var i = 0; i < n; i++) placeholderTeams.push({ id: 't' + i });
+    return createGroups(placeholderTeams, getSelectedGroupCount());
+  }
+
+  function isCrossoverFeasible(groups) {
+    return groups.length === 2 && groups.every(function (g) { return g.teams.length === 4; });
+  }
+
+  function selectFormatPreset(presetId) {
+    selectedFormatPreset = presetId;
+    clearFormatError();
+    if (presetId === 'classic') {
+      formatDraft = null;
+    } else {
+      try {
+        formatDraft = presetFormat(presetId, getSetupGroupsShape());
+      } catch (err) {
+        formatDraft = null;
+        selectedFormatPreset = 'classic';
+        showFormatError(t('tournament.format.error.presetUnavailable'));
+      }
+    }
+    renderFormatPresetButtons();
+    renderFormatEditor();
+  }
+
+  function handleFormatPresetClick(e) {
+    var btn = e.target.closest('.format-setup__opt');
+    if (!btn || btn.disabled || btn.hidden) return;
+    selectFormatPreset(btn.getAttribute('data-preset'));
+  }
+
+  function renderFormatPresetButtons() {
+    formatPresetOptions.querySelectorAll('.format-setup__opt').forEach(function (b) {
+      b.classList.toggle('format-setup__opt--active', b.getAttribute('data-preset') === selectedFormatPreset);
+    });
+  }
+
+  /** The crossover (reference) preset is only offered for exactly 2 groups of 4 teams (REQ-FMT-02). */
+  function updateFormatPresetVisibility() {
+    var feasible = isCrossoverFeasible(getSetupGroupsShape());
+    formatPresetCrossoverBtn.hidden = !feasible;
+    if (!feasible && selectedFormatPreset === 'crossover') {
+      selectFormatPreset('classic');
+    }
+  }
+
+  function renderFormatEditor() {
+    formatEditor.hidden = !formatDraft;
+    formatStagesEl.innerHTML = '';
+
+    if (!formatDraft) {
+      formatCustomRules.value = '';
+      updateFormatCustomRulesCount();
+      return;
+    }
+
+    var stagesById = formatDraft.stagesById || {};
+    var stages = Object.keys(stagesById).map(function (id) { return stagesById[id]; })
+      .sort(function (a, b) { return a.order - b.order; });
+
+    stages.forEach(function (stage) {
+      var pointsId = 'format-points-' + stage.id;
+      var overtimeId = 'format-overtime-' + stage.id;
+      var row = document.createElement('div');
+      row.className = 'format-editor__stage';
+      row.innerHTML =
+        '<span class="format-editor__stage-label">' + escapeHTML(t('tournament.format.stage.' + stage.id)) + '</span>' +
+        '<div class="format-editor__field">' +
+          '<label class="form__label" for="' + pointsId + '">' + escapeHTML(t('tournament.format.pointsTo')) + '</label>' +
+          '<input class="form__input format-editor__points" type="number" min="1" max="99" step="1" ' +
+                 'id="' + pointsId + '" data-stage-id="' + stage.id + '" data-field="pointsTo" value="' + stage.pointsTo + '">' +
+        '</div>' +
+        '<label class="format-editor__checkbox" for="' + overtimeId + '">' +
+          '<input type="checkbox" id="' + overtimeId + '" data-stage-id="' + stage.id + '" data-field="overtime"' +
+                 (stage.overtime ? ' checked' : '') + '>' +
+          '<span>' + escapeHTML(t('tournament.format.overtime')) + '</span>' +
+        '</label>';
+      formatStagesEl.appendChild(row);
+    });
+
+    formatCustomRules.value = formatDraft.customRules || '';
+    updateFormatCustomRulesCount();
+  }
+
+  function handleFormatStageInput(e) {
+    var input = e.target.closest('[data-stage-id]');
+    if (!input || !formatDraft) return;
+    var stage = formatDraft.stagesById[input.getAttribute('data-stage-id')];
+    if (!stage) return;
+
+    if (input.getAttribute('data-field') === 'pointsTo') {
+      var n = parseInt(input.value, 10);
+      if (!Number.isNaN(n)) stage.pointsTo = n;
+    } else if (input.getAttribute('data-field') === 'overtime') {
+      stage.overtime = input.checked;
+    }
+    formatDraft.preset = 'custom'; // any light edit detaches the draft from its starting preset
+    clearFormatError();
+  }
+
+  function handleFormatCustomRulesInput() {
+    if (!formatDraft) return;
+    formatDraft.customRules = formatCustomRules.value.slice(0, 500);
+    formatDraft.preset = 'custom';
+    updateFormatCustomRulesCount();
+    clearFormatError();
+  }
+
+  function updateFormatCustomRulesCount() {
+    formatCustomRulesCount.textContent = t('tournament.format.customRulesCount', { n: (formatCustomRules.value || '').length });
+  }
+
+  function showFormatError(message) {
+    formatError.textContent = message;
+  }
+
+  function clearFormatError() {
+    formatError.textContent = '';
   }
 
   function updateGroupOptions(teamCount) {
@@ -851,8 +999,19 @@
     if (teams.length < 2) return;
     const numGroups = getSelectedGroupCount();
     const groups = createGroups(teams, numGroups);
-    const matches = generateMatches(groups);
+
+    // formatDraft is null for the classic preset (D1) — validate only when a format is chosen.
+    if (formatDraft) {
+      var formatValidation = validateFormat(formatDraft, groups);
+      if (!formatValidation.valid) {
+        showFormatError(t(formatValidation.errors[0]));
+        return;
+      }
+    }
+
+    const matches = generateStageMatches(formatDraft, groups); // delegates to generateMatches() when formatDraft is null — classic path unchanged
     tournamentState = { teams: teams, groups: groups, matches: matches, players: players };
+    if (formatDraft) tournamentState.format = formatDraft; // omit the key entirely for classic — keeps classic state byte-identical
     activeMatchId = null;
     scoreboardMatchId = null;
     liveScore = { score1: 0, score2: 0 };
@@ -897,6 +1056,7 @@
       b.classList.remove('tournament-setup__opt--active');
     });
     groupCountOptions.querySelector('[data-groups="1"]').classList.add('tournament-setup__opt--active');
+    selectFormatPreset('classic');
     updateActionButtons();
   }
 

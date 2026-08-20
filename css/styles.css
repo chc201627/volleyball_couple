@@ -716,6 +716,125 @@ textarea {
   pointer-events: none;
 }
 
+/* --- Tournament Format Setup (PR3a) --- */
+.format-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.format-setup__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.format-setup__opt {
+  padding: 8px 14px;
+  border: 2px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  transition: border-color var(--transition), color var(--transition), background-color var(--transition);
+}
+
+.format-setup__opt:hover {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.format-setup__opt--active {
+  border-color: var(--color-success);
+  background-color: var(--color-success);
+  color: var(--color-white);
+}
+
+.format-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.format-editor__stages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.format-editor__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.format-editor__stage:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.format-editor__stage-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.format-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.format-editor__points {
+  max-width: 100px;
+  min-height: 44px;
+}
+
+.format-editor__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.format-editor__checkbox input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.format-editor__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.format-editor__textarea {
+  resize: vertical;
+  min-height: 72px;
+  width: 100%;
+}
+
+.format-editor__hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
 /* --- Success Button --- */
 .btn--success {
   background-color: var(--color-success);
