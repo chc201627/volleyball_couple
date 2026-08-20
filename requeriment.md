@@ -517,7 +517,7 @@ The application will be considered complete when:
 ## Configurable Tournament Formats (v1.8.0)
 
 - **REQ-FMT-01:** A Format is an ordered list of Stages, each `roundRobin` or `knockout`, with per-stage Set Rules: `pointsTo` (positive integer) and `overtime` (boolean).
-- **REQ-FMT-02:** Format creation offers stage presets (classic, groups+final, reference format) with light editing only (group count 1–4, teams per group, stage list, per-stage `pointsTo`/`overtime`). No free-form stage builder.
+- **REQ-FMT-02:** Format creation offers stage presets (classic, groups+final, reference format) with light editing only (group count 1–4, teams per group, stage list, per-stage `pointsTo`/`overtime`). No free-form stage builder. The reference (crossover) preset is offered for two groups of at least 4 teams each, including uneven groups (e.g. 5+4); the top 4 of each group advance to the knockout stage and any remaining team is eliminated in the group stage.
 - **REQ-FMT-03:** Validation rejects an empty stage list, non-positive/non-integer `pointsTo`, a knockout Slot referencing a nonexistent group rank or match, and cycles/forward references. Invalid formats do not create a session.
 - **REQ-FMT-04:** Knockout matches are pre-created at session creation with slot-descriptor team IDs (`slot:` group-rank, `winner:` match). No byes, no third-place match, no losers bracket.
 - **REQ-FMT-05:** Slot resolution is a pure, deterministic client-side projection: identical format + results yield identical bracket pairings on every device. Unresolved slots render a localized placeholder and the match is not scorable.

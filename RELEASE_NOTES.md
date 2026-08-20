@@ -2,7 +2,7 @@
 
 ## v1.8.0 — Configurable Tournament Formats
 
-- Owners can pick a preset format when starting a tournament — classic, groups + final, or the 2-group crossover reference format — with light editing only (no free-form stage builder).
+- Owners can pick a preset format when starting a tournament — classic, groups + final, or the crossover reference format (two groups of at least 4 teams each, including uneven groups such as 5+4; the top 4 of each group advance) — with light editing only (no free-form stage builder).
 - Each stage carries its own set rules: a points target and an overtime on/off toggle; the owner may attach one plain-text custom-rules note (max 500 characters), shown read-only to every role.
 - Knockout matches are pre-created at session start and pair up deterministically as prior stages finish, so every device renders the identical bracket from the same results.
 - The scoreboard enforces each match's stage rules client-side: without overtime, the first team to reach the target wins immediately; with overtime, play continues until a 2-point lead. A finished result auto-saves through the existing per-match revision-safe transaction.

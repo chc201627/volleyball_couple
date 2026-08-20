@@ -867,7 +867,7 @@
   }
 
   function isCrossoverFeasible(groups) {
-    return groups.length === 2 && groups.every(function (g) { return g.teams.length === 4; });
+    return groups.length === 2 && groups.every(function (g) { return g.teams.length >= 4; });
   }
 
   function selectFormatPreset(presetId) {
@@ -900,7 +900,9 @@
     });
   }
 
-  /** The crossover (reference) preset is only offered for exactly 2 groups of 4 teams (REQ-FMT-02). */
+  /** The crossover (reference) preset is only offered for exactly 2 groups, each with at
+   * least 4 teams (REQ-FMT-02); uneven groups (e.g. 5+4) are allowed — only the top 4 of
+   * each group advance to the knockout stage. */
   function updateFormatPresetVisibility() {
     var feasible = isCrossoverFeasible(getSetupGroupsShape());
     formatPresetCrossoverBtn.hidden = !feasible;
