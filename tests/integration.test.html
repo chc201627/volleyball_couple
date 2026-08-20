@@ -957,6 +957,97 @@
         window.confirm = savedConfirm;
       })();
 
+      // ===== LOCAL FORMAT PERSISTENCE REGRESSION (PR5 — commitScore local save path) =====
+      // Reproduces the real bug found by a browser E2E: when Firebase never confirms a
+      // session (e.g. the owner's write is unauthenticated or offline), sessionId stays
+      // null forever and every score save takes commitScore's LOCAL (non-Firebase) branch.
+      // That branch used to rebuild tournamentState by enumerating fields, silently
+      // dropping `format` (and its customRules) on the FIRST local save.
+      await (async function () {
+        setLanguage('en');
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: testRepository.tournament });
+        await Promise.resolve(); await Promise.resolve();
+        var savedConfirm = window.confirm;
+        window.confirm = function () { return true; };
+        document.getElementById('reset-tournament-btn').click();
+        document.getElementById('clear-btn').click();
+
+        // Session creation never confirms ('synced') — app.js falls back to pushShareURL()
+        // and sessionId stays null forever, so every commitScore call below MUST take the
+        // local branch, never tournamentRepository.saveResult().
+        var originalCreateSession = testRepository.createSession;
+        testRepository.createSession = function (value) {
+          this.tournament = value;
+          return Promise.resolve({ status: 'denied' });
+        };
+        testRepository.lastSave = null;
+
+        document.getElementById('type-2v2-btn').click();
+        document.getElementById('mode-random-btn').click();
+        ['R1x', 'R1y', 'R2x', 'R2y', 'R3x', 'R3y'].forEach(function (name, i) { addPlayer(name, i % 2 ? 'female' : 'male'); });
+        document.getElementById('generate-btn').click();
+        assert(document.querySelectorAll('#couples-grid .couple-card').length === 3, 'Local persistence: 3 teams generated (single round-robin group)');
+
+        document.querySelector('[data-preset="groupsTo"]').click();
+        var pointsInput = document.getElementById('format-points-group');
+        pointsInput.value = '5';
+        pointsInput.dispatchEvent(new Event('input', { bubbles: true }));
+        var rulesText = 'Regression note: sideout scoring only.';
+        document.getElementById('format-custom-rules').value = rulesText;
+        document.getElementById('format-custom-rules').dispatchEvent(new Event('input', { bubbles: true }));
+
+        document.getElementById('start-tournament-btn').click();
+        await Promise.resolve(); await Promise.resolve();
+
+        document.querySelector('[data-filter="pending"]')?.click();
+        assert(!!document.querySelector('.match-card__rule') && document.querySelector('.match-card__rule').textContent.includes('Set to 5'),
+          'Local persistence: stage rule caption (Set to 5) renders before any score is saved');
+        assert(!document.getElementById('tournament-custom-rules').hidden && document.getElementById('tournament-custom-rules-text').textContent === rulesText,
+          'Local persistence: custom rules note renders before any score is saved');
+        assert(document.querySelectorAll('.match-card').length === 3, 'Local persistence: 3 pending round-robin matches rendered');
+
+        // ---- "Save progress" (non-finished) through the real local commitScore path ----
+        document.querySelectorAll('.match-card__btn--track')[0].click();
+        var inc1 = document.querySelectorAll('.scoreboard__inc')[0];
+        inc1.click(); inc1.click(); // score1 = 2, well under the 5-point target — not finished
+        document.querySelectorAll('.scoreboard__save')[0].click(); // 'live' status = Save progress
+
+        assert(!testRepository.lastSave, 'Local persistence: Save progress used the LOCAL commitScore branch, not tournamentRepository.saveResult()');
+        var persistedAfterLive = JSON.parse(localStorage.getItem('bv-tournament'));
+        assert(!!persistedAfterLive.format && persistedAfterLive.format.customRules === rulesText,
+          'Local persistence (BUG): the FIRST local "Save progress" preserves tournamentState.format in localStorage `bv-tournament`');
+        assert(!document.getElementById('tournament-custom-rules').hidden, 'Local persistence: custom rules note still renders after the first local Save progress');
+
+        // ---- Auto-finish through the real local commitScore('finished') path ----
+        document.querySelectorAll('.match-card__btn--track')[0].click(); // re-open the same match's scoreboard
+        var incToFinish = document.querySelectorAll('.scoreboard__inc')[0];
+        for (var j = 0; j < 5; j++) incToFinish.click(); // 0 -> 5, auto-finish fires on the 5th click
+
+        assert(!testRepository.lastSave, 'Local persistence: auto-finish used the LOCAL commitScore branch, not tournamentRepository.saveResult()');
+        var persistedAfterAutoFinish = JSON.parse(localStorage.getItem('bv-tournament'));
+        assert(!!persistedAfterAutoFinish.format && persistedAfterAutoFinish.format.stagesById.group.pointsTo === 5,
+          'Local persistence (BUG): auto-finish also preserves tournamentState.format in localStorage');
+        assert(!document.getElementById('tournament-custom-rules').hidden, 'Local persistence: custom rules note still renders after auto-finish');
+
+        // ---- Rule enforcement still applies to the NEXT match after two local saves ----
+        document.querySelector('[data-filter="pending"]')?.click();
+        var nextRuleCaption = document.querySelector('.match-card__rule');
+        assert(!!nextRuleCaption && nextRuleCaption.textContent.includes('Set to 5'),
+          'Local persistence (BUG): stage rule caption still renders for the NEXT unplayed match after two local saves');
+
+        document.querySelectorAll('.match-card__btn--track')[0].click();
+        var incNext = document.querySelectorAll('.scoreboard__inc')[0];
+        for (var k = 0; k < 5; k++) incNext.click(); // 0 -> 5, auto-finish must still fire (pointsTo enforcement intact)
+        assert(!testRepository.lastSave, 'Local persistence: next match auto-finish also used the LOCAL commitScore branch');
+        var persistedAfterNextMatch = JSON.parse(localStorage.getItem('bv-tournament'));
+        assert(persistedAfterNextMatch.matches.filter(function (m) { return m.status === 'finished'; }).length === 2,
+          'Local persistence (BUG): rule enforcement (pointsTo target) still finishes the NEXT match at exactly 5 points');
+        assert(!!persistedAfterNextMatch.format, 'Local persistence (BUG): format survives a third consecutive local save');
+
+        testRepository.createSession = originalCreateSession;
+        window.confirm = savedConfirm;
+      })();
+
       // ===== Summary =====
       const total = passed + failed;
       const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';

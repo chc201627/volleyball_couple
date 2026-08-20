@@ -1226,12 +1226,9 @@
       tournamentState.matches.forEach(function (match) { if (match.status !== 'pending') resultMap[match.id] = match; });
       resultMap[matchId] = Object.assign({}, command, { revision: command.expectedRevision + 1 });
       var newMatches = projectMatchResults(tournamentState.matches, resultMap);
-      tournamentState = {
-        teams: tournamentState.teams,
-        groups: tournamentState.groups,
-        matches: newMatches,
-        players: tournamentState.players || players,
-      };
+      // Preserve every existing field (notably `format`/`customRules`, per D1) instead of
+      // re-enumerating them — only `matches` changes on a local score save.
+      tournamentState = Object.assign({}, tournamentState, { matches: newMatches, players: tournamentState.players || players });
       activeMatchId = null;
       scoreboardMatchId = null;
       liveScore = { score1: 0, score2: 0 };
