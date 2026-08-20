@@ -59,6 +59,19 @@
       return recordMatchScore(matches, matchId, s1, s2);
     }
 
+    // Plays every match with the lower-global-index team (makeGroups assigns t0, t1, ...
+    // in ascending id order) always winning — produces a strictly transitive, tie-free
+    // standings order (win counts 0..n-1) regardless of which side generateMatches() puts
+    // on team1/team2 for a given pairing.
+    function playDecisively(matches, groupMatches) {
+      groupMatches.forEach((m) => {
+        const idx1 = parseInt(m.team1Id.slice(1), 10);
+        const idx2 = parseInt(m.team2Id.slice(1), 10);
+        matches = idx1 < idx2 ? play(matches, m.id, 21, 10) : play(matches, m.id, 10, 21);
+      });
+      return matches;
+    }
+
     // ─── validateFormat ─────────────────────────────────────────────────────
 
     heading('validateFormat');
@@ -147,11 +160,40 @@
       const groups = makeGroups({ A: 4 });
       let threw = false;
       try {
-        presetFormat('crossover', groups); // only 1 group, not 2x4
+        presetFormat('crossover', groups); // only 1 group, not 2 groups of >=4
       } catch (e) {
         threw = e.message === 'tournament.format.error.presetUnavailable';
       }
-      assert(threw, 'presetFormat: crossover unavailable outside 2x4 groups');
+      assert(threw, 'presetFormat: crossover unavailable outside 2 groups of >=4');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 3, B: 4 });
+      let threw = false;
+      try {
+        presetFormat('crossover', groups); // group A has only 3 teams, below the 4-team floor
+      } catch (e) {
+        threw = e.message === 'tournament.format.error.presetUnavailable';
+      }
+      assert(threw, 'presetFormat: crossover unavailable when a group has fewer than 4 teams (3+4)');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 3, B: 3, C: 4 });
+      let threw = false;
+      try {
+        presetFormat('crossover', groups); // 3 groups, not exactly 2
+      } catch (e) {
+        threw = e.message === 'tournament.format.error.presetUnavailable';
+      }
+      assert(threw, 'presetFormat: crossover unavailable outside exactly 2 groups (3 groups)');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 5, B: 4 });
+      const format = presetFormat('crossover', groups);
+      const v = validateFormat(format, groups);
+      assert(v.valid === true, 'validateFormat: crossover format is valid with uneven groups (5+4)', JSON.stringify(v.errors));
     })();
 
     // ─── generateStageMatches ───────────────────────────────────────────────
@@ -186,6 +228,19 @@
       assert(JSON.stringify(matches) === JSON.stringify(classic), 'generateStageMatches: null format delegates to generateMatches unchanged');
     })();
 
+    (function () {
+      // 9-couple tournament: uneven groups (5+4), crossover still offered — top 4 of each advance.
+      const groups = makeGroups({ A: 5, B: 4 });
+      const format = presetFormat('crossover', groups);
+      const matches = generateStageMatches(format, groups);
+      const groupAMatches = matches.filter((m) => m.groupId === 'A');
+      const groupBMatches = matches.filter((m) => m.groupId === 'B');
+      const qf = matches.filter((m) => m.stageId === 'qf');
+      assert(groupAMatches.length === 10, 'generateStageMatches: 5-team group produces 10 round-robin matches (C(5,2))', `Got ${groupAMatches.length}`);
+      assert(groupBMatches.length === 6, 'generateStageMatches: 4-team group produces 6 round-robin matches (C(4,2))', `Got ${groupBMatches.length}`);
+      assert(qf.length === 4, 'generateStageMatches: crossover still has 4 qf matches with uneven groups (5+4)', `Got ${qf.length}`);
+    })();
+
     // ─── resolveFormat ──────────────────────────────────────────────────────
 
     heading('resolveFormat (determinism)');
@@ -218,6 +273,45 @@
       assert(JSON.stringify(a.resolution) === JSON.stringify(b.resolution), 'resolveFormat: two independent runs are identical');
     })();
 
+    heading('resolveFormat (uneven groups, 9-couple tournament)');
+
+    (function () {
+      // Leave one group-A match unplayed (involving t4, the 5th-ranked team) — qf must
+      // stay unresolved until every group match, including the 5th team's, finishes.
+      const groups = makeGroups({ A: 5, B: 4 });
+      const format = presetFormat('crossover', groups);
+      let matches = generateStageMatches(format, groups);
+      const groupMatches = matches.filter((m) => m.stageId === 'group');
+      const pending = groupMatches.find((m) => m.team1Id === 't4' || m.team2Id === 't4');
+      const toPlay = groupMatches.filter((m) => m.id !== pending.id);
+      matches = playDecisively(matches, toPlay);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const qf = resolution.stages.find((s) => s.id === 'qf');
+      assert(qf.matches.every((m) => m.resolved === false),
+        "resolveFormat: qf stays unresolved while any group match, including the 5th team's, is unplayed");
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 5, B: 4 });
+      const format = presetFormat('crossover', groups);
+      let matches = generateStageMatches(format, groups);
+      const groupMatches = matches.filter((m) => m.stageId === 'group');
+      matches = playDecisively(matches, groupMatches);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const qf = resolution.stages.find((s) => s.id === 'qf');
+      assert(qf.matches.every((m) => m.resolved === true),
+        "resolveFormat: qf resolves once ALL group matches finish, including the 5th team's", JSON.stringify(qf.matches));
+      assert(resolution.bySlot['slot:A1'] === 't0' && resolution.bySlot['slot:A4'] === 't3',
+        'resolveFormat: group A (5 teams) ranks 1 and 4 resolve to the top-4 teams', JSON.stringify(resolution.bySlot));
+      assert(resolution.bySlot['slot:B1'] === 't5' && resolution.bySlot['slot:B4'] === 't8',
+        'resolveFormat: group B (4 teams) ranks 1 and 4 resolve correctly', JSON.stringify(resolution.bySlot));
+      const qfTeams = qf.matches.reduce((acc, m) => acc.concat([m.team1Id, m.team2Id]), []);
+      assert(qfTeams.indexOf('t4') === -1,
+        'resolveFormat: the 5th-place team is eliminated in the group stage and appears in no knockout match', JSON.stringify(qfTeams));
+    })();
+
     (function () {
       const groups = makeGroups({ A: 4 });
       const format = presetFormat('groupsFinal', groups);
@@ -239,6 +333,24 @@
       const finalStage = resolution.stages.find((s) => s.id === 'final');
       assert(finalStage.matches[0].resolved === true, 'resolveFormat: slot resolves once round-robin stage is complete');
       assert(finalStage.matches[0].scorable === true, 'resolveFormat: resolved, unplayed knockout match is scorable');
+    })();
+
+    (function () {
+      // Simulate a stray/tampered slot token that validateFormat did not catch (e.g. a
+      // direct Firebase write bypassing client validation) — a stage-wide failure must
+      // fail the whole stage closed, never leaving an individually-resolved match scorable.
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      let matches = generateStageMatches(format, groups);
+      matches = matches.map((m) => (m.id === 'k-final-1' ? Object.assign({}, m, { team1Id: 'slot:A9' }) : m));
+      const groupMatches = matches.filter((m) => m.stageId === 'group');
+      groupMatches.forEach((m) => { matches = play(matches, m.id, 21, 10); });
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const finalStage = resolution.stages.find((s) => s.id === 'final');
+      assert(finalStage.status === 'invalid', 'resolveFormat: an out-of-range slot reference marks its stage invalid');
+      assert(finalStage.matches.every((m) => m.scorable === false),
+        'resolveFormat: every match in an invalid stage is never scorable, even if individually resolved');
     })();
 
     // ─── rulesForMatch ──────────────────────────────────────────────────────

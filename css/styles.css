@@ -716,6 +716,125 @@ textarea {
   pointer-events: none;
 }
 
+/* --- Tournament Format Setup (PR3a) --- */
+.format-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.format-setup__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.format-setup__opt {
+  padding: 8px 14px;
+  border: 2px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  transition: border-color var(--transition), color var(--transition), background-color var(--transition);
+}
+
+.format-setup__opt:hover {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.format-setup__opt--active {
+  border-color: var(--color-success);
+  background-color: var(--color-success);
+  color: var(--color-white);
+}
+
+.format-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.format-editor__stages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.format-editor__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.format-editor__stage:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.format-editor__stage-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.format-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.format-editor__points {
+  max-width: 100px;
+  min-height: 44px;
+}
+
+.format-editor__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.format-editor__checkbox input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.format-editor__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.format-editor__textarea {
+  resize: vertical;
+  min-height: 72px;
+  width: 100%;
+}
+
+.format-editor__hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
 /* --- Success Button --- */
 .btn--success {
   background-color: var(--color-success);
@@ -826,6 +945,37 @@ textarea {
 .access-request .btn, .access-members .btn, #retry-score-btn,
 .match-card__btn, .score-form__save, .score-form__cancel { min-height: 44px; }
 
+/* Owner-authored custom rules note (REQ-FMT-07) — collapsible, visible to every role */
+.tournament-custom-rules {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.tournament-custom-rules__summary {
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  list-style: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.tournament-custom-rules__summary::-webkit-details-marker { display: none; }
+
+.tournament-custom-rules__text {
+  padding: 10px 14px;
+  margin: 0;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .tournament-groups {
   display: flex;
   flex-direction: column;
@@ -859,6 +1009,43 @@ textarea {
   letter-spacing: 0.5px;
   color: var(--group-color, var(--color-primary));
   margin-bottom: 16px;
+}
+
+/* --- Knockout Stage Panel (REQ-FMT-05/09) --- */
+/* Vertical stage-stack: one card per knockout stage, always a single mobile-first
+   column (no grid at any breakpoint) — bracket order stays readable at 320px. */
+.tournament-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.tournament-stage {
+  background: var(--color-white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 16px;
+  border-left: 4px solid var(--color-text-secondary);
+}
+
+.tournament-stage[data-stage-status="active"] { border-left-color: var(--color-primary); }
+.tournament-stage[data-stage-status="complete"] { border-left-color: var(--color-success); }
+.tournament-stage[data-stage-status="invalid"] { border-left-color: var(--color-error); }
+
+.tournament-stage__heading {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.tournament-stage__meta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 16px;
 }
 
 /* --- Standings Table --- */
@@ -987,6 +1174,13 @@ textarea {
 
 .match-card__score--played {
   color: #388e3c;
+}
+
+/* Per-match Set Rules caption (REQ-FMT-01/08) — visible to every role */
+.match-card__rule {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: -4px 0 0;
 }
 
 .match-card__btn {
@@ -1123,6 +1317,13 @@ textarea {
 .scoreboard__match-label {
   text-align: center;
   font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.scoreboard__rule {
+  text-align: center;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
   margin-bottom: 20px;
 }

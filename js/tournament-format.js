@@ -23,7 +23,9 @@ function classicFormat() {
 }
 
 /** Build a runtime Format for a preset. Throws 'tournament.format.error.presetUnavailable'
- * for an unknown preset, or when `crossover`'s 2-groups-of-4 shape is not met. */
+ * for an unknown preset, or when `crossover`'s shape (exactly 2 groups, each with at least
+ * 4 teams) is not met. Groups may be uneven (e.g. 5+4); only ranks 1-4 of each group feed
+ * the knockout stage — any 5th+ place team is eliminated in the group stage. */
 function presetFormat(presetId, groups) {
   groups = groups || [];
 
@@ -48,8 +50,8 @@ function presetFormat(presetId, groups) {
   }
 
   if (presetId === 'crossover') {
-    var isEightInTwoGroups = groups.length === 2 && groups.every(function (g) { return g.teams.length === 4; });
-    if (!isEightInTwoGroups) throw new Error('tournament.format.error.presetUnavailable');
+    var isTwoGroupsOfAtLeastFour = groups.length === 2 && groups.every(function (g) { return g.teams.length >= 4; });
+    if (!isTwoGroupsOfAtLeastFour) throw new Error('tournament.format.error.presetUnavailable');
     return {
       version: 1, preset: 'crossover',
       stagesById: {
@@ -266,6 +268,14 @@ function resolveFormat(format, ctx) {
     else if (outMatches.some(function (m) { return m.resolved; })) status = 'active';
     else status = 'pending';
     if (status !== 'complete') overallComplete = false;
+
+    // Hardening: an `invalid` stage (a stray/tampered slot token that validateFormat
+    // did not catch, e.g. a direct Firebase write bypassing client validation) must
+    // never expose a scorable match, even if that individual match's own tokens
+    // happened to resolve — a stage-wide failure fails the whole stage closed.
+    if (status === 'invalid') {
+      outMatches = outMatches.map(function (m) { return Object.assign({}, m, { scorable: false }); });
+    }
 
     outStages.push({
       id: stage.id, kind: stage.kind, order: stage.order, label: 'tournament.format.stage.' + stage.id,
