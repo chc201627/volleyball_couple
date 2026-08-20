@@ -9,6 +9,7 @@
  *   createTeams(couplesResult)
  *   createGroups(teams)
  *   generateMatches(groups)
+ *   projectMatchResults(matches, resultsByMatchId)
  *   calculateStandings(groups, matches)
  *   recordMatchScore(matches, matchId, score1, score2)
  *   isTournamentComplete(matches)
@@ -130,9 +131,15 @@ function generateMatches(groups) {
           groupId: group.id,
           team1Id: t1.id,
           team2Id: t2.id,
+          round: round + 1,
+          order: matches.length + 1,
           score1: null,
           score2: null,
           played: false,
+          status: 'pending',
+          revision: 0,
+          updatedBy: null,
+          updatedAt: null,
         });
       }
 
@@ -146,6 +153,34 @@ function generateMatches(groups) {
   });
 
   return matches;
+}
+
+/** Join granular results onto immutable matches; only Finished affects standings. */
+function projectMatchResults(matches, resultsByMatchId) {
+  var results = resultsByMatchId || {};
+  return (matches || []).map(function (match) {
+    var result = results[match.id];
+    if (!result) {
+      return Object.assign({}, match, {
+        score1: null,
+        score2: null,
+        played: false,
+        status: 'pending',
+        revision: 0,
+        updatedBy: null,
+        updatedAt: null,
+      });
+    }
+    return Object.assign({}, match, {
+      score1: result.score1,
+      score2: result.score2,
+      played: result.status === 'finished',
+      status: result.status,
+      revision: result.revision,
+      updatedBy: result.updatedBy == null ? null : result.updatedBy,
+      updatedAt: result.updatedAt == null ? null : result.updatedAt,
+    });
+  });
 }
 
 /**
@@ -264,6 +299,8 @@ function recordMatchScore(matches, matchId, score1, score2) {
       score1: s1,
       score2: s2,
       played: true,
+      status: 'finished',
+      revision: (Number.isInteger(match.revision) ? match.revision : 0) + 1,
     });
   });
 }
