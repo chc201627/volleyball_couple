@@ -7,7 +7,7 @@
   <meta name="description" content="Randomly match beach volleyball players into couples with gender-balanced pairing.">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
 
-  <link rel="stylesheet" href="css/styles.css?v=1.7.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.8.0">
 
 </head>
 <body>
@@ -317,6 +317,9 @@
       <div class="tournament-groups" id="tournament-groups">
         <!-- Group panels rendered by JS -->
       </div>
+      <div class="tournament-stages" id="tournament-stages" hidden>
+        <!-- Knockout stage panels rendered by JS (formatted sessions only) -->
+      </div>
       <div class="scoreboard-panel" id="scoreboard-panel" hidden>
         <!-- Live scoreboard rendered by JS -->
       </div>
@@ -324,7 +327,7 @@
   </main>
 
   <footer class="footer">
-    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.7.0</p>
+    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.8.0</p>
   </footer>
 
   <!-- Firebase Realtime Database (compat SDK v10) -->
@@ -332,16 +335,16 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
-  <script src="js/firebase-config.js?v=1.7.0"></script>
+  <script src="js/firebase-config.js?v=1.8.0"></script>
 
-  <script src="js/pairing.js?v=1.7.0"></script>
-  <script src="js/player-import.js?v=1.7.0"></script>
-  <script src="js/i18n.js?v=1.7.0"></script>
-  <script src="js/tournament.js?v=1.7.0"></script>
-  <script src="js/tournament-format.js?v=1.7.0"></script>
-  <script src="js/tournament-repository.js?v=1.7.0"></script>
-  <script src="js/king-of-court.js?v=1.7.0"></script>
-  <script src="js/app.js?v=1.7.0"></script>
+  <script src="js/pairing.js?v=1.8.0"></script>
+  <script src="js/player-import.js?v=1.8.0"></script>
+  <script src="js/i18n.js?v=1.8.0"></script>
+  <script src="js/tournament.js?v=1.8.0"></script>
+  <script src="js/tournament-format.js?v=1.8.0"></script>
+  <script src="js/tournament-repository.js?v=1.8.0"></script>
+  <script src="js/king-of-court.js?v=1.8.0"></script>
+  <script src="js/app.js?v=1.8.0"></script>
 
 </body>
 </html>

@@ -267,6 +267,14 @@ function resolveFormat(format, ctx) {
     else status = 'pending';
     if (status !== 'complete') overallComplete = false;
 
+    // Hardening: an `invalid` stage (a stray/tampered slot token that validateFormat
+    // did not catch, e.g. a direct Firebase write bypassing client validation) must
+    // never expose a scorable match, even if that individual match's own tokens
+    // happened to resolve — a stage-wide failure fails the whole stage closed.
+    if (status === 'invalid') {
+      outMatches = outMatches.map(function (m) { return Object.assign({}, m, { scorable: false }); });
+    }
+
     outStages.push({
       id: stage.id, kind: stage.kind, order: stage.order, label: 'tournament.format.stage.' + stage.id,
       pointsTo: stage.pointsTo, overtime: !!stage.overtime, status: status, matches: outMatches,
