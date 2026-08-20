@@ -13,6 +13,9 @@
   let couplesGenerated = false;
   let lastResult = null;
   let tournamentState = null;   // { teams, groups, matches }
+  let currentResolution = null; // last resolveFormat() projection, null for classic sessions
+  let selectedFormatPreset = 'classic'; // 'classic' | 'groupsTo' | 'groupsFinal' | 'crossover'
+  let formatDraft = null;       // Format object being edited in setup, null for classic (PR3a)
   let activeMatchId = null;     // which match card has the score form open
   let scoreboardMatchId = null; // which match is open in live scoreboard mode
   let liveScore = { score1: 0, score2: 0 }; // live scores being tracked
@@ -84,6 +87,13 @@
   const tournamentSetup = document.getElementById('tournament-setup');
   const startTournamentBtn = document.getElementById('start-tournament-btn');
   const groupCountOptions = document.getElementById('group-count-options');
+  const formatPresetOptions = document.getElementById('format-preset-options');
+  const formatPresetCrossoverBtn = document.getElementById('format-preset-crossover');
+  const formatEditor = document.getElementById('format-editor');
+  const formatStagesEl = document.getElementById('format-stages');
+  const formatCustomRules = document.getElementById('format-custom-rules');
+  const formatCustomRulesCount = document.getElementById('format-custom-rules-count');
+  const formatError = document.getElementById('format-error');
   const shareTournamentBtn = document.getElementById('share-tournament-btn');
   const resetTournamentBtn = document.getElementById('reset-tournament-btn');
   const readonlyBanner = document.getElementById('readonly-banner');
@@ -98,7 +108,11 @@
   const retryScoreBtn = document.getElementById('retry-score-btn');
   const tournamentSection = document.getElementById('tournament-section');
   const tournamentGroupsEl = document.getElementById('tournament-groups');
+  const tournamentStagesEl = document.getElementById('tournament-stages');
   const scoreboardPanelEl = document.getElementById('scoreboard-panel');
+  const tournamentCustomRules = document.getElementById('tournament-custom-rules');
+  const tournamentCustomRulesSummary = document.getElementById('tournament-custom-rules-summary');
+  const tournamentCustomRulesText = document.getElementById('tournament-custom-rules-text');
 
   const kingSetup              = document.getElementById('king-setup');
   const startKingBtn           = document.getElementById('start-king-btn');
@@ -150,6 +164,10 @@
       if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, null, lastScoreCommand.status);
     });
     groupCountOptions.addEventListener('click', handleGroupOptClick);
+    formatPresetOptions.addEventListener('click', handleFormatPresetClick);
+    formatStagesEl.addEventListener('input', handleFormatStageInput);
+    formatStagesEl.addEventListener('change', handleFormatStageInput);
+    formatCustomRules.addEventListener('input', handleFormatCustomRulesInput);
     startKingBtn.addEventListener('click', handleStartKing);
     resetKingBtn.addEventListener('click', handleResetKing);
     kingWinsBtn.addEventListener('click', function () { handleRally('king'); });
@@ -601,6 +619,7 @@
     const result = teamSize === 2 ? generateCouples(players) : generateTeams(players, teamSize);
     couplesGenerated = true;
     lastResult = result;
+    selectFormatPreset('classic'); // couple/team shape changed — start fresh (format is immutable per session)
     renderResults(result);
     updateUI();
   }
@@ -706,6 +725,7 @@
     if (couplesGenerated && lastResult) {
       const teamCount = lastResult.teams ? lastResult.teams.length : (lastResult.couples ? lastResult.couples.length : 0);
       updateGroupOptions(teamCount);
+      updateFormatPresetVisibility();
     }
   }
 
@@ -828,6 +848,139 @@
       b.classList.remove('tournament-setup__opt--active');
     });
     btn.classList.add('tournament-setup__opt--active');
+    // Group shape changed — any in-progress format draft (slot descriptors) no longer applies.
+    selectFormatPreset('classic');
+    updateFormatPresetVisibility();
+  }
+
+  // --- Tournament Format Setup (PR3a — presets + light editing; no scoreboard/bracket wiring yet) ---
+
+  /** Shape of the groups the format editor previews, using the actual createGroups() split
+   * so preset feasibility and validateFormat() match what handleStartTournament() will build. */
+  function getSetupGroupsShape() {
+    if (!lastResult) return [];
+    var n = (lastResult.couples || lastResult.teams || []).length;
+    if (n < 2) return [];
+    var placeholderTeams = [];
+    for (var i = 0; i < n; i++) placeholderTeams.push({ id: 't' + i });
+    return createGroups(placeholderTeams, getSelectedGroupCount());
+  }
+
+  function isCrossoverFeasible(groups) {
+    return groups.length === 2 && groups.every(function (g) { return g.teams.length === 4; });
+  }
+
+  function selectFormatPreset(presetId) {
+    selectedFormatPreset = presetId;
+    clearFormatError();
+    if (presetId === 'classic') {
+      formatDraft = null;
+    } else {
+      try {
+        formatDraft = presetFormat(presetId, getSetupGroupsShape());
+      } catch (err) {
+        formatDraft = null;
+        selectedFormatPreset = 'classic';
+        showFormatError(t('tournament.format.error.presetUnavailable'));
+      }
+    }
+    renderFormatPresetButtons();
+    renderFormatEditor();
+  }
+
+  function handleFormatPresetClick(e) {
+    var btn = e.target.closest('.format-setup__opt');
+    if (!btn || btn.disabled || btn.hidden) return;
+    selectFormatPreset(btn.getAttribute('data-preset'));
+  }
+
+  function renderFormatPresetButtons() {
+    formatPresetOptions.querySelectorAll('.format-setup__opt').forEach(function (b) {
+      b.classList.toggle('format-setup__opt--active', b.getAttribute('data-preset') === selectedFormatPreset);
+    });
+  }
+
+  /** The crossover (reference) preset is only offered for exactly 2 groups of 4 teams (REQ-FMT-02). */
+  function updateFormatPresetVisibility() {
+    var feasible = isCrossoverFeasible(getSetupGroupsShape());
+    formatPresetCrossoverBtn.hidden = !feasible;
+    if (!feasible && selectedFormatPreset === 'crossover') {
+      selectFormatPreset('classic');
+    }
+  }
+
+  function renderFormatEditor() {
+    formatEditor.hidden = !formatDraft;
+    formatStagesEl.innerHTML = '';
+
+    if (!formatDraft) {
+      formatCustomRules.value = '';
+      updateFormatCustomRulesCount();
+      return;
+    }
+
+    var stagesById = formatDraft.stagesById || {};
+    var stages = Object.keys(stagesById).map(function (id) { return stagesById[id]; })
+      .sort(function (a, b) { return a.order - b.order; });
+
+    stages.forEach(function (stage) {
+      var pointsId = 'format-points-' + stage.id;
+      var overtimeId = 'format-overtime-' + stage.id;
+      var row = document.createElement('div');
+      row.className = 'format-editor__stage';
+      row.innerHTML =
+        '<span class="format-editor__stage-label">' + escapeHTML(t('tournament.format.stage.' + stage.id)) + '</span>' +
+        '<div class="format-editor__field">' +
+          '<label class="form__label" for="' + pointsId + '">' + escapeHTML(t('tournament.format.pointsTo')) + '</label>' +
+          '<input class="form__input format-editor__points" type="number" min="1" max="99" step="1" ' +
+                 'id="' + pointsId + '" data-stage-id="' + stage.id + '" data-field="pointsTo" value="' + stage.pointsTo + '">' +
+        '</div>' +
+        '<label class="format-editor__checkbox" for="' + overtimeId + '">' +
+          '<input type="checkbox" id="' + overtimeId + '" data-stage-id="' + stage.id + '" data-field="overtime"' +
+                 (stage.overtime ? ' checked' : '') + '>' +
+          '<span>' + escapeHTML(t('tournament.format.overtime')) + '</span>' +
+        '</label>';
+      formatStagesEl.appendChild(row);
+    });
+
+    formatCustomRules.value = formatDraft.customRules || '';
+    updateFormatCustomRulesCount();
+  }
+
+  function handleFormatStageInput(e) {
+    var input = e.target.closest('[data-stage-id]');
+    if (!input || !formatDraft) return;
+    var stage = formatDraft.stagesById[input.getAttribute('data-stage-id')];
+    if (!stage) return;
+
+    if (input.getAttribute('data-field') === 'pointsTo') {
+      var n = parseInt(input.value, 10);
+      if (!Number.isNaN(n)) stage.pointsTo = n;
+    } else if (input.getAttribute('data-field') === 'overtime') {
+      stage.overtime = input.checked;
+    }
+    formatDraft.preset = 'custom'; // any light edit detaches the draft from its starting preset
+    clearFormatError();
+  }
+
+  function handleFormatCustomRulesInput() {
+    if (!formatDraft) return;
+    formatDraft.customRules = formatCustomRules.value.slice(0, 500);
+    formatDraft.preset = 'custom';
+    updateFormatCustomRulesCount();
+    clearFormatError();
+  }
+
+  function updateFormatCustomRulesCount() {
+    formatCustomRulesCount.textContent = t('tournament.format.customRulesCount', { n: (formatCustomRules.value || '').length });
+  }
+
+  function showFormatError(message) {
+    formatError.textContent = message;
+  }
+
+  function clearFormatError() {
+    formatError.textContent = '';
   }
 
   function updateGroupOptions(teamCount) {
@@ -851,8 +1004,19 @@
     if (teams.length < 2) return;
     const numGroups = getSelectedGroupCount();
     const groups = createGroups(teams, numGroups);
-    const matches = generateMatches(groups);
+
+    // formatDraft is null for the classic preset (D1) — validate only when a format is chosen.
+    if (formatDraft) {
+      var formatValidation = validateFormat(formatDraft, groups);
+      if (!formatValidation.valid) {
+        showFormatError(t(formatValidation.errors[0]));
+        return;
+      }
+    }
+
+    const matches = generateStageMatches(formatDraft, groups); // delegates to generateMatches() when formatDraft is null — classic path unchanged
     tournamentState = { teams: teams, groups: groups, matches: matches, players: players };
+    if (formatDraft) tournamentState.format = formatDraft; // omit the key entirely for classic — keeps classic state byte-identical
     activeMatchId = null;
     scoreboardMatchId = null;
     liveScore = { score1: 0, score2: 0 };
@@ -897,6 +1061,7 @@
       b.classList.remove('tournament-setup__opt--active');
     });
     groupCountOptions.querySelector('[data-groups="1"]').classList.add('tournament-setup__opt--active');
+    selectFormatPreset('classic');
     updateActionButtons();
   }
 
@@ -1029,6 +1194,18 @@
       if (!Number.isInteger(score1) || !Number.isInteger(score2)) throw new Error('tournament.error.scoreNotInt');
       if (score1 < 0 || score2 < 0) throw new Error('tournament.error.scoreNegative');
       if (status === 'finished' && score1 === score2) throw new Error('tournament.error.scoreDraw');
+      // Stage Set Rules enforcement (REQ-FMT-20/21) — rulesForMatch falls back to
+      // pointsTo:null for classic sessions (tournamentState.format undefined), so this
+      // block is a no-op and classic scoring behavior stays byte-identical.
+      var stageRules = rulesForMatch(tournamentState.format, matchId);
+      if (stageRules.pointsTo != null) {
+        if (!stageRules.overtime && Math.max(score1, score2) > stageRules.pointsTo) {
+          throw new Error('tournament.format.error.pointsTarget');
+        }
+        if (status === 'finished' && !matchOutcome(stageRules, score1, score2).finished) {
+          throw new Error('tournament.format.error.pointsTarget');
+        }
+      }
       var confirmedMatch = tournamentState.matches.find(function (match) { return match.id === matchId; });
       var command = { matchId: matchId, score1: score1, score2: score2, status: status, expectedRevision: confirmedMatch.revision || 0 };
       if (tournamentRepository && sessionId) {
@@ -1049,12 +1226,9 @@
       tournamentState.matches.forEach(function (match) { if (match.status !== 'pending') resultMap[match.id] = match; });
       resultMap[matchId] = Object.assign({}, command, { revision: command.expectedRevision + 1 });
       var newMatches = projectMatchResults(tournamentState.matches, resultMap);
-      tournamentState = {
-        teams: tournamentState.teams,
-        groups: tournamentState.groups,
-        matches: newMatches,
-        players: tournamentState.players || players,
-      };
+      // Preserve every existing field (notably `format`/`customRules`, per D1) instead of
+      // re-enumerating them — only `matches` changes on a local score save.
+      tournamentState = Object.assign({}, tournamentState, { matches: newMatches, players: tournamentState.players || players });
       activeMatchId = null;
       scoreboardMatchId = null;
       liveScore = { score1: 0, score2: 0 };
@@ -1325,15 +1499,39 @@
       tournamentGroupsEl.classList.remove('tournament-groups--multi');
     }
 
-    var standings = calculateStandings(tournamentState.groups, tournamentState.matches);
+    // Extended tiebreak (D9) is opt-in and only enabled for format sessions — classic
+    // sessions keep today's exact 2-arg ordering, satisfying "classic unchanged".
+    var standings = calculateStandings(tournamentState.groups, tournamentState.matches,
+      tournamentState.format ? { extendedTiebreak: true } : undefined);
+
+    // Deterministic bracket projection (D5/D6) — null for classic sessions, in which case
+    // every consumer below falls back to the pre-existing classic-only code path unchanged.
+    currentResolution = tournamentState.format
+      ? resolveFormat(tournamentState.format, { groups: tournamentState.groups, matches: tournamentState.matches, standings: standings })
+      : null;
+
+    renderCustomRulesNote();
 
     tournamentState.groups.forEach(function (group, idx) {
       var panel = renderGroupPanel(group, idx, standings);
       tournamentGroupsEl.appendChild(panel);
     });
 
-    // Tournament complete banner
-    if (isTournamentComplete(tournamentState.matches)) {
+    // Knockout stage panels (D2/D5/D6, REQ-FMT-05/23) — one per knockout stage, rendered
+    // below the group panels; the round-robin stage stays represented by the group panels.
+    // Hidden entirely (not just empty) for classic sessions so no extra spacing is added —
+    // "classic sessions: zero behavior/rendering change".
+    tournamentStagesEl.innerHTML = '';
+    var knockoutStages = currentResolution
+      ? currentResolution.stages.filter(function (stage) { return stage.kind === 'knockout'; })
+      : [];
+    knockoutStages.forEach(function (stage) { tournamentStagesEl.appendChild(renderStagePanel(stage)); });
+    tournamentStagesEl.hidden = knockoutStages.length === 0;
+
+    // Tournament complete banner — formatted sessions use the bracket projection's
+    // `complete` flag (REQ-FMT-05); classic sessions keep isTournamentComplete unchanged.
+    var complete = currentResolution ? currentResolution.complete : isTournamentComplete(tournamentState.matches);
+    if (complete) {
       var banner = document.createElement('div');
       banner.className = 'tournament-complete animate__animated animate__fadeIn';
       banner.textContent = t('tournament.complete');
@@ -1350,16 +1548,175 @@
     }
   }
 
+  /** Owner-authored custom-rules note (REQ-FMT-07), visible read-only to every role
+   * (owner, scorer, spectator). Uses .textContent — never innerHTML — so no escapeHTML()
+   * call is required for this user-provided text. Hidden entirely for classic sessions
+   * or when no note was set. */
+  function renderCustomRulesNote() {
+    var note = tournamentState.format && tournamentState.format.customRules;
+    if (!note || !String(note).trim()) {
+      tournamentCustomRules.hidden = true;
+      tournamentCustomRulesText.textContent = '';
+      return;
+    }
+    tournamentCustomRulesSummary.textContent = t('tournament.format.customRulesNote.heading');
+    tournamentCustomRulesText.textContent = note;
+    tournamentCustomRules.hidden = false;
+  }
+
+  /** Localized inline caption for a match's Set Rules, e.g. "Set to 15 · no overtime"
+   * (REQ-FMT-01/08) — shown to every role, not just the live scoreboard. */
+  function formatStageRuleLabel(rules) {
+    var overtimeKey = rules.overtime ? 'tournament.format.rule.overtimeOn' : 'tournament.format.rule.overtimeOff';
+    return t('tournament.format.rule.pointsTo', { points: rules.pointsTo }) + ' · ' + t(overtimeKey);
+  }
+
+  /** Localized lock/progress/finish caption for a knockout stage panel (REQ-FMT-05/08). */
+  function formatStageStatusLabel(status) {
+    return t('tournament.format.stageStatus.' + status);
+  }
+
+  /** Localized placeholder for a not-yet-resolved bracket slot (REQ-FMT-05/08), e.g.
+   * "Rank 1 · Group A" or "Winner of Quarterfinals #1". Any other/unparseable token
+   * (including a stray slot the engine already marked `invalid`) falls back to a
+   * generic TBD label — this never throws on unexpected input. */
+  function formatSlotLabel(token) {
+    if (typeof token === 'string') {
+      var slotMatch = /^slot:([A-Z])(\d+)$/.exec(token);
+      if (slotMatch) return t('tournament.format.slot.groupRank', { rank: slotMatch[2], group: slotMatch[1] });
+      var winnerMatch = /^winner:k-([a-z][a-z0-9]{0,11})-(\d+)$/.exec(token);
+      if (winnerMatch) {
+        return t('tournament.format.slot.winner', { match: t('tournament.format.stage.' + winnerMatch[1]) + ' #' + winnerMatch[2] });
+      }
+    }
+    return t('tournament.format.slot.tbd');
+  }
+
+  /** Team display name for a resolved slot's real team id, matching the fallback used
+   * throughout renderTournament when a team lookup somehow fails. */
+  function resolveMatchTeamName(teamId) {
+    var team = tournamentState.teams.find(function (tm) { return tm.id === teamId; });
+    return team ? team.name : teamId;
+  }
+
+  /** Finds a match's projected entry in the current bracket resolution (any stage,
+   * round-robin or knockout) — null when no format is active or the match id is unknown. */
+  function findProjectedMatch(matchId) {
+    if (!currentResolution) return null;
+    for (var i = 0; i < currentResolution.stages.length; i++) {
+      var found = currentResolution.stages[i].matches.find(function (pm) { return pm.matchId === matchId; });
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /** One vertical card per knockout stage (D2/D5/D6), rendered below the group panels.
+   * Unresolved sides show a localized slot placeholder instead of a team name; a match's
+   * action button is offered only when the projection marks it `scorable` — resolveFormat
+   * already forces that to false for every match in an `invalid` stage, so this render
+   * guard never needs its own separate invalid-stage check. */
+  function renderStagePanel(stage) {
+    var panel = document.createElement('div');
+    panel.className = 'tournament-stage';
+    panel.dataset.stageStatus = stage.status;
+
+    var heading = document.createElement('h3');
+    heading.className = 'tournament-stage__heading';
+    heading.textContent = t(stage.label);
+    panel.appendChild(heading);
+
+    var meta = document.createElement('p');
+    meta.className = 'tournament-stage__meta';
+    meta.textContent = formatStageRuleLabel({ pointsTo: stage.pointsTo, overtime: stage.overtime }) +
+      ' · ' + formatStageStatusLabel(stage.status);
+    panel.appendChild(meta);
+
+    var ul = document.createElement('ul');
+    ul.className = 'match-list';
+
+    stage.matches.forEach(function (projected) {
+      var rawMatch = tournamentState.matches.find(function (m) { return m.id === projected.matchId; });
+      if (!rawMatch) return;
+
+      var name1 = projected.team1Id ? resolveMatchTeamName(projected.team1Id) : formatSlotLabel(projected.team1Slot);
+      var name2 = projected.team2Id ? resolveMatchTeamName(projected.team2Id) : formatSlotLabel(projected.team2Slot);
+      var hasScore = rawMatch.status !== 'pending' && rawMatch.score1 != null;
+      var isActive = scoreboardMatchId === rawMatch.id;
+
+      var li = document.createElement('li');
+      li.className = 'match-card' + (rawMatch.played ? ' match-card--played' : '') + (isActive ? ' match-card--active' : '');
+
+      var row = document.createElement('div');
+      row.className = 'match-card__row';
+
+      var teamsEl = document.createElement('span');
+      teamsEl.className = 'match-card__teams';
+      teamsEl.innerHTML = escapeHTML(name1) +
+        ' <span class="match-card__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+        escapeHTML(name2);
+
+      var scoreEl = document.createElement('span');
+      scoreEl.className = 'match-card__score' + (hasScore ? ' match-card__score--played' : '');
+      scoreEl.textContent = hasScore ? (rawMatch.score1 + ' – ' + rawMatch.score2) : '–';
+
+      row.appendChild(teamsEl);
+      row.appendChild(scoreEl);
+
+      // A single action button covers enter + edit + live tracking, all via the existing
+      // scoreboard panel (handleScoreboard pre-fills liveScore from the finished result).
+      if (!isReadOnly && projected.scorable) {
+        var btnGroup = document.createElement('div');
+        btnGroup.className = 'match-card__btn-group';
+
+        var trackBtn = document.createElement('button');
+        trackBtn.className = 'match-card__btn match-card__btn--track' + (isActive ? ' match-card__btn--track-active' : '');
+        trackBtn.type = 'button';
+        trackBtn.textContent = hasScore ? t('tournament.match.edit') : t('tournament.match.trackScore');
+        trackBtn.addEventListener('click', (function (mid) { return function () { handleScoreboard(mid); }; })(rawMatch.id));
+
+        btnGroup.appendChild(trackBtn);
+        row.appendChild(btnGroup);
+      }
+
+      li.appendChild(row);
+
+      var ruleCaption = document.createElement('p');
+      ruleCaption.className = 'match-card__rule';
+      ruleCaption.textContent = formatStageRuleLabel({ pointsTo: stage.pointsTo, overtime: stage.overtime });
+      li.appendChild(ruleCaption);
+
+      ul.appendChild(li);
+    });
+
+    panel.appendChild(ul);
+    return panel;
+  }
+
   function renderScoreboardPanel() {
     scoreboardPanelEl.innerHTML = '';
 
     var match = tournamentState.matches.find(function (m) { return m.id === scoreboardMatchId; });
     if (!match) return;
 
-    var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
-    var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
-    var name1 = team1 ? team1.name : match.team1Id;
-    var name2 = team2 ? team2.name : match.team2Id;
+    // Knockout matches persist slot-descriptor team ids forever (D3) — the real team id
+    // only ever exists in the client-side bracket projection, so a format match must be
+    // named through findProjectedMatch()/resolveMatchTeamName(), never the raw match node.
+    // findProjectedMatch() is null for classic sessions, keeping this branch byte-identical
+    // to the pre-existing lookup for every non-format tournament.
+    var projected = findProjectedMatch(match.id);
+    var name1, name2;
+    if (projected) {
+      name1 = projected.team1Id ? resolveMatchTeamName(projected.team1Id) : formatSlotLabel(projected.team1Slot);
+      name2 = projected.team2Id ? resolveMatchTeamName(projected.team2Id) : formatSlotLabel(projected.team2Slot);
+    } else {
+      var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
+      var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
+      name1 = team1 ? team1.name : match.team1Id;
+      name2 = team2 ? team2.name : match.team2Id;
+    }
+    // Stage Set Rules (REQ-FMT-20) — pointsTo:null (classic/unrecognized match) means
+    // unrestricted free-entry scoring, so the caption and the +/- cap below are skipped.
+    var rules = rulesForMatch(tournamentState.format, match.id);
 
     var panel = document.createElement('div');
     panel.className = 'scoreboard animate__animated animate__fadeInUp';
@@ -1379,8 +1736,17 @@
       '<span class="scoreboard__team-tag">' + escapeHTML(name2) + '</span>';
     panel.appendChild(matchLabel);
 
+    if (rules.pointsTo != null) {
+      var ruleCaption = document.createElement('p');
+      ruleCaption.className = 'scoreboard__rule';
+      ruleCaption.textContent = formatStageRuleLabel(rules);
+      panel.appendChild(ruleCaption);
+    }
+
     var errorEl = document.createElement('p');
     errorEl.className = 'scoreboard__error';
+    errorEl.setAttribute('role', 'alert');
+    errorEl.setAttribute('aria-live', 'polite');
 
     // Teams grid
     var teamsGrid = document.createElement('div');
@@ -1426,8 +1792,21 @@
       incBtn.setAttribute('aria-label', '+ ' + side.name);
       incBtn.addEventListener('click', (function (key, display) {
         return function () {
+          // No-op once the set is already decided with no overtime (REQ-FMT-20) —
+          // rules.pointsTo is null for classic/unrecognized matches, so `capped` is
+          // always false there and this guard never affects classic scoring.
+          var before = matchOutcome(rules, liveScore.score1, liveScore.score2);
+          if (before.capped && !rules.overtime) return;
+
           liveScore[key]++;
           display.textContent = liveScore[key];
+
+          // Auto-finish through the existing commitScore('finished') transaction —
+          // same expectedRevision/conflict semantics as a manual Finish (REQ-FMT-21).
+          var after = matchOutcome(rules, liveScore.score1, liveScore.score2);
+          if (after.finished) {
+            commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, 'finished');
+          }
         };
       })(side.scoreKey, scoreDisplay));
 
@@ -1603,6 +1982,18 @@
 
       li.appendChild(row);
 
+      // Stage Set Rules caption — visible to every role (owner, scorer, spectator),
+      // not just inside the isReadOnly-gated live scoreboard (REQ-FMT-01/08).
+      if (tournamentState.format) {
+        var matchRules = rulesForMatch(tournamentState.format, match.id);
+        if (matchRules.pointsTo != null) {
+          var ruleEl = document.createElement('p');
+          ruleEl.className = 'match-card__rule';
+          ruleEl.textContent = formatStageRuleLabel(matchRules);
+          li.appendChild(ruleEl);
+        }
+      }
+
       // ── Score form (only when this card is active) ──
       if (!isReadOnly && isActive) {
         var scoreForm = document.createElement('div');
@@ -1642,6 +2033,8 @@
 
         var errorEl = document.createElement('p');
         errorEl.className = 'score-form__error';
+        errorEl.setAttribute('role', 'alert');
+        errorEl.setAttribute('aria-live', 'polite');
 
         [in1, in2].forEach(function (inp) {
           inp.addEventListener('keydown', function (e) {

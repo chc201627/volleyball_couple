@@ -153,6 +153,48 @@ var t, setLanguage, getLanguage;
       'tournament.sync.conflict': '⚠ Newer result found · review and retry',
       'tournament.sync.invalid': '⚠ Check the score and retry',
       'tournament.sync.retry': 'Retry',
+      // Tournament format (PR3a — setup presets + light editing)
+      'tournament.format.presetLabel': 'Format:',
+      'tournament.format.preset.classic': 'Classic',
+      'tournament.format.preset.groupsTo': 'Groups Only',
+      'tournament.format.preset.groupsFinal': 'Groups + Final',
+      'tournament.format.preset.crossover': 'Reference (2×4)',
+      'tournament.format.pointsTo': 'Points to win',
+      'tournament.format.overtime': 'Overtime (win by 2)',
+      'tournament.format.customRules': 'Custom rules note (optional)',
+      'tournament.format.customRulesHint': 'e.g. No open-hand finger reception or set-over',
+      'tournament.format.customRulesCount': '{n} / 500',
+      'tournament.format.stage.group': 'Group Stage',
+      'tournament.format.stage.qf': 'Quarterfinals',
+      'tournament.format.stage.sf': 'Semifinals',
+      'tournament.format.stage.final': 'Final',
+      'tournament.format.error.presetUnavailable': 'This format is not available for the current group setup',
+      'tournament.format.error.missing': 'Select a tournament format before starting',
+      'tournament.format.error.version': 'Unsupported format version',
+      'tournament.format.error.stageCount': 'A format must have between 1 and 8 stages',
+      'tournament.format.error.stageId': 'Invalid stage identifier',
+      'tournament.format.error.stageIdCollidesWithGroup': 'A stage identifier collides with a group name',
+      'tournament.format.error.pointsTo': 'Points to win must be a whole number between 1 and 99',
+      'tournament.format.error.overtime': 'Overtime must be on or off',
+      'tournament.format.error.roundRobinStage': 'A format needs exactly one group stage',
+      'tournament.format.error.roundRobinOrder': 'The group stage must be the first stage',
+      'tournament.format.error.knockoutPairs': 'The knockout stage pairings are invalid',
+      'tournament.format.error.knockoutTokenDuplicate': 'A knockout slot is used more than once',
+      'tournament.format.error.knockoutToken': 'A knockout slot references an invalid group rank or match',
+      'tournament.format.error.customRules': 'The custom rules note must be 500 characters or fewer',
+      // Tournament format (PR3b — scoreboard enforcement)
+      'tournament.format.rule.pointsTo': 'Set to {points}',
+      'tournament.format.rule.overtimeOn': 'overtime win by 2',
+      'tournament.format.rule.overtimeOff': 'no overtime',
+      'tournament.format.error.pointsTarget': 'Score does not meet the target for this stage',
+      'tournament.format.customRulesNote.heading': 'Custom rules',
+      'tournament.format.stageStatus.pending': 'Locked',
+      'tournament.format.stageStatus.active': 'In progress',
+      'tournament.format.stageStatus.complete': 'Finished',
+      'tournament.format.stageStatus.invalid': 'Invalid configuration',
+      'tournament.format.slot.groupRank': 'Rank {rank} · Group {group}',
+      'tournament.format.slot.winner': 'Winner of {match}',
+      'tournament.format.slot.tbd': 'TBD',
       // Match Type
       'matchType.label': 'Match Type',
       'matchType.2v2': '2vs2 (Couples)',
@@ -195,7 +237,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.7.0'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.8.0'
 
     },
     es: {
@@ -335,6 +377,48 @@ var t, setLanguage, getLanguage;
       'tournament.sync.conflict': '⚠ Hay un resultado más reciente · revisa y reintenta',
       'tournament.sync.invalid': '⚠ Revisa el marcador e intenta de nuevo',
       'tournament.sync.retry': 'Reintentar',
+      // Formato del torneo (PR3a — preajustes y edición ligera)
+      'tournament.format.presetLabel': 'Formato:',
+      'tournament.format.preset.classic': 'Clásico',
+      'tournament.format.preset.groupsTo': 'Solo Grupos',
+      'tournament.format.preset.groupsFinal': 'Grupos + Final',
+      'tournament.format.preset.crossover': 'Referencia (2×4)',
+      'tournament.format.pointsTo': 'Puntos para ganar',
+      'tournament.format.overtime': 'Tiempo extra (ganar por 2)',
+      'tournament.format.customRules': 'Nota de reglas personalizadas (opcional)',
+      'tournament.format.customRulesHint': 'Ej. Sin recepción con dedos ni remate de colocación',
+      'tournament.format.customRulesCount': '{n} / 500',
+      'tournament.format.stage.group': 'Fase de Grupos',
+      'tournament.format.stage.qf': 'Cuartos de Final',
+      'tournament.format.stage.sf': 'Semifinales',
+      'tournament.format.stage.final': 'Final',
+      'tournament.format.error.presetUnavailable': 'Este formato no está disponible para la configuración actual de grupos',
+      'tournament.format.error.missing': 'Selecciona un formato de torneo antes de iniciar',
+      'tournament.format.error.version': 'Versión de formato no compatible',
+      'tournament.format.error.stageCount': 'Un formato debe tener entre 1 y 8 etapas',
+      'tournament.format.error.stageId': 'Identificador de etapa inválido',
+      'tournament.format.error.stageIdCollidesWithGroup': 'Un identificador de etapa coincide con el nombre de un grupo',
+      'tournament.format.error.pointsTo': 'Los puntos para ganar deben ser un número entero entre 1 y 99',
+      'tournament.format.error.overtime': 'El tiempo extra debe estar activado o desactivado',
+      'tournament.format.error.roundRobinStage': 'Un formato necesita exactamente una fase de grupos',
+      'tournament.format.error.roundRobinOrder': 'La fase de grupos debe ser la primera etapa',
+      'tournament.format.error.knockoutPairs': 'Los cruces de la etapa eliminatoria no son válidos',
+      'tournament.format.error.knockoutTokenDuplicate': 'Un cupo de la eliminatoria se usa más de una vez',
+      'tournament.format.error.knockoutToken': 'Un cupo de la eliminatoria hace referencia a una posición de grupo o partido inválida',
+      'tournament.format.error.customRules': 'La nota de reglas personalizadas debe tener 500 caracteres o menos',
+      // Formato del torneo (PR3b — cumplimiento del marcador)
+      'tournament.format.rule.pointsTo': 'A {points} puntos',
+      'tournament.format.rule.overtimeOn': 'tiempo extra, gana por 2',
+      'tournament.format.rule.overtimeOff': 'sin tiempo extra',
+      'tournament.format.error.pointsTarget': 'El resultado no cumple con la meta de esta etapa',
+      'tournament.format.customRulesNote.heading': 'Reglas personalizadas',
+      'tournament.format.stageStatus.pending': 'Bloqueada',
+      'tournament.format.stageStatus.active': 'En curso',
+      'tournament.format.stageStatus.complete': 'Finalizada',
+      'tournament.format.stageStatus.invalid': 'Configuración inválida',
+      'tournament.format.slot.groupRank': 'Puesto {rank} · Grupo {group}',
+      'tournament.format.slot.winner': 'Ganador de {match}',
+      'tournament.format.slot.tbd': 'Por definir',
       // Tipo de Partido
       'matchType.label': 'Tipo de Partido',
       'matchType.2v2': '2vs2 (Parejas)',
@@ -377,7 +461,7 @@ var t, setLanguage, getLanguage;
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.7.0'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.8.0'
 
     }
   };
