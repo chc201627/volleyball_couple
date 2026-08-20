@@ -31,9 +31,60 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     });
     return Object.keys(byId).map(function (id) { return byId[id]; });
   }
+  /** Format node under `structure/format` never stores `pairs` (D3) — knockout pairings
+   * live on the generated match nodes, not the persisted format. Empty `customRules` is
+   * OMITTED, never written as an empty string, null, or undefined. */
+  function encodeFormat(format) {
+    if (!format) return null;
+    var stagesById = {};
+    Object.keys(format.stagesById || {}).forEach(function (id) {
+      var stage = format.stagesById[id];
+      stagesById[id] = {
+        id: stage.id, kind: stage.kind, order: stage.order,
+        pointsTo: stage.pointsTo, overtime: !!stage.overtime,
+      };
+    });
+    var encoded = { version: format.version, preset: format.preset, stagesById: stagesById };
+    if (format.customRules != null && String(format.customRules).length > 0) {
+      encoded.customRules = String(format.customRules);
+    }
+    return encoded;
+  }
+  /** Mirrors encodeFormat's shape (stagesById kept as an id-keyed map, matching every
+   * tournament-format.js consumer: resolveFormat/rulesForMatch/isValidToken all do keyed
+   * `stagesById[id]` lookups, never array indexing). */
+  function decodeFormat(stored) {
+    if (!stored) return null;
+    var stagesById = {};
+    Object.keys(stored.stagesById || {}).forEach(function (id) {
+      var stage = stored.stagesById[id];
+      stagesById[id] = {
+        id: stage.id, kind: stage.kind, order: stage.order,
+        pointsTo: stage.pointsTo, overtime: !!stage.overtime,
+      };
+    });
+    var format = { version: stored.version, preset: stored.preset, stagesById: stagesById };
+    if (stored.customRules != null) format.customRules = stored.customRules;
+    return format;
+  }
+  /** A v3 session's format MUST decode into a well-formed stage map, or decodeSession fails
+   * closed with 'unsupported-schema' (design: "v3 requires a decodable format"). */
+  function isDecodableFormat(stored) {
+    if (!stored || typeof stored !== 'object') return false;
+    if (stored.version !== 1 || typeof stored.preset !== 'string') return false;
+    var stagesById = stored.stagesById;
+    if (!stagesById || typeof stagesById !== 'object') return false;
+    var ids = Object.keys(stagesById);
+    if (ids.length < 1) return false;
+    return ids.every(function (id) {
+      var stage = stagesById[id];
+      return !!stage && stage.id === id && typeof stage.kind === 'string' &&
+        Number.isInteger(stage.order) && Number.isInteger(stage.pointsTo) && typeof stage.overtime === 'boolean';
+    });
+  }
   function encodeStructure(tournament) {
     var players = collectPlayers(tournament);
-    return {
+    var structure = {
       playersById: toIndexedMap(players, 'p'),
       teamsById: toIndexedMap(tournament.teams, 't', function (team) {
         var encoded = clone(team);
@@ -59,6 +110,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         return structureMatch;
       }),
     };
+    if (tournament.format) structure.format = encodeFormat(tournament.format);
+    return structure;
   }
   function decodeStructure(structure, results) {
     var players = values(structure.playersById);
@@ -87,6 +140,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
       teams: teams,
       groups: groups,
       matches: projectMatchResults(matches, results || {}),
+      format: decodeFormat(structure.format),
     };
   }
   function decodeSession(session) {
@@ -94,13 +148,17 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     if (!session.schemaVersion || session.schemaVersion === 1) {
       return { schemaVersion: 1, legacy: true, tournament: clone(session.state) };
     }
-    if (session.schemaVersion !== 2) {
+    if (session.schemaVersion !== 2 && session.schemaVersion !== 3) {
       return { schemaVersion: session.schemaVersion, legacy: false, tournament: null, error: 'unsupported-schema' };
     }
+    var structure = session.structure || {};
+    if (session.schemaVersion === 3 && !isDecodableFormat(structure.format)) {
+      return { schemaVersion: 3, legacy: false, tournament: null, error: 'unsupported-schema' };
+    }
     return {
-      schemaVersion: 2,
+      schemaVersion: session.schemaVersion,
       legacy: false,
-      tournament: decodeStructure(session.structure || {}, session.results || {}),
+      tournament: decodeStructure(structure, session.results || {}),
     };
   }
   function validResult(command) {
@@ -143,7 +201,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
       createSession: function (tournament) {
         var sessionId = 'memory-' + (++sequence);
         sessions[sessionId] = {
-          schemaVersion: 2,
+          schemaVersion: (tournament && tournament.format) ? 3 : 2,
           ownerUid: runtime.uid,
           createdAt: now(),
           structure: encodeStructure(tournament || {}),
@@ -165,7 +223,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
       },
       requestAccess: function (sessionId, label) {
         var session = sessions[sessionId];
-        if (!session || session.schemaVersion !== 2) return Promise.resolve({ status: 'denied' });
+        if (!session || (session.schemaVersion !== 2 && session.schemaVersion !== 3)) return Promise.resolve({ status: 'denied' });
         session.access = session.access || {};
         session.access[runtime.uid] = { label: String(label || ''), status: 'pending', requestedAt: now() };
         notify(sessionId);
@@ -292,7 +350,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         return requireUser().then(function (user) {
           var sessionRef = db.ref('tournaments').push();
           return sessionRef.set({
-            schemaVersion: 2, ownerUid: user.uid, createdAt: { '.sv': 'timestamp' },
+            schemaVersion: (tournament && tournament.format) ? 3 : 2, ownerUid: user.uid, createdAt: { '.sv': 'timestamp' },
             structure: encodeStructure(tournament || {}),
           }).then(function () { return { status: 'synced', sessionId: sessionRef.key }; });
         }).catch(classify);
