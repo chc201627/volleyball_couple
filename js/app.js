@@ -13,6 +13,7 @@
   let couplesGenerated = false;
   let lastResult = null;
   let tournamentState = null;   // { teams, groups, matches }
+  let currentResolution = null; // last resolveFormat() projection, null for classic sessions
   let selectedFormatPreset = 'classic'; // 'classic' | 'groupsTo' | 'groupsFinal' | 'crossover'
   let formatDraft = null;       // Format object being edited in setup, null for classic (PR3a)
   let activeMatchId = null;     // which match card has the score form open
@@ -107,6 +108,7 @@
   const retryScoreBtn = document.getElementById('retry-score-btn');
   const tournamentSection = document.getElementById('tournament-section');
   const tournamentGroupsEl = document.getElementById('tournament-groups');
+  const tournamentStagesEl = document.getElementById('tournament-stages');
   const scoreboardPanelEl = document.getElementById('scoreboard-panel');
   const tournamentCustomRules = document.getElementById('tournament-custom-rules');
   const tournamentCustomRulesSummary = document.getElementById('tournament-custom-rules-summary');
@@ -1505,6 +1507,12 @@
     var standings = calculateStandings(tournamentState.groups, tournamentState.matches,
       tournamentState.format ? { extendedTiebreak: true } : undefined);
 
+    // Deterministic bracket projection (D5/D6) — null for classic sessions, in which case
+    // every consumer below falls back to the pre-existing classic-only code path unchanged.
+    currentResolution = tournamentState.format
+      ? resolveFormat(tournamentState.format, { groups: tournamentState.groups, matches: tournamentState.matches, standings: standings })
+      : null;
+
     renderCustomRulesNote();
 
     tournamentState.groups.forEach(function (group, idx) {
@@ -1512,8 +1520,21 @@
       tournamentGroupsEl.appendChild(panel);
     });
 
-    // Tournament complete banner
-    if (isTournamentComplete(tournamentState.matches)) {
+    // Knockout stage panels (D2/D5/D6, REQ-FMT-05/23) — one per knockout stage, rendered
+    // below the group panels; the round-robin stage stays represented by the group panels.
+    // Hidden entirely (not just empty) for classic sessions so no extra spacing is added —
+    // "classic sessions: zero behavior/rendering change".
+    tournamentStagesEl.innerHTML = '';
+    var knockoutStages = currentResolution
+      ? currentResolution.stages.filter(function (stage) { return stage.kind === 'knockout'; })
+      : [];
+    knockoutStages.forEach(function (stage) { tournamentStagesEl.appendChild(renderStagePanel(stage)); });
+    tournamentStagesEl.hidden = knockoutStages.length === 0;
+
+    // Tournament complete banner — formatted sessions use the bracket projection's
+    // `complete` flag (REQ-FMT-05); classic sessions keep isTournamentComplete unchanged.
+    var complete = currentResolution ? currentResolution.complete : isTournamentComplete(tournamentState.matches);
+    if (complete) {
       var banner = document.createElement('div');
       banner.className = 'tournament-complete animate__animated animate__fadeIn';
       banner.textContent = t('tournament.complete');
@@ -1553,16 +1574,149 @@
     return t('tournament.format.rule.pointsTo', { points: rules.pointsTo }) + ' · ' + t(overtimeKey);
   }
 
+  /** Localized lock/progress/finish caption for a knockout stage panel (REQ-FMT-05/08). */
+  function formatStageStatusLabel(status) {
+    return t('tournament.format.stageStatus.' + status);
+  }
+
+  /** Localized placeholder for a not-yet-resolved bracket slot (REQ-FMT-05/08), e.g.
+   * "Rank 1 · Group A" or "Winner of Quarterfinals #1". Any other/unparseable token
+   * (including a stray slot the engine already marked `invalid`) falls back to a
+   * generic TBD label — this never throws on unexpected input. */
+  function formatSlotLabel(token) {
+    if (typeof token === 'string') {
+      var slotMatch = /^slot:([A-Z])(\d+)$/.exec(token);
+      if (slotMatch) return t('tournament.format.slot.groupRank', { rank: slotMatch[2], group: slotMatch[1] });
+      var winnerMatch = /^winner:k-([a-z][a-z0-9]{0,11})-(\d+)$/.exec(token);
+      if (winnerMatch) {
+        return t('tournament.format.slot.winner', { match: t('tournament.format.stage.' + winnerMatch[1]) + ' #' + winnerMatch[2] });
+      }
+    }
+    return t('tournament.format.slot.tbd');
+  }
+
+  /** Team display name for a resolved slot's real team id, matching the fallback used
+   * throughout renderTournament when a team lookup somehow fails. */
+  function resolveMatchTeamName(teamId) {
+    var team = tournamentState.teams.find(function (tm) { return tm.id === teamId; });
+    return team ? team.name : teamId;
+  }
+
+  /** Finds a match's projected entry in the current bracket resolution (any stage,
+   * round-robin or knockout) — null when no format is active or the match id is unknown. */
+  function findProjectedMatch(matchId) {
+    if (!currentResolution) return null;
+    for (var i = 0; i < currentResolution.stages.length; i++) {
+      var found = currentResolution.stages[i].matches.find(function (pm) { return pm.matchId === matchId; });
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /** One vertical card per knockout stage (D2/D5/D6), rendered below the group panels.
+   * Unresolved sides show a localized slot placeholder instead of a team name; a match's
+   * action button is offered only when the projection marks it `scorable` — resolveFormat
+   * already forces that to false for every match in an `invalid` stage, so this render
+   * guard never needs its own separate invalid-stage check. */
+  function renderStagePanel(stage) {
+    var panel = document.createElement('div');
+    panel.className = 'tournament-stage';
+    panel.dataset.stageStatus = stage.status;
+
+    var heading = document.createElement('h3');
+    heading.className = 'tournament-stage__heading';
+    heading.textContent = t(stage.label);
+    panel.appendChild(heading);
+
+    var meta = document.createElement('p');
+    meta.className = 'tournament-stage__meta';
+    meta.textContent = formatStageRuleLabel({ pointsTo: stage.pointsTo, overtime: stage.overtime }) +
+      ' · ' + formatStageStatusLabel(stage.status);
+    panel.appendChild(meta);
+
+    var ul = document.createElement('ul');
+    ul.className = 'match-list';
+
+    stage.matches.forEach(function (projected) {
+      var rawMatch = tournamentState.matches.find(function (m) { return m.id === projected.matchId; });
+      if (!rawMatch) return;
+
+      var name1 = projected.team1Id ? resolveMatchTeamName(projected.team1Id) : formatSlotLabel(projected.team1Slot);
+      var name2 = projected.team2Id ? resolveMatchTeamName(projected.team2Id) : formatSlotLabel(projected.team2Slot);
+      var hasScore = rawMatch.status !== 'pending' && rawMatch.score1 != null;
+      var isActive = scoreboardMatchId === rawMatch.id;
+
+      var li = document.createElement('li');
+      li.className = 'match-card' + (rawMatch.played ? ' match-card--played' : '') + (isActive ? ' match-card--active' : '');
+
+      var row = document.createElement('div');
+      row.className = 'match-card__row';
+
+      var teamsEl = document.createElement('span');
+      teamsEl.className = 'match-card__teams';
+      teamsEl.innerHTML = escapeHTML(name1) +
+        ' <span class="match-card__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+        escapeHTML(name2);
+
+      var scoreEl = document.createElement('span');
+      scoreEl.className = 'match-card__score' + (hasScore ? ' match-card__score--played' : '');
+      scoreEl.textContent = hasScore ? (rawMatch.score1 + ' – ' + rawMatch.score2) : '–';
+
+      row.appendChild(teamsEl);
+      row.appendChild(scoreEl);
+
+      // A single action button covers enter + edit + live tracking, all via the existing
+      // scoreboard panel (handleScoreboard pre-fills liveScore from the finished result).
+      if (!isReadOnly && projected.scorable) {
+        var btnGroup = document.createElement('div');
+        btnGroup.className = 'match-card__btn-group';
+
+        var trackBtn = document.createElement('button');
+        trackBtn.className = 'match-card__btn match-card__btn--track' + (isActive ? ' match-card__btn--track-active' : '');
+        trackBtn.type = 'button';
+        trackBtn.textContent = hasScore ? t('tournament.match.edit') : t('tournament.match.trackScore');
+        trackBtn.addEventListener('click', (function (mid) { return function () { handleScoreboard(mid); }; })(rawMatch.id));
+
+        btnGroup.appendChild(trackBtn);
+        row.appendChild(btnGroup);
+      }
+
+      li.appendChild(row);
+
+      var ruleCaption = document.createElement('p');
+      ruleCaption.className = 'match-card__rule';
+      ruleCaption.textContent = formatStageRuleLabel({ pointsTo: stage.pointsTo, overtime: stage.overtime });
+      li.appendChild(ruleCaption);
+
+      ul.appendChild(li);
+    });
+
+    panel.appendChild(ul);
+    return panel;
+  }
+
   function renderScoreboardPanel() {
     scoreboardPanelEl.innerHTML = '';
 
     var match = tournamentState.matches.find(function (m) { return m.id === scoreboardMatchId; });
     if (!match) return;
 
-    var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
-    var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
-    var name1 = team1 ? team1.name : match.team1Id;
-    var name2 = team2 ? team2.name : match.team2Id;
+    // Knockout matches persist slot-descriptor team ids forever (D3) — the real team id
+    // only ever exists in the client-side bracket projection, so a format match must be
+    // named through findProjectedMatch()/resolveMatchTeamName(), never the raw match node.
+    // findProjectedMatch() is null for classic sessions, keeping this branch byte-identical
+    // to the pre-existing lookup for every non-format tournament.
+    var projected = findProjectedMatch(match.id);
+    var name1, name2;
+    if (projected) {
+      name1 = projected.team1Id ? resolveMatchTeamName(projected.team1Id) : formatSlotLabel(projected.team1Slot);
+      name2 = projected.team2Id ? resolveMatchTeamName(projected.team2Id) : formatSlotLabel(projected.team2Slot);
+    } else {
+      var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
+      var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
+      name1 = team1 ? team1.name : match.team1Id;
+      name2 = team2 ? team2.name : match.team2Id;
+    }
     // Stage Set Rules (REQ-FMT-20) — pointsTo:null (classic/unrecognized match) means
     // unrestricted free-entry scoring, so the caption and the +/- cap below are skipped.
     var rules = rulesForMatch(tournamentState.format, match.id);

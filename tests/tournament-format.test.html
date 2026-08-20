@@ -241,6 +241,24 @@
       assert(finalStage.matches[0].scorable === true, 'resolveFormat: resolved, unplayed knockout match is scorable');
     })();
 
+    (function () {
+      // Simulate a stray/tampered slot token that validateFormat did not catch (e.g. a
+      // direct Firebase write bypassing client validation) — a stage-wide failure must
+      // fail the whole stage closed, never leaving an individually-resolved match scorable.
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      let matches = generateStageMatches(format, groups);
+      matches = matches.map((m) => (m.id === 'k-final-1' ? Object.assign({}, m, { team1Id: 'slot:A9' }) : m));
+      const groupMatches = matches.filter((m) => m.stageId === 'group');
+      groupMatches.forEach((m) => { matches = play(matches, m.id, 21, 10); });
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const finalStage = resolution.stages.find((s) => s.id === 'final');
+      assert(finalStage.status === 'invalid', 'resolveFormat: an out-of-range slot reference marks its stage invalid');
+      assert(finalStage.matches.every((m) => m.scorable === false),
+        'resolveFormat: every match in an invalid stage is never scorable, even if individually resolved');
+    })();
+
     // ─── rulesForMatch ──────────────────────────────────────────────────────
 
     heading('rulesForMatch');

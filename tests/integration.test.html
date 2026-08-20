@@ -173,6 +173,30 @@
               <button class="tournament-setup__opt" data-groups="3" type="button">A–C</button>
               <button class="tournament-setup__opt" data-groups="4" type="button">A–D</button>
             </div>
+            <div class="format-setup" id="format-setup">
+              <span class="tournament-setup__label" data-i18n="tournament.format.presetLabel">Format:</span>
+              <div class="format-setup__presets" id="format-preset-options">
+                <button class="format-setup__opt format-setup__opt--active" data-preset="classic" type="button"
+                        data-i18n="tournament.format.preset.classic">Classic</button>
+                <button class="format-setup__opt" data-preset="groupsTo" type="button"
+                        data-i18n="tournament.format.preset.groupsTo">Groups Only</button>
+                <button class="format-setup__opt" data-preset="groupsFinal" type="button"
+                        data-i18n="tournament.format.preset.groupsFinal">Groups + Final</button>
+                <button class="format-setup__opt" id="format-preset-crossover" data-preset="crossover" type="button" hidden
+                        data-i18n="tournament.format.preset.crossover">Reference (2×4)</button>
+              </div>
+              <div class="format-editor" id="format-editor" hidden>
+                <div class="format-editor__stages" id="format-stages"></div>
+                <div class="format-editor__group">
+                  <label class="form__label" for="format-custom-rules"
+                         data-i18n="tournament.format.customRules">Custom rules note (optional)</label>
+                  <textarea class="form__input format-editor__textarea" id="format-custom-rules" maxlength="500" rows="3"
+                            data-i18n-placeholder="tournament.format.customRulesHint"></textarea>
+                  <p class="format-editor__hint" id="format-custom-rules-count">0 / 500</p>
+                </div>
+              </div>
+              <p class="form__error" id="format-error" role="alert" aria-live="polite"></p>
+            </div>
             <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
               Start Tournament
             </button>
@@ -287,8 +311,15 @@
           <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
           <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
         </div>
+        <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
+          <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
+          <p class="tournament-custom-rules__text" id="tournament-custom-rules-text"></p>
+        </details>
         <div class="tournament-groups" id="tournament-groups">
           <!-- Group panels rendered by JS -->
+        </div>
+        <div class="tournament-stages" id="tournament-stages" hidden>
+          <!-- Knockout stage panels rendered by JS (formatted sessions only) -->
         </div>
         <div class="scoreboard-panel" id="scoreboard-panel" hidden></div>
       </section>
@@ -299,6 +330,7 @@
   <script src="../js/player-import.js"></script>
   <script src="../js/i18n.js"></script>
   <script src="../js/tournament.js"></script>
+  <script src="../js/tournament-format.js"></script>
   <script>
     var testRepository = {
       listener: null, tournament: null, saveOutcome: { status: 'synced' },
@@ -789,6 +821,141 @@
       appFrame.style.cssText = 'display:block;width:320px';
       assert(appFrame.scrollWidth <= appFrame.clientWidth && Array.from(document.querySelectorAll('.match-filters__btn')).every(function (button) { return button.getBoundingClientRect().height >= 44; }), 'Scoring mobile: 320px has no overflow and filter targets are at least 44px');
       appFrame.style.cssText = '';
+
+      // ===== REFERENCE FORMAT END-TO-END (2×4 crossover bracket, REQ-FMT-01..05/09/23) =====
+      await (async function () {
+        setLanguage('en');
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: testRepository.tournament });
+        await Promise.resolve(); await Promise.resolve();
+        var savedConfirm = window.confirm;
+        window.confirm = function () { return true; };
+        document.getElementById('reset-tournament-btn').click();
+        document.getElementById('clear-btn').click();
+
+        document.getElementById('type-2v2-btn').click();
+        document.getElementById('mode-random-btn').click();
+        for (var i = 1; i <= 8; i++) {
+          addPlayer('T' + i + 'x', i % 2 ? 'male' : 'female');
+          addPlayer('T' + i + 'y', i % 2 ? 'female' : 'male');
+        }
+        document.getElementById('mode-manual-btn').click();
+
+        function pairManual(nameA, nameB) {
+          var selectors = document.querySelectorAll('.manual-pairing__selector-group select');
+          var optA = Array.from(selectors[0].options).find(function (o) { return o.textContent === nameA; });
+          selectors[0].value = optA.value; selectors[0].dispatchEvent(new Event('change'));
+          selectors = document.querySelectorAll('.manual-pairing__selector-group select');
+          var optB = Array.from(selectors[1].options).find(function (o) { return o.textContent === nameB; });
+          selectors[1].value = optB.value; selectors[1].dispatchEvent(new Event('change'));
+          document.getElementById('manual-pair-btn').click();
+        }
+        for (var i = 1; i <= 8; i++) pairManual('T' + i + 'x', 'T' + i + 'y');
+        document.getElementById('confirm-manual-btn').click();
+        assert(document.querySelectorAll('#couples-grid .couple-card').length === 8, 'Reference format: 8 manually-paired teams generated');
+
+        document.querySelector('#group-count-options [data-groups="2"]').click();
+        assert(!document.getElementById('format-preset-crossover').hidden, 'Reference format: crossover preset is offered for 2 groups of 4');
+        document.getElementById('format-preset-crossover').click();
+        var pointsValues = Array.from(document.querySelectorAll('.format-editor__points')).map(function (inp) { return inp.value; });
+        assert(pointsValues.join(',') === '11,15,15,20', 'Reference format: preset defaults are group 11 / qf 15 / sf 15 / final 20', pointsValues.join(','));
+
+        document.getElementById('start-tournament-btn').click();
+        await Promise.resolve(); await Promise.resolve();
+
+        assert(!document.getElementById('tournament-stages').hidden, 'Reference format: knockout stage panels are visible for a formatted session');
+        var stagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(stagePanels.length === 3, 'Reference format: 3 knockout stage panels rendered (qf, sf, final)', String(stagePanels.length));
+        assert(stagePanels[0].textContent.includes('Quarterfinals') && stagePanels[0].textContent.includes('Rank 1') && stagePanels[0].textContent.includes('Group A'),
+          'Reference format: unresolved qf slot shows a localized group-rank placeholder');
+        assert(stagePanels[1].textContent.includes('Winner of Quarterfinals'), 'Reference format: unresolved sf slot shows a localized "Winner of" placeholder');
+        assert(!document.querySelector('#tournament-stages .match-card__btn--track'), 'Reference format: no knockout match is scorable before its slots resolve');
+
+        var teamIds = testRepository.tournament.teams.map(function (tm) { return tm.id; });
+        assert(testRepository.tournament.teams[0].name.indexOf('T1x') !== -1 && testRepository.tournament.teams[7].name.indexOf('T8x') !== -1,
+          'Reference format: manual pairing confirmation order becomes team ids t0..t7 (T1..T8)');
+        var teamId = {};
+        for (var n = 1; n <= 8; n++) teamId['T' + n] = teamIds[n - 1];
+
+        function withResults(tournament, resultsByMatchId) {
+          var matches = tournament.matches.map(function (m) {
+            var r = resultsByMatchId[m.id];
+            if (!r) return m;
+            return Object.assign({}, m, { score1: r[0], score2: r[1], played: true, status: 'finished', revision: (m.revision || 0) + 1 });
+          });
+          return Object.assign({}, tournament, { matches: matches });
+        }
+
+        // Group A: T1 > T2 > T3 > T4. Group B: T5 > T6 > T7 > T8 — a clean win-count
+        // ranking with no ties (tiebreak determinism is unit-tested separately).
+        var groupResults = {};
+        [
+          ['A', teamId.T1, teamId.T2], ['A', teamId.T1, teamId.T3], ['A', teamId.T1, teamId.T4],
+          ['A', teamId.T2, teamId.T3], ['A', teamId.T2, teamId.T4], ['A', teamId.T3, teamId.T4],
+          ['B', teamId.T5, teamId.T6], ['B', teamId.T5, teamId.T7], ['B', teamId.T5, teamId.T8],
+          ['B', teamId.T6, teamId.T7], ['B', teamId.T6, teamId.T8], ['B', teamId.T7, teamId.T8],
+        ].forEach(function (row) {
+          var groupId = row[0], winnerId = row[1], loserId = row[2];
+          var match = testRepository.tournament.matches.find(function (m) {
+            return m.groupId === groupId && ((m.team1Id === winnerId && m.team2Id === loserId) || (m.team1Id === loserId && m.team2Id === winnerId));
+          });
+          groupResults[match.id] = [match.team1Id === winnerId ? 11 : 6, match.team2Id === winnerId ? 11 : 6];
+        });
+        testRepository.tournament = withResults(testRepository.tournament, groupResults);
+        testRepository.emit({ role: 'owner', tournament: testRepository.tournament });
+        await Promise.resolve(); await Promise.resolve();
+
+        // Crossover pairs: qf1 A1×B4, qf2 B1×A4, qf3 A2×B3, qf4 B2×A3 (team1 = the pair's
+        // first slot) — T1/T5/T2/T6 always sit on team1, matching the champion's path below.
+        stagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(stagePanels[0].textContent.includes('T1x') && stagePanels[0].textContent.includes('T8x'), 'Reference format: qf1 resolves to A1 vs B4 (T1 vs T8)');
+        assert(stagePanels[0].textContent.includes('T5x') && stagePanels[0].textContent.includes('T4x'), 'Reference format: qf2 resolves to B1 vs A4 (T5 vs T4)');
+        assert(stagePanels[0].textContent.includes('T2x') && stagePanels[0].textContent.includes('T7x'), 'Reference format: qf3 resolves to A2 vs B3 (T2 vs T7)');
+        assert(stagePanels[0].textContent.includes('T6x') && stagePanels[0].textContent.includes('T3x'), 'Reference format: qf4 resolves to B2 vs A3 (T6 vs T3)');
+        assert(document.querySelectorAll('#tournament-stages .match-card__btn--track').length === 4, 'Reference format: all 4 qf matches become scorable once the group stage completes');
+        assert(stagePanels[1].textContent.includes('Winner of Quarterfinals'), 'Reference format: sf still shows placeholders before qf is played');
+
+        testRepository.tournament = withResults(testRepository.tournament, {
+          'k-qf-1': [15, 10], 'k-qf-2': [15, 10], 'k-qf-3': [15, 10], 'k-qf-4': [15, 10],
+        });
+        testRepository.emit({ role: 'owner', tournament: testRepository.tournament });
+        await Promise.resolve(); await Promise.resolve();
+
+        stagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(stagePanels[1].textContent.includes('T1x') && stagePanels[1].textContent.includes('T2x'), 'Reference format: sf1 resolves to winner(qf1) vs winner(qf3) = T1 vs T2');
+        assert(stagePanels[1].textContent.includes('T5x') && stagePanels[1].textContent.includes('T6x'), 'Reference format: sf2 resolves to winner(qf2) vs winner(qf4) = T5 vs T6');
+        assert(stagePanels[2].textContent.includes('Winner of Semifinals'), 'Reference format: final still shows a placeholder before sf is played');
+
+        testRepository.tournament = withResults(testRepository.tournament, { 'k-sf-1': [15, 10], 'k-sf-2': [15, 10] });
+        testRepository.emit({ role: 'owner', tournament: testRepository.tournament });
+        await Promise.resolve(); await Promise.resolve();
+
+        stagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(stagePanels[2].textContent.includes('T1x') && stagePanels[2].textContent.includes('T5x'), 'Reference format: final resolves to winner(sf1) vs winner(sf2) = T1 vs T5');
+        assert(!document.querySelector('.tournament-complete'), 'Reference format: tournament is not complete before the final is played');
+
+        testRepository.tournament = withResults(testRepository.tournament, { 'k-final-1': [20, 15] });
+        testRepository.emit({ role: 'owner', tournament: testRepository.tournament });
+        await Promise.resolve(); await Promise.resolve();
+
+        assert(!!document.querySelector('.tournament-complete'), 'Reference format: complete banner uses resolveFormat(...).complete once the final is played');
+        stagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(Array.from(stagePanels).every(function (p) { return p.textContent.includes('Finished'); }), 'Reference format: every stage panel reports Finished once its matches are all played');
+        assert(stagePanels[2].textContent.includes('20') && stagePanels[2].textContent.includes('15'), 'Reference format: final score (20–15) is rendered');
+
+        // Determinism (REQ-FMT-05): identical results, shuffled match array order → identical bracket.
+        var shuffled = Object.assign({}, testRepository.tournament, { matches: testRepository.tournament.matches.slice().reverse() });
+        testRepository.emit({ role: 'owner', tournament: shuffled });
+        await Promise.resolve(); await Promise.resolve();
+        stagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(stagePanels[2].textContent.includes('T1x') && stagePanels[2].textContent.includes('T5x'), 'Reference format: shuffled match array order yields the identical bracket (determinism)');
+
+        // 320px check (REQ-FMT-09) — no horizontal overflow, 44px touch targets on stage actions.
+        appFrame.style.cssText = 'display:block;width:320px';
+        assert(appFrame.scrollWidth <= appFrame.clientWidth, 'Reference format: knockout stage panels fit 320px with no horizontal overflow');
+        appFrame.style.cssText = '';
+
+        window.confirm = savedConfirm;
+      })();
 
       // ===== Summary =====
       const total = passed + failed;
