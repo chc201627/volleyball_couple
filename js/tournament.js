@@ -10,7 +10,7 @@
  *   createGroups(teams)
  *   generateMatches(groups)
  *   projectMatchResults(matches, resultsByMatchId)
- *   calculateStandings(groups, matches)
+ *   calculateStandings(groups, matches, options)
  *   recordMatchScore(matches, matchId, score1, score2)
  *   isTournamentComplete(matches)
  */
@@ -186,27 +186,28 @@ function projectMatchResults(matches, resultsByMatchId) {
 /**
  * Calculate current standings for all groups from match results.
  * Win = 3 points, Loss = 0 points, no draws.
- * Tiebreaker: set differential (setsFor - setsAgainst) DESC, then setsFor DESC.
+ * Default chain (options omitted, classic/legacy sessions, byte-for-bit
+ * unchanged): points DESC → set differential DESC → setsFor DESC.
+ * With `options.extendedTiebreak === true` (formatted sessions only), a
+ * `h2hWins` scalar — precomputed per tie cluster BEFORE sorting, never a
+ * pairwise comparator, so the total order stays transitive even under a
+ * 3-way circular tie (D8) — and stable `entryIndex` extend the chain so
+ * ties are provably impossible.
  *
  * @param {Array<{ id: string, teams: Array }>} groups
  * @param {Array<{ id, groupId, team1Id, team2Id, score1, score2, played }>} matches
- * @returns {Map<string, Array<{
- *   teamId: string,
- *   played: number,
- *   won: number,
- *   lost: number,
- *   points: number,
- *   setsFor: number,
- *   setsAgainst: number
- * }>>}
+ * @param {{ extendedTiebreak?: boolean }} [options]
+ * @returns {Map<string, Array<{ teamId, played, won, lost, points, setsFor, setsAgainst,
+ *   h2hWins?, entryIndex? }>>}
  */
-function calculateStandings(groups, matches) {
+function calculateStandings(groups, matches, options) {
+  var extended = !!(options && options.extendedTiebreak);
   var result = new Map();
 
   groups.forEach(function (group) {
     // Initialize standings for each team in this group
     var standingsMap = {};
-    group.teams.forEach(function (team) {
+    group.teams.forEach(function (team, index) {
       standingsMap[team.id] = {
         teamId: team.id,
         played: 0,
@@ -216,6 +217,7 @@ function calculateStandings(groups, matches) {
         setsFor: 0,
         setsAgainst: 0,
       };
+      if (extended) standingsMap[team.id].entryIndex = index;
     });
 
     // Process all played matches in this group
@@ -244,13 +246,43 @@ function calculateStandings(groups, matches) {
       }
     });
 
-    // Sort: points DESC → set differential DESC → setsFor DESC
-    var sorted = Object.values(standingsMap).sort(function (a, b) {
+    var records = Object.values(standingsMap);
+
+    if (extended) {
+      // Partition into tie clusters on (points, diff, setsFor), then
+      // precompute each team's h2hWins as a mini-league win count *within
+      // its own cluster* — a scalar, not a pairwise comparison (D8).
+      var clusters = {};
+      records.forEach(function (r) {
+        var key = r.points + '|' + (r.setsFor - r.setsAgainst) + '|' + r.setsFor;
+        (clusters[key] = clusters[key] || []).push(r);
+      });
+      Object.keys(clusters).forEach(function (key) {
+        var cluster = clusters[key];
+        cluster.forEach(function (r) { r.h2hWins = 0; });
+        if (cluster.length < 2) return;
+        var clusterIds = cluster.map(function (r) { return r.teamId; });
+        matches.forEach(function (match) {
+          if (match.groupId !== group.id || !match.played) return;
+          if (clusterIds.indexOf(match.team1Id) === -1 || clusterIds.indexOf(match.team2Id) === -1) return;
+          var winnerId = match.score1 > match.score2 ? match.team1Id : match.team2Id;
+          var winnerRecord = cluster.filter(function (r) { return r.teamId === winnerId; })[0];
+          if (winnerRecord) winnerRecord.h2hWins++;
+        });
+      });
+    }
+
+    // Sort: points DESC → set differential DESC → setsFor DESC →
+    // [extended only] h2hWins DESC → entryIndex ASC
+    var sorted = records.sort(function (a, b) {
       if (b.points !== a.points) return b.points - a.points;
       var diffA = a.setsFor - a.setsAgainst;
       var diffB = b.setsFor - b.setsAgainst;
       if (diffB !== diffA) return diffB - diffA;
-      return b.setsFor - a.setsFor;
+      if (b.setsFor !== a.setsFor) return b.setsFor - a.setsFor;
+      if (!extended) return 0;
+      if (b.h2hWins !== a.h2hWins) return b.h2hWins - a.h2hWins;
+      return a.entryIndex - b.entryIndex;
     });
 
     result.set(group.id, sorted);
