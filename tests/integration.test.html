@@ -331,6 +331,7 @@
   <script src="../js/i18n.js"></script>
   <script src="../js/tournament.js"></script>
   <script src="../js/tournament-format.js"></script>
+  <script src="../js/tournament-repository.js"></script>
   <script>
     var testRepository = {
       listener: null, tournament: null, saveOutcome: { status: 'synced' },
@@ -955,6 +956,91 @@
         appFrame.style.cssText = '';
 
         window.confirm = savedConfirm;
+      })();
+
+      // ===== HOTFIX v1.8.1 — REAL repository decode round trip (fix/format-pairs-rehydration) =====
+      // `testRepository.emit()` above echoes `tournament` straight back unchanged, so every
+      // "Reference format" assertion ran against the in-memory format object exactly as
+      // `handleStartTournament` built it — never against what a real Firebase round trip
+      // produces. That is why this suite never caught the production defect: after a real
+      // session sync, `encodeFormat()` strips each stage's `pairs` (D3) and the OLD
+      // `decodeFormat()` never rebuilt it, so `isValidToken()`'s `winner:` branch read
+      // `undefined.length` and `resolveFormat()` marked Semifinals/Final "Invalid
+      // configuration" (unscorable) even though Quarterfinals — which only uses `slot:`
+      // tokens — looked fine. This block substitutes the REAL
+      // `createInMemoryTournamentRepository` (now loaded above) for one genuine
+      // encode/decode/saveResult round trip and re-emits its decoded snapshot into app.js's
+      // real listener, exactly like the Firebase adapter's `watchSession` would.
+      await (async function () {
+        setLanguage('en');
+        var realRepo = createInMemoryTournamentRepository({ uid: 'hotfix-owner-1', now: function () { return 9500; } });
+
+        function hfTeam(i) {
+          var players = [{ id: 'hfp' + (i * 2), name: 'P' + (i * 2) }, { id: 'hfp' + (i * 2 + 1), name: 'P' + (i * 2 + 1) }];
+          return { id: 'hf' + i, name: 'HF' + i, players: players, player1: players[0], player2: players[1] };
+        }
+        var hfTeams = [0, 1, 2, 3, 4, 5, 6, 7].map(hfTeam);
+        var hfGroups = [{ id: 'A', teams: hfTeams.slice(0, 4) }, { id: 'B', teams: hfTeams.slice(4, 8) }];
+        var hfFormat = presetFormat('crossover', hfGroups);
+        var hfMatches = generateStageMatches(hfFormat, hfGroups);
+        var hfTournament = {
+          players: hfTeams.reduce(function (acc, t) { return acc.concat(t.players); }, []),
+          teams: hfTeams, groups: hfGroups, matches: hfMatches, format: hfFormat,
+        };
+
+        var hfCreated = await realRepo.createSession(hfTournament);
+        var hfDecoded;
+        realRepo.watchSession(hfCreated.sessionId, function (v) { hfDecoded = v; });
+        assert(hfDecoded.schemaVersion === 3, 'HOTFIX v1.8.1: real repository round trip creates a schema-v3 session for the crossover format');
+
+        // Play the group stage through the REAL repository (real saveResult transactions).
+        var hfGroupIds = hfDecoded.tournament.matches.filter(function (m) { return m.stageId === 'group'; }).map(function (m) { return m.id; });
+        for (var gi = 0; gi < hfGroupIds.length; gi++) {
+          var gm = hfDecoded.tournament.matches.find(function (m) { return m.id === hfGroupIds[gi]; });
+          var gi1 = parseInt(gm.team1Id.slice(2), 10), gi2 = parseInt(gm.team2Id.slice(2), 10);
+          await realRepo.saveResult(hfCreated.sessionId, {
+            matchId: gm.id, score1: gi1 < gi2 ? 11 : 6, score2: gi1 < gi2 ? 6 : 11, status: 'finished', expectedRevision: 0,
+          });
+        }
+
+        // Feed the genuinely decoded (post-round-trip) snapshot into app.js's real listener —
+        // this is the exact path an auto-created online session's subscribed snapshot takes.
+        testRepository.emit({ role: 'owner', tournament: hfDecoded.tournament });
+        await Promise.resolve(); await Promise.resolve();
+
+        var hfStagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(hfStagePanels.length === 3 && Array.from(hfStagePanels).every(function (p) { return p.dataset.stageStatus !== 'invalid'; }),
+          'HOTFIX v1.8.1: qf/sf/final stay out of "Invalid configuration" after a real decode round trip',
+          Array.from(hfStagePanels).map(function (p) { return p.dataset.stageStatus; }).join(','));
+        assert(document.querySelectorAll('#tournament-stages .match-card__btn--track').length === 4,
+          'HOTFIX v1.8.1: all 4 qf matches remain scorable after a real decode round trip');
+
+        // Play qf through the repository (resolving the real seeded teams via resolveFormat,
+        // since a decoded match's team1Id/team2Id stays a slot descriptor forever — D3), then
+        // decode again and confirm sf resolves its winner: tokens — the exact branch that
+        // failed before this hotfix (isValidToken read undefined pairs.length).
+        var hfStandings = calculateStandings(hfDecoded.tournament.groups, hfDecoded.tournament.matches, { extendedTiebreak: true });
+        var hfResolution = resolveFormat(hfDecoded.tournament.format, {
+          groups: hfDecoded.tournament.groups, matches: hfDecoded.tournament.matches, standings: hfStandings,
+        });
+        var hfQfStage = hfResolution.stages.find(function (s) { return s.id === 'qf'; });
+        for (var qi = 0; qi < hfQfStage.matches.length; qi++) {
+          var qm = hfQfStage.matches[qi];
+          var qi1 = parseInt(qm.team1Id.slice(2), 10), qi2 = parseInt(qm.team2Id.slice(2), 10);
+          await realRepo.saveResult(hfCreated.sessionId, {
+            matchId: qm.matchId, score1: qi1 < qi2 ? 15 : 10, score2: qi1 < qi2 ? 10 : 15, status: 'finished', expectedRevision: 0,
+          });
+        }
+        testRepository.emit({ role: 'owner', tournament: hfDecoded.tournament });
+        await Promise.resolve(); await Promise.resolve();
+
+        hfStagePanels = document.querySelectorAll('#tournament-stages .tournament-stage');
+        assert(Array.from(hfStagePanels).every(function (p) { return p.dataset.stageStatus !== 'invalid'; }) &&
+          hfStagePanels[1].textContent.indexOf('Winner of Quarterfinals') === -1,
+          'HOTFIX v1.8.1: sf resolves winner: tokens from a real decoded snapshot (was "Invalid configuration" pre-fix)',
+          hfStagePanels[1].textContent);
+        assert(document.querySelectorAll('#tournament-stages .match-card__btn--track').length === 2,
+          'HOTFIX v1.8.1: sf matches become scorable after a real decode round trip resolves qf winners');
       })();
 
       // ===== LOCAL FORMAT PERSISTENCE REGRESSION (PR5 — commitScore local save path) =====

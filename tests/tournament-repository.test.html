@@ -154,8 +154,18 @@
         assert(formatSnapshot.tournament.format.stagesById.final.pointsTo === 15 &&
           formatSnapshot.tournament.format.stagesById.final.overtime === false,
           'v3 round-trip preserves per-stage pointsTo/overtime');
-        assert(formatSnapshot.tournament.format.stagesById.final.pairs === undefined,
-          'the persisted format never stores authoring-time pairs (D3)');
+        // HOTFIX v1.8.1: `pairs` is still never PERSISTED (D3) — but decodeFormat() now
+        // rehydrates it at decode time from the stage's match nodes (team1Id/team2Id are
+        // never mutated after creation) so the decoded runtime format keeps the engine
+        // invariant "a format always carries pairs" that isValidToken()'s winner: branch and
+        // validateFormat() both depend on. Previously this asserted `pairs === undefined`
+        // post-decode, which was the root cause reproduced below.
+        assert(Array.isArray(formatSnapshot.tournament.format.stagesById.final.pairs) &&
+          formatSnapshot.tournament.format.stagesById.final.pairs.length === 1 &&
+          formatSnapshot.tournament.format.stagesById.final.pairs[0][0] === 'slot:A1' &&
+          formatSnapshot.tournament.format.stagesById.final.pairs[0][1] === 'slot:A2',
+          'v3 round-trip rehydrates knockout pairs from the decoded match nodes',
+          JSON.stringify(formatSnapshot.tournament.format.stagesById.final.pairs));
         const knockoutMatch = formatSnapshot.tournament.matches.filter(m => m.id.indexOf('k-') === 0)[0];
         assert(knockoutMatch && knockoutMatch.team1Id === 'slot:A1' && knockoutMatch.team2Id === 'slot:A2',
           'v3 round-trip preserves knockout slot descriptors');
@@ -178,6 +188,117 @@
         classicRepo.watchSession(classicCreated.sessionId, value => { classicSnapshot = value; });
         assert(classicSnapshot.schemaVersion === 2 && classicSnapshot.tournament.format === null,
           'a classic tournament (no format) still creates a byte-identical schema-v2 session');
+
+        // HOTFIX v1.8.1 (fix/format-pairs-rehydration) — decode-time pairs rehydration.
+        // Production bug: encodeFormat() strips every stage's `pairs` (D3 — matches are the
+        // runtime source of truth), but isValidToken()'s `winner:` branch read
+        // `srcStage.pairs.length`, which was `undefined` post-decode, so EVERY
+        // `winner:k-<stage>-<n>` token failed validation and resolveFormat() marked every
+        // stage after the first knockout stage "Invalid configuration" (unscorable). QF was
+        // unaffected because `slot:` tokens don't consult `pairs`. This block reproduces the
+        // bug via a real encode/decode round trip of a crossover format (2 groups of 4 -> qf
+        // -> sf -> final, sf/final both keyed on winner: tokens) and proves the decoded format
+        // stays valid and scorable end to end.
+        function crossoverFixture() {
+          const teams = [];
+          for (let i = 0; i < 8; i++) {
+            const p1 = { id: 'cp' + (i * 2), name: 'P' + (i * 2) };
+            const p2 = { id: 'cp' + (i * 2 + 1), name: 'P' + (i * 2 + 1) };
+            teams.push({ id: 'ct' + i, name: 'Team ' + i, players: [p1, p2], player1: p1, player2: p2 });
+          }
+          const groups = [{ id: 'A', teams: teams.slice(0, 4) }, { id: 'B', teams: teams.slice(4, 8) }];
+          const format = presetFormat('crossover', groups);
+          const matches = generateStageMatches(format, groups);
+          const players = teams.reduce((acc, t) => acc.concat(t.players), []);
+          return { players, teams, groups, matches, format };
+        }
+        function indexStages(resolution) {
+          const map = {};
+          resolution.stages.forEach(s => { map[s.id] = s; });
+          return map;
+        }
+
+        const crossover = crossoverFixture();
+        const crossoverRepo = createInMemoryTournamentRepository({ uid: 'owner-5', now: () => 5000 });
+        const crossoverCreated = await crossoverRepo.createSession(crossover);
+        let crossoverSnapshot;
+        crossoverRepo.watchSession(crossoverCreated.sessionId, value => { crossoverSnapshot = value; });
+        assert(crossoverSnapshot.schemaVersion === 3, 'HOTFIX v1.8.1: crossover format creates a schema-v3 session');
+
+        // Pre-fix, this failed: validateFormat rejected the decoded format's sf/final stages
+        // (unresolvable `winner:` tokens), and resolveFormat marked them invalid immediately,
+        // even before the group stage was played.
+        const preValidation = validateFormat(crossoverSnapshot.tournament.format, crossoverSnapshot.tournament.groups);
+        assert(preValidation.valid === true,
+          'HOTFIX v1.8.1: the decoded (post-Firebase-sync) crossover format passes validateFormat',
+          JSON.stringify(preValidation.errors));
+        const preStandings = calculateStandings(crossoverSnapshot.tournament.groups, crossoverSnapshot.tournament.matches, { extendedTiebreak: true });
+        const preStages = indexStages(resolveFormat(crossoverSnapshot.tournament.format, {
+          groups: crossoverSnapshot.tournament.groups, matches: crossoverSnapshot.tournament.matches, standings: preStandings,
+        }));
+        assert(preStages.qf.status !== 'invalid' && preStages.sf.status !== 'invalid' && preStages.final.status !== 'invalid',
+          'HOTFIX v1.8.1: qf/sf/final all stay out of "Invalid configuration" before any result is saved',
+          JSON.stringify({ qf: preStages.qf.status, sf: preStages.sf.status, final: preStages.final.status }));
+
+        // Play every group-stage match (lower global team index always wins -> a clean,
+        // tie-free ranking) through the real repository, exactly like the online path.
+        const groupMatchIds = crossoverSnapshot.tournament.matches.filter(m => m.stageId === 'group').map(m => m.id);
+        for (const matchId of groupMatchIds) {
+          const match = crossoverSnapshot.tournament.matches.find(m => m.id === matchId);
+          const i1 = parseInt(match.team1Id.slice(2), 10);
+          const i2 = parseInt(match.team2Id.slice(2), 10);
+          await crossoverRepo.saveResult(crossoverCreated.sessionId, {
+            matchId, score1: i1 < i2 ? 11 : 6, score2: i1 < i2 ? 6 : 11, status: 'finished', expectedRevision: 0,
+          });
+        }
+        const groupStandings = calculateStandings(crossoverSnapshot.tournament.groups, crossoverSnapshot.tournament.matches, { extendedTiebreak: true });
+        const groupStages = indexStages(resolveFormat(crossoverSnapshot.tournament.format, {
+          groups: crossoverSnapshot.tournament.groups, matches: crossoverSnapshot.tournament.matches, standings: groupStandings,
+        }));
+        assert(groupStages.qf.status === 'active' && groupStages.qf.matches.every(m => m.resolved && m.scorable),
+          'HOTFIX v1.8.1: qf locks in real teams once the (decoded) group stage completes',
+          JSON.stringify(groupStages.qf));
+        assert(groupStages.sf.status !== 'invalid' && groupStages.final.status !== 'invalid',
+          'HOTFIX v1.8.1: sf/final stay scorable once qf teams are known but qf is unplayed');
+
+        // Play qf, then confirm sf resolves its winner: tokens — the exact isValidToken()
+        // branch that read undefined pairs.length before this hotfix.
+        for (const m of groupStages.qf.matches) {
+          const i1 = parseInt(m.team1Id.slice(2), 10);
+          const i2 = parseInt(m.team2Id.slice(2), 10);
+          await crossoverRepo.saveResult(crossoverCreated.sessionId, {
+            matchId: m.matchId, score1: i1 < i2 ? 15 : 10, score2: i1 < i2 ? 10 : 15, status: 'finished', expectedRevision: 0,
+          });
+        }
+        const sfStandings = calculateStandings(crossoverSnapshot.tournament.groups, crossoverSnapshot.tournament.matches, { extendedTiebreak: true });
+        const sfStages = indexStages(resolveFormat(crossoverSnapshot.tournament.format, {
+          groups: crossoverSnapshot.tournament.groups, matches: crossoverSnapshot.tournament.matches, standings: sfStandings,
+        }));
+        assert(sfStages.sf.status === 'active' && sfStages.sf.matches.every(m => m.resolved && m.scorable),
+          'HOTFIX v1.8.1: sf resolves winner: tokens from decoded qf results (was "Invalid configuration" pre-fix)',
+          JSON.stringify(sfStages.sf));
+        assert(sfStages.final.status !== 'invalid',
+          'HOTFIX v1.8.1: final stays scorable (not invalid) while sf is unplayed');
+
+        // D3 must still hold: `pairs` is never persisted, only rebuilt at decode time from
+        // the match nodes. Prove derivation-from-matches (not a smuggled persisted value) by
+        // decoding a session whose knockout match tokens were swapped relative to the
+        // authoring-time format.pairs — the decoded pairs must follow the MATCHES.
+        const swapFixture = crossoverFixture();
+        swapFixture.matches = swapFixture.matches.map(m => {
+          if (m.id !== 'k-final-1' && m.id.indexOf('k-') !== 0) return m; // keep qf/sf/group as generated
+          if (m.id === 'k-qf-1') return Object.assign({}, m, { team1Id: m.team2Id, team2Id: m.team1Id });
+          return m;
+        });
+        const swapRepo = createInMemoryTournamentRepository({ uid: 'owner-6', now: () => 6000 });
+        const swapCreated = await swapRepo.createSession(swapFixture);
+        let swapSnapshot;
+        swapRepo.watchSession(swapCreated.sessionId, value => { swapSnapshot = value; });
+        const originalQf1 = swapFixture.format.stagesById.qf.pairs[0];
+        const decodedQf1 = swapSnapshot.tournament.format.stagesById.qf.pairs[0];
+        assert(decodedQf1[0] === originalQf1[1] && decodedQf1[1] === originalQf1[0],
+          'HOTFIX v1.8.1: decoded pairs are derived from the persisted match nodes, not a persisted format.pairs field (D3 still holds)',
+          JSON.stringify({ original: originalQf1, decoded: decodedQf1 }));
       } catch (error) {
         assert(false, 'repository suite completes without an unexpected error', error && error.message);
       }
