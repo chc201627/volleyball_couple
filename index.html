@@ -271,6 +271,21 @@
       <div class="tournament-readonly-banner" id="readonly-banner" hidden>
         <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
       </div>
+      <div class="tournament-ops" id="tournament-ops" hidden>
+        <p id="access-status" class="tournament-ops__status" role="status" aria-live="polite"></p>
+        <div id="access-request" class="access-request" hidden>
+          <input id="access-label" class="form__input" maxlength="50" data-i18n-placeholder="tournament.access.label" data-i18n-aria-label="tournament.access.label">
+          <button id="request-access-btn" class="btn btn--primary" type="button" data-i18n="tournament.access.request">Request scoring access</button>
+        </div>
+        <ul id="access-members" class="access-members" hidden></ul>
+        <div id="match-filters" class="match-filters" role="group" data-i18n-aria-label="tournament.filter.label">
+          <button class="match-filters__btn match-filters__btn--active" type="button" data-filter="pending" data-i18n="tournament.filter.pending">Pending</button>
+          <button class="match-filters__btn" type="button" data-filter="live" data-i18n="tournament.filter.live">Live</button>
+          <button class="match-filters__btn" type="button" data-filter="finished" data-i18n="tournament.filter.finished">Finished</button>
+        </div>
+        <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
+        <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
+      </div>
       <div class="tournament-groups" id="tournament-groups">
         <!-- Group panels rendered by JS -->
       </div>

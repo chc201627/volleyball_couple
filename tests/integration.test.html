@@ -272,9 +272,25 @@
         <div class="tournament-readonly-banner" id="readonly-banner" hidden>
           <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
         </div>
+        <div class="tournament-ops" id="tournament-ops" hidden>
+          <p id="access-status" class="tournament-ops__status" role="status" aria-live="polite"></p>
+          <div id="access-request" class="access-request" hidden>
+            <input id="access-label" class="form__input" maxlength="50" data-i18n-placeholder="tournament.access.label" data-i18n-aria-label="tournament.access.label">
+            <button id="request-access-btn" class="btn btn--primary" type="button" data-i18n="tournament.access.request">Request scoring access</button>
+          </div>
+          <ul id="access-members" class="access-members" hidden></ul>
+          <div id="match-filters" class="match-filters" role="group" data-i18n-aria-label="tournament.filter.label">
+            <button class="match-filters__btn match-filters__btn--active" type="button" data-filter="pending" data-i18n="tournament.filter.pending">Pending</button>
+            <button class="match-filters__btn" type="button" data-filter="live" data-i18n="tournament.filter.live">Live</button>
+            <button class="match-filters__btn" type="button" data-filter="finished" data-i18n="tournament.filter.finished">Finished</button>
+          </div>
+          <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
+          <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
+        </div>
         <div class="tournament-groups" id="tournament-groups">
           <!-- Group panels rendered by JS -->
         </div>
+        <div class="scoreboard-panel" id="scoreboard-panel" hidden></div>
       </section>
     </main>
   </div>
@@ -282,6 +298,22 @@
   <script src="../js/pairing.js"></script>
   <script src="../js/player-import.js"></script>
   <script src="../js/i18n.js"></script>
+  <script src="../js/tournament.js"></script>
+  <script>
+    var testRepository = {
+      listener: null, tournament: null, saveOutcome: { status: 'synced' },
+      createSession: function (value) { this.tournament = value; return Promise.resolve({ status: 'synced', sessionId: 'mobile-session' }); },
+      watchSession: function (id, listener) { this.listener = listener; return function () {}; },
+      emit: function (value) { this.listener(Object.assign({ schemaVersion: 2, legacy: false, tournament: this.tournament, authState: 'ready', connection: 'online', role: 'owner', accessStatus: 'approved', requests: {} }, value)); },
+      requestAccess: function (id, label) { this.requestedLabel = label; return Promise.resolve({ status: 'requested' }); },
+      setAccess: function (id, memberId, status) { this.accessCommand = { memberId: memberId, status: status }; return Promise.resolve({ status: 'synced' }); },
+      saveResult: function (id, command) { this.lastSave = command; return Promise.resolve(this.saveOutcome); },
+      removeSession: function () { return Promise.resolve({ status: 'synced' }); },
+    };
+    var FIREBASE_CONFIG = { apiKey: 'integration-test' };
+    var firebase = { apps: [], initializeApp: function () { this.apps.push({}); }, app: function () { return {}; } };
+    var createFirebaseTournamentRepository = function () { return testRepository; };
+  </script>
   <script src="../js/app.js"></script>
   <script>
     const out = document.getElementById('test-results');
@@ -318,7 +350,7 @@
     }
 
     // Wait for DOMContentLoaded handlers (app.js, i18n.js) to finish
-    setTimeout(function runTests() {
+    setTimeout(async function runTests() {
 
       // ===== TEST 1: Initial empty state =====
       assert(getPlayerItems().length === 0, 'Initial: player list is empty');
@@ -701,6 +733,62 @@
       var genderCountsText = document.getElementById('gender-counts').textContent;
       assert(genderCountsText.includes('Unspecified: 1') || genderCountsText.includes('Sin especificar: 1'),
         'Unspecified Gender: gender counts text includes Unspecified: 1');
+
+      // ===== COLLABORATIVE MOBILE TOURNAMENT =====
+      window.confirm = function () { return true; }; document.getElementById('clear-btn').click();
+      document.getElementById('type-2v2-btn').click(); document.getElementById('mode-random-btn').click();
+      ['P1','P2','P3','P4','P5','P6'].forEach(function (name, index) { addPlayer(name, index % 2 ? 'female' : 'male'); });
+      document.getElementById('generate-btn').click(); document.getElementById('start-tournament-btn').click(); await Promise.resolve(); await Promise.resolve();
+      testRepository.emit({ role: 'owner', requests: { phone1: { label: 'Court 1', status: 'pending' }, phone2: { label: 'Court 2', status: 'approved' } } });
+      assert(document.querySelectorAll('#access-members li').length === 2, 'Scoring access: owner sees private device requests');
+      document.querySelector('[data-member="phone1"][data-access="approved"]')?.click();
+      assert(testRepository.accessCommand && testRepository.accessCommand.status === 'approved', 'Scoring access: owner can approve a pending device');
+      document.querySelector('[data-member="phone2"][data-access="revoked"]')?.click();
+      assert(testRepository.accessCommand && testRepository.accessCommand.status === 'revoked', 'Scoring access: owner can revoke a scorer');
+
+      testRepository.emit({ role: 'spectator', authState: 'pending', accessStatus: null });
+      assert(document.getElementById('request-access-btn').disabled && !document.querySelector('.match-card__btn'), 'Scoring access: auth pending remains readable and disables editing');
+      testRepository.emit({ role: 'spectator', accessStatus: null });
+      document.getElementById('access-label').value = 'Beach phone'; document.getElementById('request-access-btn').click(); await Promise.resolve();
+      assert(testRepository.requestedLabel === 'Beach phone', 'Scoring access: spectator can request device-scoped access');
+      testRepository.emit({ role: 'spectator', accessStatus: 'pending' });
+      assert(document.getElementById('access-status').textContent.length > 0 && !document.querySelector('.match-card__btn'), 'Scoring access: pending request stays read-only');
+
+      var mixed = JSON.parse(JSON.stringify(testRepository.tournament));
+      Object.assign(mixed.matches[0], { status: 'pending', revision: 0, played: false, score1: null, score2: null });
+      Object.assign(mixed.matches[1], { status: 'live', revision: 1, played: false, score1: 10, score2: 10 });
+      Object.assign(mixed.matches[2], { status: 'finished', revision: 1, played: true, score1: 21, score2: 18 });
+      testRepository.emit({ role: 'scorer', accessStatus: 'approved', tournament: mixed });
+      assert(document.querySelectorAll('.match-card').length === 1 && document.querySelector('.match-card')?.dataset.status === 'pending', 'Match filters: defaults to Pending');
+      document.querySelector('[data-filter="live"]').click();
+      assert(document.querySelector('.match-card')?.dataset.status === 'live', 'Match filters: Live shows synchronized progress');
+      document.querySelector('[data-filter="finished"]').click();
+      assert(document.querySelector('.match-card')?.dataset.status === 'finished', 'Match filters: Finished shows final results');
+      document.querySelector('[data-filter="pending"]').click(); document.querySelector('.match-card__btn')?.click();
+      var formButtons = document.querySelectorAll('[data-score-action]');
+      assert(formButtons.length === 2, 'Scoring actions: Save progress and Finish are explicit');
+      document.querySelectorAll('.score-form__input').forEach(function (input) { input.value = '5'; });
+      var confirmSave; testRepository.saveOutcome = new Promise(function (resolve) { confirmSave = resolve; });
+      document.querySelector('[data-score-action="live"]')?.click();
+      assert(document.getElementById('sync-status').dataset.state === 'saving', 'Scoring feedback: saving awaits server confirmation');
+      confirmSave({ status: 'synced' }); await Promise.resolve(); await Promise.resolve();
+      assert(testRepository.lastSave && testRepository.lastSave.status === 'live' && document.getElementById('sync-status').dataset.state === 'synced', 'Scoring feedback: confirmed Live save is announced');
+      document.querySelectorAll('.score-form__input')[1].value = '4';
+      testRepository.saveOutcome = { status: 'offline' }; document.querySelector('[data-score-action="finished"]')?.click(); await Promise.resolve();
+      assert(!document.getElementById('retry-score-btn').hidden && document.getElementById('sync-status').dataset.state === 'offline', 'Scoring feedback: offline save is unsynced with retry');
+      testRepository.saveOutcome = { status: 'synced' }; document.getElementById('retry-score-btn').click(); await Promise.resolve();
+      assert(document.getElementById('sync-status').dataset.state === 'synced', 'Scoring feedback: retry waits for server confirmation');
+      testRepository.saveOutcome = { status: 'conflict' }; document.querySelector('[data-score-action="finished"]')?.click(); await Promise.resolve();
+      assert(document.getElementById('sync-status').dataset.state === 'conflict', 'Scoring feedback: conflict is explicit and keeps confirmation');
+      testRepository.saveOutcome = { status: 'denied' }; document.getElementById('retry-score-btn').click(); await Promise.resolve();
+      assert(document.getElementById('sync-status').dataset.state === 'denied', 'Scoring feedback: denied write is explicit and retryable');
+      testRepository.emit({ role: 'spectator', accessStatus: 'revoked', tournament: mixed });
+      document.querySelector('[data-filter="live"]').click();
+      assert(document.querySelector('.match-card__score').textContent.includes('10'), 'Scoring live: spectators receive synchronized progress');
+      assert(!document.querySelector('.match-card__btn') && !document.getElementById('readonly-banner').hidden, 'Scoring access: revocation removes controls before the next write');
+      appFrame.style.cssText = 'display:block;width:320px';
+      assert(appFrame.scrollWidth <= appFrame.clientWidth && Array.from(document.querySelectorAll('.match-filters__btn')).every(function (button) { return button.getBoundingClientRect().height >= 44; }), 'Scoring mobile: 320px has no overflow and filter targets are at least 44px');
+      appFrame.style.cssText = '';
 
       // ===== Summary =====
       const total = passed + failed;

@@ -20,6 +20,9 @@
   var tournamentRepository = null;
   var repositoryUnsubscribe = null;
   var sessionId = null;         // Active session ID written to / read from Firebase
+  var sessionSnapshot = null;
+  var matchFilter = 'pending';
+  var lastScoreCommand = null;
   let pairingMode = 'random';  // 'random' | 'manual'
   let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
   let kingState = null;        // KingState object or null when no game active
@@ -84,6 +87,15 @@
   const shareTournamentBtn = document.getElementById('share-tournament-btn');
   const resetTournamentBtn = document.getElementById('reset-tournament-btn');
   const readonlyBanner = document.getElementById('readonly-banner');
+  const tournamentOps = document.getElementById('tournament-ops');
+  const accessStatus = document.getElementById('access-status');
+  const accessRequest = document.getElementById('access-request');
+  const accessLabel = document.getElementById('access-label');
+  const requestAccessBtn = document.getElementById('request-access-btn');
+  const accessMembers = document.getElementById('access-members');
+  const matchFilters = document.getElementById('match-filters');
+  const syncStatus = document.getElementById('sync-status');
+  const retryScoreBtn = document.getElementById('retry-score-btn');
   const tournamentSection = document.getElementById('tournament-section');
   const tournamentGroupsEl = document.getElementById('tournament-groups');
   const scoreboardPanelEl = document.getElementById('scoreboard-panel');
@@ -131,6 +143,12 @@
     startTournamentBtn.addEventListener('click', handleStartTournament);
     resetTournamentBtn.addEventListener('click', handleResetTournament);
     shareTournamentBtn.addEventListener('click', handleShareTournament);
+    requestAccessBtn.addEventListener('click', handleRequestAccess);
+    accessMembers.addEventListener('click', handleAccessDecision);
+    matchFilters.addEventListener('click', handleMatchFilter);
+    retryScoreBtn.addEventListener('click', function () {
+      if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, null, lastScoreCommand.status);
+    });
     groupCountOptions.addEventListener('click', handleGroupOptClick);
     startKingBtn.addEventListener('click', handleStartKing);
     resetKingBtn.addEventListener('click', handleResetKing);
@@ -862,6 +880,7 @@
       if (repositoryUnsubscribe) repositoryUnsubscribe();
       repositoryUnsubscribe = null;
       sessionId = null;
+      sessionSnapshot = null;
     }
     tournamentState = null;
     activeMatchId = null;
@@ -1002,26 +1021,34 @@
     renderTournament();
   }
 
-  function commitScore(matchId, s1val, s2val, errorEl) {
+  function commitScore(matchId, s1val, s2val, errorEl, status) {
     try {
-      var newMatches = recordMatchScore(tournamentState.matches, matchId, s1val, s2val);
-      var nextMatch = newMatches.find(function (match) { return match.id === matchId; });
+      status = status || 'finished';
+      if (String(s1val).trim() === '' || String(s2val).trim() === '') throw new Error('tournament.error.scoreEmpty');
+      var score1 = Number(s1val), score2 = Number(s2val);
+      if (!Number.isInteger(score1) || !Number.isInteger(score2)) throw new Error('tournament.error.scoreNotInt');
+      if (score1 < 0 || score2 < 0) throw new Error('tournament.error.scoreNegative');
+      if (status === 'finished' && score1 === score2) throw new Error('tournament.error.scoreDraw');
       var confirmedMatch = tournamentState.matches.find(function (match) { return match.id === matchId; });
+      var command = { matchId: matchId, score1: score1, score2: score2, status: status, expectedRevision: confirmedMatch.revision || 0 };
       if (tournamentRepository && sessionId) {
-        tournamentRepository.saveResult(sessionId, {
-          matchId: matchId, score1: nextMatch.score1, score2: nextMatch.score2,
-          status: 'finished', expectedRevision: confirmedMatch.revision || 0,
-        }).then(function (result) {
+        lastScoreCommand = command; setSyncState('saving');
+        tournamentRepository.saveResult(sessionId, command).then(function (result) {
           if (result.status !== 'synced') {
-            if (errorEl) errorEl.textContent = result.status;
+            setSyncState(result.status); if (errorEl) errorEl.textContent = t('tournament.sync.' + result.status);
             return;
           }
+          lastScoreCommand = null; setSyncState('synced');
           activeMatchId = null;
           scoreboardMatchId = null;
           liveScore = { score1: 0, score2: 0 };
         });
         return;
       }
+      var resultMap = {};
+      tournamentState.matches.forEach(function (match) { if (match.status !== 'pending') resultMap[match.id] = match; });
+      resultMap[matchId] = Object.assign({}, command, { revision: command.expectedRevision + 1 });
+      var newMatches = projectMatchResults(tournamentState.matches, resultMap);
       tournamentState = {
         teams: tournamentState.teams,
         groups: tournamentState.groups,
@@ -1035,12 +1062,13 @@
       pushShareURL();
       renderTournament();
     } catch (e) {
+      setSyncState('invalid');
       if (errorEl) errorEl.textContent = t(e.message) || e.message;
     }
   }
 
-  function handleSaveScore(matchId, input1El, input2El, errorEl) {
-    commitScore(matchId, input1El.value.trim(), input2El.value.trim(), errorEl);
+  function handleSaveScore(matchId, input1El, input2El, errorEl, status) {
+    commitScore(matchId, input1El.value.trim(), input2El.value.trim(), errorEl, status);
   }
 
   function handleScoreboard(matchId) {
@@ -1121,6 +1149,7 @@
         if (snapshot && snapshot.error) console.warn(snapshot.error);
         return;
       }
+      sessionSnapshot = snapshot;
       tournamentState = snapshot.tournament;
       isReadOnly = snapshot.legacy || (snapshot.role !== 'owner' && snapshot.role !== 'scorer');
       readonlyBanner.hidden = !isReadOnly;
@@ -1135,6 +1164,64 @@
       renderTournament();
       updateUI();
     });
+  }
+
+  function setSyncState(state) {
+    syncStatus.dataset.state = state || '';
+    syncStatus.textContent = state ? t('tournament.sync.' + state) : '';
+    retryScoreBtn.hidden = !lastScoreCommand || ['offline', 'denied', 'conflict', 'invalid'].indexOf(state) === -1;
+  }
+
+  function renderTournamentOps() {
+    tournamentOps.hidden = false;
+    if (!sessionSnapshot || !sessionId) {
+      accessStatus.hidden = true; accessRequest.hidden = true; accessMembers.hidden = true; return;
+    }
+    accessStatus.hidden = false;
+    var owner = sessionSnapshot.role === 'owner';
+    var requestable = !sessionSnapshot.legacy && sessionSnapshot.role === 'spectator' && sessionSnapshot.accessStatus !== 'pending';
+    accessRequest.hidden = !requestable;
+    requestAccessBtn.disabled = sessionSnapshot.authState !== 'ready';
+    var key = owner ? 'owner' : sessionSnapshot.role === 'scorer' ? 'scorer' :
+      sessionSnapshot.authState !== 'ready' ? 'authPending' : sessionSnapshot.accessStatus === 'pending' ? 'pending' : sessionSnapshot.accessStatus === 'revoked' ? 'revoked' : 'viewer';
+    accessStatus.textContent = t('tournament.access.' + key);
+    accessMembers.hidden = !owner;
+    accessMembers.innerHTML = '';
+    if (owner) Object.keys(sessionSnapshot.requests || {}).forEach(function (memberId) {
+      var member = sessionSnapshot.requests[memberId];
+      var li = document.createElement('li'); li.className = 'access-members__item';
+      var label = document.createElement('span'); label.className = 'access-members__label';
+      label.textContent = member.label + ' — ' + t('tournament.access.state.' + member.status); li.appendChild(label);
+      ['approved', 'revoked'].forEach(function (status) {
+        if ((status === 'approved' && member.status !== 'pending') || (status === 'revoked' && member.status === 'revoked')) return;
+        var button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--small';
+        button.dataset.member = memberId; button.dataset.access = status;
+        button.textContent = t('tournament.access.' + (status === 'approved' ? 'approve' : 'revoke')); li.appendChild(button);
+      });
+      accessMembers.appendChild(li);
+    });
+  }
+
+  function handleRequestAccess() {
+    var label = accessLabel.value.trim();
+    if (!label || !tournamentRepository || !sessionId) { setSyncState('invalid'); return; }
+    tournamentRepository.requestAccess(sessionId, label).then(function (result) { setSyncState(result.status === 'requested' ? 'synced' : result.status); });
+  }
+
+  function handleAccessDecision(event) {
+    var button = event.target.closest('[data-access]');
+    if (!button || !tournamentRepository) return;
+    tournamentRepository.setAccess(sessionId, button.dataset.member, button.dataset.access).then(function (result) { setSyncState(result.status); });
+  }
+
+  function handleMatchFilter(event) {
+    var button = event.target.closest('[data-filter]'); if (!button) return;
+    matchFilter = button.dataset.filter;
+    matchFilters.querySelectorAll('[data-filter]').forEach(function (item) {
+      item.classList.toggle('match-filters__btn--active', item === button);
+      item.setAttribute('aria-pressed', String(item === button));
+    });
+    activeMatchId = null; scoreboardMatchId = null; renderTournament();
   }
 
   // --- URL Sharing ---
@@ -1218,6 +1305,7 @@
 
     // Share is an owner-only action; read-only viewers already hold the link
     shareTournamentBtn.hidden = isReadOnly;
+    renderTournamentOps();
 
     // Add multi-group grid class when there are 2+ groups
     if (tournamentState.groups.length >= 2) {
@@ -1355,16 +1443,13 @@
       renderTournament();
     });
 
-    var saveBtn = document.createElement('button');
-    saveBtn.type = 'button';
-    saveBtn.className = 'scoreboard__save';
-    saveBtn.textContent = t('tournament.match.save');
-    saveBtn.addEventListener('click', function () {
-      commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl);
-    });
-
     actions.appendChild(cancelBtn);
-    actions.appendChild(saveBtn);
+    ['live', 'finished'].forEach(function (status) {
+      var action = document.createElement('button'); action.type = 'button'; action.className = 'scoreboard__save';
+      action.textContent = t(status === 'live' ? 'tournament.match.saveProgress' : 'tournament.match.finish');
+      action.addEventListener('click', function () { commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, status); });
+      actions.appendChild(action);
+    });
     panel.appendChild(actions);
     panel.appendChild(errorEl);
 
@@ -1446,7 +1531,7 @@
     var ul = document.createElement('ul');
     ul.className = 'match-list';
 
-    matches.forEach(function (match) {
+    matches.filter(function (match) { return (match.status || (match.played ? 'finished' : 'pending')) === matchFilter; }).forEach(function (match) {
       var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
       var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
       var name1 = team1 ? team1.name : match.team1Id;
@@ -1454,6 +1539,7 @@
       var isActive = activeMatchId === match.id;
 
       var li = document.createElement('li');
+      li.dataset.status = match.status || (match.played ? 'finished' : 'pending');
       li.className = 'match-card' +
         (match.played ? ' match-card--played' : '') +
         (isActive ? ' match-card--active' : '');
@@ -1470,8 +1556,9 @@
         escapeHTML(name2);
 
       var scoreEl = document.createElement('span');
-      scoreEl.className = 'match-card__score' + (match.played ? ' match-card__score--played' : '');
-      scoreEl.textContent = match.played ? (match.score1 + ' \u2013 ' + match.score2) : '\u2013';
+      var hasScore = match.status !== 'pending' && match.score1 != null;
+      scoreEl.className = 'match-card__score' + (hasScore ? ' match-card__score--played' : '');
+      scoreEl.textContent = hasScore ? (match.score1 + ' \u2013 ' + match.score2) : '\u2013';
 
       row.appendChild(teamsEl);
       row.appendChild(scoreEl);
@@ -1484,7 +1571,7 @@
         var btn = document.createElement('button');
         btn.className = 'match-card__btn';
         btn.type = 'button';
-        btn.textContent = match.played ? t('tournament.match.edit') : t('tournament.match.enterScore');
+        btn.textContent = hasScore ? t('tournament.match.edit') : t('tournament.match.enterScore');
         btn.addEventListener('click', (function (mid) {
           return function () { handleScoreEntry(mid); };
         })(match.id));
@@ -1515,7 +1602,7 @@
         in1.min = '0';
         in1.max = '999';
         in1.className = 'score-form__input';
-        in1.value = match.played ? match.score1 : '';
+        in1.value = hasScore ? match.score1 : '';
         in1.placeholder = '0';
         in1.setAttribute('aria-label', name1);
 
@@ -1528,14 +1615,9 @@
         in2.min = '0';
         in2.max = '999';
         in2.className = 'score-form__input';
-        in2.value = match.played ? match.score2 : '';
+        in2.value = hasScore ? match.score2 : '';
         in2.placeholder = '0';
         in2.setAttribute('aria-label', name2);
-
-        var saveBtn = document.createElement('button');
-        saveBtn.type = 'button';
-        saveBtn.className = 'score-form__save';
-        saveBtn.textContent = t('tournament.match.save');
 
         var cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
@@ -1550,20 +1632,22 @@
         var errorEl = document.createElement('p');
         errorEl.className = 'score-form__error';
 
-        saveBtn.addEventListener('click', function () {
-          handleSaveScore(match.id, in1, in2, errorEl);
-        });
-
         [in1, in2].forEach(function (inp) {
           inp.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') handleSaveScore(match.id, in1, in2, errorEl);
+            if (e.key === 'Enter') handleSaveScore(match.id, in1, in2, errorEl, 'finished');
           });
         });
 
         scoreForm.appendChild(in1);
         scoreForm.appendChild(sep);
         scoreForm.appendChild(in2);
-        scoreForm.appendChild(saveBtn);
+        ['live', 'finished'].forEach(function (status) {
+          var action = document.createElement('button'); action.type = 'button'; action.className = 'score-form__save';
+          action.dataset.scoreAction = status;
+          action.textContent = t(status === 'live' ? 'tournament.match.saveProgress' : 'tournament.match.finish');
+          action.addEventListener('click', function () { handleSaveScore(match.id, in1, in2, errorEl, status); });
+          scoreForm.appendChild(action);
+        });
         scoreForm.appendChild(cancelBtn);
         scoreForm.appendChild(errorEl);
         li.appendChild(scoreForm);
