@@ -1376,7 +1376,13 @@
   function renderCompletionSummary(day) {
     var parts = [];
     if (tournamentState) {
-      parts.push(t('tournament.format.preset.' + selectedFormatPreset));
+      // Reads the SESSION's own format (REQ-UX-51), not the Setup draft's
+      // selectedFormatPreset — that module var reflects whatever is currently
+      // selected in Setup and goes stale/wrong for an already-running session
+      // restored from a reload or a scorer/spectator's #s= link, which never
+      // populates it at all (corrective pass).
+      var formatPresetId = tournamentState.format ? tournamentState.format.preset : 'classic';
+      parts.push(t('tournament.format.preset.' + formatPresetId));
       parts.push(t('workspace.summary.teams', { count: tournamentState.teams.length }));
       parts.push(t('workspace.results.summary.matches', { played: day.progress.played, total: day.progress.total }));
     } else if (kingState) {
@@ -1498,11 +1504,16 @@
       : [];
     completionBracketEl.hidden = knockoutStages.length === 0;
     completionBracketContentEl.innerHTML = '';
-    knockoutStages.forEach(function (stage) { completionBracketContentEl.appendChild(renderStagePanel(stage)); });
+    knockoutStages.forEach(function (stage) { completionBracketContentEl.appendChild(renderStagePanel(stage, { readOnly: true })); });
 
     completionActionsEl.hidden = false;
     completionShareBtn.hidden = !tournamentState;
-    completionStartAnotherBtn.hidden = isReadOnly;
+    // REQ-UX-60: reset is organizer-only (cf. resetTournamentBtn.hidden = snapshot.role
+    // !== 'owner' at subscribeToSession()) — isReadOnly alone is false for an approved
+    // scorer, which previously let a scorer see this button too (corrective pass).
+    completionStartAnotherBtn.hidden = tournamentState
+      ? !(sessionSnapshot ? sessionSnapshot.role === 'owner' : !isReadOnly)
+      : isReadOnly;
   }
 
   /** REQ-UX-62: leaves the not-found state and returns to a fresh local
@@ -2446,17 +2457,22 @@
     history.replaceState(null, '', '#t=' + encoded);
   }
 
-  function handleShareTournament() {
+  /** Shared by both the Tournament destination's #share-tournament-btn and the
+   * Results destination's #completion-share-btn — event.currentTarget decides
+   * which button shows the confirmation, so clicking Share on Results never
+   * silently animates the hidden Tournament button instead (corrective pass). */
+  function handleShareTournament(event) {
+    var btn = (event && event.currentTarget) || shareTournamentBtn;
     var url = tournamentRepository && sessionId ? window.location.href : getShareURL();
     if (!url) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {
-        showShareCopied();
+        showShareCopied(btn);
       }).catch(function () {
-        fallbackCopyText(url);
+        fallbackCopyText(url, function () { showShareCopied(btn); });
       });
     } else {
-      fallbackCopyText(url);
+      fallbackCopyText(url, function () { showShareCopied(btn); });
     }
   }
 
@@ -2474,13 +2490,16 @@
     document.body.removeChild(ta);
   }
 
-  function showShareCopied() {
-    var originalText = t('tournament.share');
-    shareTournamentBtn.textContent = t('tournament.shareCopied');
-    shareTournamentBtn.classList.add('btn--share--copied');
+  /** `btn` defaults to the Tournament destination's Share button; the Results
+   * destination passes its own #completion-share-btn (see handleShareTournament()). */
+  function showShareCopied(btn) {
+    btn = btn || shareTournamentBtn;
+    var originalText = btn.textContent;
+    btn.textContent = t('tournament.shareCopied');
+    btn.classList.add('btn--share--copied');
     setTimeout(function () {
-      shareTournamentBtn.textContent = originalText;
-      shareTournamentBtn.classList.remove('btn--share--copied');
+      btn.textContent = originalText;
+      btn.classList.remove('btn--share--copied');
     }, 2500);
   }
 
@@ -2611,8 +2630,14 @@
    * Unresolved sides show a localized slot placeholder instead of a team name; a match's
    * action button is offered only when the projection marks it `scorable` — resolveFormat
    * already forces that to false for every match in an `invalid` stage, so this render
-   * guard never needs its own separate invalid-stage check. */
-  function renderStagePanel(stage) {
+   * guard never needs its own separate invalid-stage check.
+   * `options.readOnly` (REQ-UX-51 "bracket (read-only)", corrective pass) suppresses the
+   * action button unconditionally — the Results destination reuses this same function but
+   * must never let an owner/scorer open the scoreboard from there (wrong destination, and
+   * #completion-bracket-content is innerHTML-rebuilt per snapshot with no focus capture).
+   * The Tournament destination's own call is unchanged (options omitted → false). */
+  function renderStagePanel(stage, options) {
+    var readOnly = !!(options && options.readOnly);
     var panel = document.createElement('div');
     panel.className = 'tournament-stage';
     panel.dataset.stageStatus = stage.status;
@@ -2661,7 +2686,7 @@
 
       // A single action button covers enter + edit + live tracking, all via the existing
       // scoreboard panel (handleScoreboard pre-fills liveScore from the finished result).
-      if (!isReadOnly && projected.scorable) {
+      if (!readOnly && !isReadOnly && projected.scorable) {
         var btnGroup = document.createElement('div');
         btnGroup.className = 'match-card__btn-group';
 

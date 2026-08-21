@@ -164,6 +164,7 @@ var t, setLanguage, getLanguage;
       'tournament.format.preset.groupsTo': 'Groups Only',
       'tournament.format.preset.groupsFinal': 'Groups + Final',
       'tournament.format.preset.crossover': 'Reference (Top 4)',
+      'tournament.format.preset.custom': 'Custom format',
       'tournament.format.pointsTo': 'Points to win',
       'tournament.format.overtime': 'Overtime (win by 2)',
       'tournament.format.customRules': 'Custom rules note (optional)',
@@ -308,7 +309,7 @@ var t, setLanguage, getLanguage;
       'workspace.tournament.notFound.startLocalSetup': 'Start a local setup',
       // Results / completion (REQ-UX-50..53)
       'workspace.results.heading': 'Results',
-      'workspace.results.inProgress': '⏳ Tournament in progress — live standings, no champion yet',
+      'workspace.results.inProgress': 'Tournament in progress — live standings, no champion yet',
       'workspace.results.empty': 'No results yet',
       'workspace.results.emptyLink': 'Go to Setup',
       'workspace.results.champion.heading': 'Champion',
@@ -480,6 +481,7 @@ var t, setLanguage, getLanguage;
       'tournament.format.preset.groupsTo': 'Solo Grupos',
       'tournament.format.preset.groupsFinal': 'Grupos + Final',
       'tournament.format.preset.crossover': 'Referencia (Top 4)',
+      'tournament.format.preset.custom': 'Formato personalizado',
       'tournament.format.pointsTo': 'Puntos para ganar',
       'tournament.format.overtime': 'Tiempo extra (ganar por 2)',
       'tournament.format.customRules': 'Nota de reglas personalizadas (opcional)',
@@ -624,7 +626,7 @@ var t, setLanguage, getLanguage;
       'workspace.tournament.notFound.startLocalSetup': 'Iniciar una configuraci\u00f3n local',
       // Resultados / finalizaci\u00f3n (REQ-UX-50..53)
       'workspace.results.heading': 'Resultados',
-      'workspace.results.inProgress': '\u23f3 Torneo en curso \u2014 resultados en vivo, a\u00fan sin campe\u00f3n',
+      'workspace.results.inProgress': 'Torneo en curso \u2014 resultados en vivo, a\u00fan sin campe\u00f3n',
       'workspace.results.empty': 'A\u00fan no hay resultados',
       'workspace.results.emptyLink': 'Ir a Inicio',
       'workspace.results.champion.heading': 'Campe\u00f3n',
