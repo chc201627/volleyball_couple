@@ -272,6 +272,12 @@ var t, setLanguage, getLanguage;
       'workspace.checklist.firebaseConnected.ok': 'Connection available',
       'workspace.checklist.firebaseConnected.warn': 'Connection unavailable — offline',
       'workspace.setup.formatLocked.note': 'Locked — reset tournament to change',
+      // Teams workspace (REQ-UX-20..23)
+      'workspace.teams.moreOptions': 'More options',
+      'workspace.teams.editPairs': 'Edit pairs',
+      'workspace.teams.forkHeading': 'How do you want to play?',
+      'workspace.teams.forkTournament': 'Tournament',
+      'workspace.teams.forkKing': 'King of the Court',
       // Footer
 
       'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.8.1'
@@ -533,6 +539,12 @@ var t, setLanguage, getLanguage;
       'workspace.checklist.firebaseConnected.ok': 'Conexi\u00f3n disponible',
       'workspace.checklist.firebaseConnected.warn': 'Sin conexi\u00f3n \u2014 modo sin conexi\u00f3n',
       'workspace.setup.formatLocked.note': 'Bloqueado \u2014 reinicia el torneo para cambiarlo',
+      // Espacio de equipos (REQ-UX-20..23)
+      'workspace.teams.moreOptions': 'M\u00e1s opciones',
+      'workspace.teams.editPairs': 'Editar parejas',
+      'workspace.teams.forkHeading': '\u00bfC\u00f3mo quieres jugar?',
+      'workspace.teams.forkTournament': 'Torneo',
+      'workspace.teams.forkKing': 'Rey de la cancha',
       // Pie de p\u00e1gina
 
       'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.8.1'

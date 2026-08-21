@@ -218,16 +218,50 @@
       </div>
     </section>
 
-    <!-- Teams Actions: progressive-disclosure regenerate/clear + King fork (REQ-UX-21/22) -->
+    <!-- Results Section -->
+    <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden data-view-slot="teams">
+      <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
+      <p class="teams-summary" id="teams-summary-line"></p>
+      <div class="couples-grid" id="couples-grid">
+        <!-- Couple cards rendered by JS -->
+      </div>
+      <div class="unmatched" id="unmatched-notice" hidden>
+        <!-- Unmatched player notice rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Teams Actions: progressive-disclosure regenerate/edit + mode fork (REQ-UX-21/22/23) -->
     <section class="section section--actions" id="teams-actions" aria-labelledby="teams-actions-heading" data-view-slot="teams">
       <h2 id="teams-actions-heading" class="sr-only">Team options</h2>
       <div class="actions">
-        <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
-          Regenerate Couples
-        </button>
-        <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
-          Clear All Players
-        </button>
+        <details class="disclosure" id="teams-options-disclosure">
+          <summary class="disclosure__summary" data-i18n="workspace.teams.moreOptions">More options</summary>
+          <div class="disclosure__content">
+            <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
+              Regenerate Couples
+            </button>
+            <button class="btn btn--large" id="edit-pairs-btn" type="button" hidden data-i18n="workspace.teams.editPairs">
+              Edit pairs
+            </button>
+            <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
+              Clear All Players
+            </button>
+          </div>
+        </details>
+
+        <!-- Mode fork: Tournament | King of the Court (REQ-UX-22/23) -->
+        <div class="mode-fork" id="teams-mode-fork" hidden>
+          <h3 class="mode-fork__heading" data-i18n="workspace.teams.forkHeading">How do you want to play?</h3>
+          <div class="mode-fork__options">
+            <button class="btn btn--success btn--large" id="teams-fork-tournament-btn" type="button" data-i18n="workspace.teams.forkTournament">
+              Tournament
+            </button>
+            <button class="btn btn--large" id="teams-fork-king-btn" type="button" data-i18n="workspace.teams.forkKing">
+              King of the Court
+            </button>
+          </div>
+        </div>
+
         <!-- King of the Court Setup (shown after couples generated, no active tournament or king game) -->
         <div class="king-setup" id="king-setup" hidden>
           <div class="king-setup__options">
@@ -247,20 +281,9 @@
               <button class="king-setup__opt" data-target="10" type="button">10</button>
             </div>
           </div>
-          <button class="btn btn--success btn--large" id="start-king-btn"
+          <button class="btn btn--success btn--large" id="start-king-btn" hidden
                   type="button" data-i18n="king.start">Start King of the Court</button>
         </div>
-      </div>
-    </section>
-
-    <!-- Results Section -->
-    <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden data-view-slot="teams">
-      <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
-      <div class="couples-grid" id="couples-grid">
-        <!-- Couple cards rendered by JS -->
-      </div>
-      <div class="unmatched" id="unmatched-notice" hidden>
-        <!-- Unmatched player notice rendered by JS -->
       </div>
     </section>
 

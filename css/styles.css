@@ -643,6 +643,7 @@ textarea {
 .couple-card__player {
   font-size: 1rem;
   padding: 4px 0;
+  overflow-wrap: anywhere; /* REQ-UX-73: long names wrap, never overflow their card */
 }
 
 /* --- Unmatched Notice --- */
@@ -653,6 +654,10 @@ textarea {
   border: 1px solid var(--color-warning);
   border-radius: var(--radius);
   text-align: center;
+}
+
+.unmatched__title, .unmatched__text, .unmatched__player {
+  overflow-wrap: anywhere; /* REQ-UX-73: long unmatched-player names wrap, never overflow */
 }
 
 .unmatched__title {
@@ -1962,7 +1967,8 @@ textarea {
 
 /* --- Guided Setup: event summary, readiness checklist, format lock (REQ-UX-10..13) --- */
 .section--summary { padding: 12px 16px; }
-.event-summary__line { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.event-summary__line, .teams-summary { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.teams-summary { margin-bottom: 12px; }
 
 .readiness { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .readiness__item { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; min-height: 44px; }
@@ -1981,3 +1987,54 @@ textarea {
 }
 .format-locked-note__text { margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .format-locked-note .btn { min-height: 44px; } /* REQ-UX-73: .btn--small's 36px is too short here */
+
+/* --- Teams workspace: progressive disclosure, mode fork (REQ-UX-21..23) --- */
+.disclosure {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.disclosure__summary {
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  list-style: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.disclosure__summary::-webkit-details-marker { display: none; }
+.disclosure__content {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mode-fork {
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+.mode-fork__heading {
+  margin: 0 0 12px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+.mode-fork__options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mode-fork__options .btn { width: 100%; }
+
+@media (min-width: 600px) {
+  .mode-fork__options { flex-direction: row; }
+}
