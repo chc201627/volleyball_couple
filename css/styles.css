@@ -891,6 +891,7 @@ textarea {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin: 16px 0;
 }
 
 /* --- Read-only Banner --- */
@@ -1186,7 +1187,10 @@ textarea {
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  min-height: 32px;
+  /* REQ-UX-73: this later, same-specificity rule was overriding the 44px
+     baseline set at ~:940 with 32px — every .match-card__btn (per-group list
+     AND the new command-center rows) was under the touch-target minimum. */
+  min-height: 44px;
   white-space: nowrap;
   transition: background-color var(--transition), color var(--transition);
 }
