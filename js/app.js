@@ -97,6 +97,10 @@
   const formatCustomRules = document.getElementById('format-custom-rules');
   const formatCustomRulesCount = document.getElementById('format-custom-rules-count');
   const formatError = document.getElementById('format-error');
+  const formatLockedNote = document.getElementById('format-locked-note');
+  const formatLockedResetBtn = document.getElementById('format-locked-reset-btn');
+  const eventSummaryLine = document.getElementById('event-summary-line');
+  const readinessListEl = document.getElementById('readiness-list');
   const shareTournamentBtn = document.getElementById('share-tournament-btn');
   const resetTournamentBtn = document.getElementById('reset-tournament-btn');
   const readonlyBanner = document.getElementById('readonly-banner');
@@ -163,6 +167,7 @@
     confirmManualBtn.addEventListener('click', handleConfirmManualCouples);
     startTournamentBtn.addEventListener('click', handleStartTournament);
     resetTournamentBtn.addEventListener('click', handleResetTournament);
+    formatLockedResetBtn.addEventListener('click', handleResetTournament);
     shareTournamentBtn.addEventListener('click', handleShareTournament);
     requestAccessBtn.addEventListener('click', handleRequestAccess);
     accessMembers.addEventListener('click', handleAccessDecision);
@@ -730,7 +735,10 @@
     }
 
     clearBtn.hidden = isReadOnly || players.length === 0;
-    tournamentSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
+    // REQ-UX-13: once a tournament starts, format stays visible but read-only
+    // (renderChrome() -> renderTournamentSetupState() applies the lock) rather
+    // than disappearing — the organizer needs the "Locked" note and Reset path.
+    tournamentSetup.hidden = !couplesGenerated || kingState !== null;
     kingSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
     // Keep max selectable groups in sync with available teams
     if (couplesGenerated && lastResult) {
@@ -801,6 +809,67 @@
     var view = applyWorkspace();
     patchWorkspaceNavItems(view);
     patchWorkspaceCta(view);
+    renderEventSummary();
+    renderReadiness(view);
+    renderTournamentSetupState(view);
+  }
+
+  /** REQ-UX-10: compact "{players} · {teamSize}vs{teamSize} · {mode} ·
+   * {teams} · {format|King}" line atop Setup. Reuses existing translated
+   * labels (pairing mode, format preset, King heading) to avoid duplicate
+   * i18n keys. */
+  function renderEventSummary() {
+    var parts = [t('workspace.summary.players', { count: players.length }), teamSize + 'vs' + teamSize];
+    if (couplesGenerated) {
+      parts.push(t(pairingMode === 'manual' ? 'pairing.modeManual' : 'pairing.modeRandom'));
+      var teams = lastResult ? (lastResult.teams || lastResult.couples || []) : [];
+      parts.push(t('workspace.summary.teams', { count: teams.length }));
+    }
+    if (kingState) parts.push(t('king.heading'));
+    else if (formatDraft) parts.push(t('tournament.format.preset.' + selectedFormatPreset));
+    eventSummaryLine.textContent = parts.join(' · ');
+  }
+
+  /** REQ-UX-11: renders computeWorkspace().readiness as an icon+text list —
+   * never color-only (REQ-UX-72). */
+  function renderReadiness(view) {
+    readinessListEl.innerHTML = '';
+    view.readiness.forEach(function (item) {
+      var suffix = item.ok ? 'ok' : (item.blocking ? 'blocked' : 'warn');
+      var li = document.createElement('li');
+      li.className = 'readiness__item readiness__item--' + (item.ok ? 'ok' : (item.blocking ? 'not-ok' : 'warn'));
+      li.dataset.readinessKey = item.key;
+      var icon = document.createElement('span');
+      icon.className = 'readiness__icon'; icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = item.ok ? '✓' : (item.blocking ? '✗' : '⚠');
+      var text = document.createElement('span');
+      text.className = 'readiness__text';
+      text.textContent = t('workspace.checklist.' + item.key + '.' + suffix, item.params);
+      li.appendChild(icon); li.appendChild(text);
+      readinessListEl.appendChild(li);
+    });
+  }
+
+  /** REQ-UX-13 format lock (read-only note + disabled controls, reset
+   * reachable from Setup) and REQ-UX-12 single-CTA gating for the literal
+   * Start Tournament button (the nav center CTA already gates itself). */
+  function renderTournamentSetupState(view) {
+    var locked = view.formatLocked;
+    formatLockedNote.hidden = !locked;
+    if (couplesGenerated && lastResult) {
+      updateGroupOptions((lastResult.teams || lastResult.couples || []).length);
+    }
+    if (locked) groupCountOptions.querySelectorAll('.tournament-setup__opt').forEach(function (b) { b.disabled = true; });
+    formatPresetOptions.querySelectorAll('.format-setup__opt').forEach(function (b) { b.disabled = locked; });
+    formatCustomRules.disabled = locked;
+    formatStagesEl.querySelectorAll('input').forEach(function (el) { el.disabled = locked; });
+
+    startTournamentBtn.hidden = locked;
+    var blockedReasonKey = (!locked && view.primaryAction && view.primaryAction.id === 'startTournament')
+      ? view.primaryAction.blockedReasonKey : null;
+    startTournamentBtn.disabled = !!blockedReasonKey;
+    if (blockedReasonKey) startTournamentBtn.title = t(blockedReasonKey);
+    else startTournamentBtn.removeAttribute('title');
   }
 
   /** Rebuilds buttons only when the nav-id list itself changes (role/session
@@ -1058,6 +1127,7 @@
     }
     renderFormatPresetButtons();
     renderFormatEditor();
+    renderChrome(); // group/format changes affect groupFeasible/formatValid readiness (REQ-UX-11/12)
   }
 
   function handleFormatPresetClick(e) {
@@ -1135,6 +1205,7 @@
     }
     formatDraft.preset = 'custom'; // any light edit detaches the draft from its starting preset
     clearFormatError();
+    renderChrome(); // stage edits affect formatValid readiness (REQ-UX-11)
   }
 
   function handleFormatCustomRulesInput() {
