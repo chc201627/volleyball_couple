@@ -346,6 +346,11 @@
         <div class="tournament-readonly-banner" id="readonly-banner" hidden>
           <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
         </div>
+
+        <!-- Next Match card (REQ-UX-30/31) — first content block below the status strip -->
+        <div class="next-match-card" id="next-match-card" hidden></div>
+
+        <!-- Inline scorer-access-request card (REQ-UX-34), reusing #access-request/#access-members -->
         <div class="tournament-ops" id="tournament-ops" hidden>
           <p id="access-status" class="tournament-ops__status" role="status" aria-live="polite"></p>
           <div id="access-request" class="access-request" hidden>
@@ -353,12 +358,16 @@
             <button id="request-access-btn" class="btn btn--primary" type="button" data-i18n="tournament.access.request">Request scoring access</button>
           </div>
           <ul id="access-members" class="access-members" hidden></ul>
-          <div id="match-filters" class="match-filters" role="group" data-i18n-aria-label="tournament.filter.label">
-            <button class="match-filters__btn match-filters__btn--active" type="button" data-filter="pending" data-i18n="tournament.filter.pending">Pending</button>
-            <button class="match-filters__btn" type="button" data-filter="live" data-i18n="tournament.filter.live">Live</button>
-            <button class="match-filters__btn" type="button" data-filter="finished" data-i18n="tournament.filter.finished">Finished</button>
-          </div>
         </div>
+
+        <!-- Stage progress (REQ-UX-33) -->
+        <div class="stage-progress" id="tournament-stage-progress" hidden></div>
+
+        <!-- Stacked Live / Up next / Recently finished sections, collapse after 5 (REQ-UX-32) -->
+        <div class="match-day-section" id="tournament-live-section" hidden></div>
+        <div class="match-day-section" id="tournament-pending-section" hidden></div>
+        <div class="match-day-section" id="tournament-recently-finished-section" hidden></div>
+
         <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
           <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
           <p class="tournament-custom-rules__text" id="tournament-custom-rules-text"></p>
@@ -371,6 +380,14 @@
         </div>
         <div class="scoreboard-panel" id="scoreboard-panel" hidden></div>
       </section>
+
+      <!-- Session-not-found state (REQ-UX-62) -->
+      <div class="session-missing" id="session-not-found" data-view-slot="tournament" hidden>
+        <p class="session-missing__icon" aria-hidden="true">⛔</p>
+        <h2 class="section__heading" data-i18n="workspace.tournament.notFound.heading">Session unavailable</h2>
+        <p class="session-missing__text" data-i18n="workspace.tournament.notFound.text">This link is missing, expired, or you do not have permission to read it. Ask the organizer for a new link.</p>
+        <button class="btn btn--primary" id="session-not-found-reset-btn" type="button" data-i18n="workspace.tournament.notFound.startLocalSetup">Start a local setup</button>
+      </div>
 
       <!-- Workspace bottom nav + toast -->
       <nav class="workspace-nav" id="workspace-nav" aria-label="Workspace">
@@ -993,12 +1010,42 @@
       Object.assign(mixed.matches[2], { status: 'finished', revision: 1, played: true, score1: 21, score2: 18 });
       testRepository.emit({ role: 'scorer', accessStatus: 'approved', tournament: mixed });
       assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 2, 'Workspace shell: scorer nav is tournament+results only (2 items)');
-      assert(document.querySelectorAll('.match-card').length === 1 && document.querySelector('.match-card')?.dataset.status === 'pending', 'Match filters: defaults to Pending');
-      document.querySelector('[data-filter="live"]').click();
-      assert(document.querySelector('.match-card')?.dataset.status === 'live', 'Match filters: Live shows synchronized progress');
-      document.querySelector('[data-filter="finished"]').click();
-      assert(document.querySelector('.match-card')?.dataset.status === 'finished', 'Match filters: Finished shows final results');
-      document.querySelector('[data-filter="pending"]').click(); document.querySelector('.match-card__btn')?.click();
+
+      // ===== TOURNAMENT COMMAND CENTER (slice E): Next Match, stage progress, stacked lists — REQ-UX-30..35 =====
+      assert(document.querySelectorAll('#tournament-groups .match-card').length === 3,
+        'Group panel: the #match-filters toggle is retired — every match shows unfiltered (REQ-UX-32)');
+      var liveMatch = mixed.matches[1];
+      var liveTeam1 = mixed.teams.find(function (tm) { return tm.id === liveMatch.team1Id; });
+      var liveTeam2 = mixed.teams.find(function (tm) { return tm.id === liveMatch.team2Id; });
+      var nextMatchCardEl = document.getElementById('next-match-card');
+      assert(!nextMatchCardEl.hidden && nextMatchCardEl.textContent.indexOf(liveTeam1.name) !== -1 && nextMatchCardEl.textContent.indexOf(liveTeam2.name) !== -1,
+        'Next Match card: the live match takes precedence over pending (REQ-UX-31)');
+      assert(document.querySelector('.next-match-card__action').textContent.trim() === 'Resume scoring',
+        'Next Match card: a live next match reads "Resume scoring" (REQ-UX-31)');
+      assert(!!(nextMatchCardEl.compareDocumentPosition(document.getElementById('tournament-ops')) & Node.DOCUMENT_POSITION_FOLLOWING),
+        'Command center layout: the access-request card renders after (below) the Next Match card (REQ-UX-30/34)');
+      assert(!document.getElementById('tournament-stage-progress').hidden &&
+        document.getElementById('tournament-stage-progress').textContent.indexOf('1/3') !== -1,
+        'Stage progress: shows played/total as text (REQ-UX-33)');
+      assert(!document.getElementById('tournament-live-section').hidden &&
+        document.getElementById('tournament-live-section').textContent.indexOf('Live (1)') !== -1,
+        'Command center: Live section shows its count (REQ-UX-32)');
+      assert(!document.getElementById('tournament-pending-section').hidden &&
+        document.getElementById('tournament-pending-section').textContent.indexOf('Up next (1)') !== -1,
+        'Command center: Pending section shows its count (REQ-UX-32)');
+      assert(!document.getElementById('tournament-recently-finished-section').hidden &&
+        document.getElementById('tournament-recently-finished-section').textContent.indexOf('Recently finished (1)') !== -1,
+        'Command center: Recently finished section shows its count (REQ-UX-32)');
+
+      document.querySelector('.next-match-card__action').click();
+      var scoreboardPanelText = document.getElementById('scoreboard-panel').textContent;
+      assert(!document.getElementById('scoreboard-panel').hidden &&
+        scoreboardPanelText.indexOf(liveTeam1.name) !== -1 && scoreboardPanelText.indexOf(liveTeam2.name) !== -1,
+        'Next Match card: the action button opens the live scoreboard for the next match (REQ-UX-30)');
+      document.querySelector('.scoreboard__cancel').click();
+
+      var pendingEntryBtn = document.querySelector('#tournament-groups .match-card[data-status="pending"] .match-card__btn:not(.match-card__btn--track)');
+      pendingEntryBtn.click();
       var formButtons = document.querySelectorAll('[data-score-action]');
       assert(formButtons.length === 2, 'Scoring actions: Save progress and Finish are explicit');
       document.querySelectorAll('.score-form__input').forEach(function (input) { input.value = '5'; });
@@ -1017,18 +1064,69 @@
       testRepository.saveOutcome = { status: 'denied' }; document.getElementById('retry-score-btn').click(); await Promise.resolve();
       assert(document.getElementById('sync-status').dataset.state === 'denied', 'Scoring feedback: denied write is explicit and retryable');
       testRepository.emit({ role: 'spectator', accessStatus: 'revoked', tournament: mixed });
-      document.querySelector('[data-filter="live"]').click();
-      assert(document.querySelector('.match-card__score').textContent.includes('10'), 'Scoring live: spectators receive synchronized progress');
-      assert(!document.querySelector('.match-card__btn') && !document.getElementById('readonly-banner').hidden, 'Scoring access: revocation removes controls before the next write');
+      var liveScoreCell = document.querySelector('#tournament-groups .match-card[data-status="live"] .match-card__score');
+      assert(liveScoreCell.textContent.includes('10'), 'Scoring live: spectators receive synchronized progress');
+      assert(!document.querySelector('.match-card__btn') && !document.getElementById('readonly-banner').hidden, 'Scoring access: revocation removes controls before the next write (covers both the group panel and the command center)');
+      assert(document.getElementById('next-match-card').querySelector('.next-match-card__action') === null,
+        'Next Match card: no action button for a read-only revoked viewer (REQ-UX-40 role-visibility)');
+
       appFrame.style.cssText = 'display:block;width:320px';
       // Scoped to #tournament-section, not #app-frame: the never-truncated nav CTA ("Request
       // scoring access") needs its real >=600px single-row width here (same harness artifact
       // as the WORKSPACE SHELL block above), verified fine on a genuine 320px window.
       var tournamentSectionEl = document.getElementById('tournament-section');
-      assert(tournamentSectionEl.scrollWidth <= tournamentSectionEl.clientWidth &&
-        Array.from(document.querySelectorAll('.match-filters__btn')).every(function (button) { return button.getBoundingClientRect().height >= 44; }),
-        'Scoring mobile: 320px has no overflow and filter targets are at least 44px');
+      assert(tournamentSectionEl.scrollWidth <= tournamentSectionEl.clientWidth,
+        'Command center mobile: 320px has no overflow with the Next Match card, access card, stage progress and stacked lists rendered');
+      assert(!!(nextMatchCardEl.compareDocumentPosition(document.getElementById('tournament-groups')) & Node.DOCUMENT_POSITION_FOLLOWING),
+        'Command center layout: the Next Match card precedes the standings/bracket panels (REQ-UX-30)');
+      // Relative to the section's own box (not window.innerHeight, which the growing
+      // #test-results log above #app-frame in THIS harness page would otherwise pollute):
+      // Next Match is the first real content block after the header/status strip.
+      var sectionRect = tournamentSectionEl.getBoundingClientRect();
+      var nextMatchRect = document.getElementById('next-match-card').getBoundingClientRect();
+      assert(nextMatchRect.top >= sectionRect.top && (nextMatchRect.top - sectionRect.top) < 300,
+        'Command center mobile: the Next Match card renders near the top of the Tournament destination, only after the header/readonly-banner (REQ-UX-30)');
       appFrame.style.cssText = '';
+
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+
+      // ---- Collapse after 5 (REQ-UX-32): a 7th finished match pushes "Show all (7)" ----
+      var manyMatches = JSON.parse(JSON.stringify(mixed));
+      manyMatches.matches = [];
+      for (var mi = 0; mi < 7; mi++) {
+        manyMatches.matches.push({
+          id: 'day-match-' + mi, groupId: mixed.groups[0].id, order: mi, status: 'finished', played: true,
+          score1: 21, score2: 18, revision: 1, updatedAt: 1000 + mi,
+          team1Id: mixed.teams[0].id, team2Id: mixed.teams[1].id,
+        });
+      }
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: manyMatches });
+      var finishedSection = document.getElementById('tournament-recently-finished-section');
+      assert(finishedSection.textContent.indexOf('Recently finished (7)') !== -1, 'Collapse: the section heading names the full count (REQ-UX-32)');
+      assert(finishedSection.querySelectorAll(':scope > ul.match-list > li').length === 5,
+        'Collapse: exactly 5 rows are directly visible before the disclosure (REQ-UX-32/TOURNAMENT_DAY_COLLAPSE_AFTER)');
+      var showAllDetails = finishedSection.querySelector('details.disclosure');
+      assert(!!showAllDetails && !showAllDetails.open && showAllDetails.querySelector('summary').textContent.indexOf('Show all (7)') !== -1,
+        'Collapse: "Show all (7)" discloses the remaining 2 rows, closed by default (REQ-UX-32)');
+      assert(showAllDetails.querySelectorAll('li').length === 2, 'Collapse: the disclosure holds exactly the remaining 2 rows');
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+
+      // ---- Session-not-found (REQ-UX-62) ----
+      testRepository.emit({ tournament: null });
+      assert(!document.getElementById('session-not-found').hidden, 'Session-not-found: renders the dedicated not-found state');
+      assert(document.getElementById('tournament-section').hidden && document.getElementById('king-section').hidden,
+        'Session-not-found: neither the tournament nor King sections render');
+      assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 1 &&
+        document.querySelector('#workspace-nav-items .workspace-nav__item').dataset.viewId === 'tournament',
+        'Session-not-found: nav shows Tournament only, no Results (REQ-UX-62)');
+      document.getElementById('session-not-found-reset-btn').click();
+      assert(document.getElementById('session-not-found').hidden, 'Session-not-found: "Start a local setup" leaves the not-found state');
+      // couplesGenerated is still true from the earlier scenarios in this run, so
+      // computeWorkspace()'s default-view table correctly lands on Teams (players +
+      // teams, no active tournament/king) rather than Setup — REQ-UX-05 default-view.
+      assert(document.getElementById('workspace').dataset.view === 'teams', 'Session-not-found: "Start a local setup" returns to the organizer flow (Teams, since teams already existed)');
+      assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 4,
+        'Session-not-found: leaving restores the full 4-item owner nav');
 
       // ===== REFERENCE FORMAT END-TO-END (2×4 crossover bracket, REQ-FMT-01..05/09/23) =====
       await (async function () {
@@ -1292,15 +1390,18 @@
         document.getElementById('start-tournament-btn').click();
         await Promise.resolve(); await Promise.resolve();
 
-        document.querySelector('[data-filter="pending"]')?.click();
         assert(!!document.querySelector('.match-card__rule') && document.querySelector('.match-card__rule').textContent.includes('Set to 5'),
           'Local persistence: stage rule caption (Set to 5) renders before any score is saved');
         assert(!document.getElementById('tournament-custom-rules').hidden && document.getElementById('tournament-custom-rules-text').textContent === rulesText,
           'Local persistence: custom rules note renders before any score is saved');
-        assert(document.querySelectorAll('.match-card').length === 3, 'Local persistence: 3 pending round-robin matches rendered');
+        assert(document.querySelectorAll('#tournament-groups .match-card').length === 3, 'Local persistence: 3 pending round-robin matches rendered');
 
         // ---- "Save progress" (non-finished) through the real local commitScore path ----
-        document.querySelectorAll('.match-card__btn--track')[0].click();
+        // Scoped to the still-pending match: #match-filters is retired (REQ-UX-32) so the
+        // group's match list is no longer filtered down to only-pending — a finished match
+        // keeps its original array position, so a bare index[0] would re-target it instead
+        // of the next unplayed match once one match finishes.
+        document.querySelector('#tournament-groups .match-card[data-status="pending"] .match-card__btn--track').click();
         var inc1 = document.querySelectorAll('.scoreboard__inc')[0];
         inc1.click(); inc1.click(); // score1 = 2, well under the 5-point target — not finished
         document.querySelectorAll('.scoreboard__save')[0].click(); // 'live' status = Save progress
@@ -1312,7 +1413,9 @@
         assert(!document.getElementById('tournament-custom-rules').hidden, 'Local persistence: custom rules note still renders after the first local Save progress');
 
         // ---- Auto-finish through the real local commitScore('finished') path ----
-        document.querySelectorAll('.match-card__btn--track')[0].click(); // re-open the same match's scoreboard
+        // The same match is now 'live' (score1=2) after the Save progress above — scoped
+        // by data-status so this re-opens THAT match, not whichever is first in the array.
+        document.querySelector('#tournament-groups .match-card[data-status="live"] .match-card__btn--track').click(); // re-open the same match's scoreboard
         var incToFinish = document.querySelectorAll('.scoreboard__inc')[0];
         for (var j = 0; j < 5; j++) incToFinish.click(); // 0 -> 5, auto-finish fires on the 5th click
 
@@ -1323,12 +1426,11 @@
         assert(!document.getElementById('tournament-custom-rules').hidden, 'Local persistence: custom rules note still renders after auto-finish');
 
         // ---- Rule enforcement still applies to the NEXT match after two local saves ----
-        document.querySelector('[data-filter="pending"]')?.click();
         var nextRuleCaption = document.querySelector('.match-card__rule');
         assert(!!nextRuleCaption && nextRuleCaption.textContent.includes('Set to 5'),
           'Local persistence (BUG): stage rule caption still renders for the NEXT unplayed match after two local saves');
 
-        document.querySelectorAll('.match-card__btn--track')[0].click();
+        document.querySelector('#tournament-groups .match-card[data-status="pending"] .match-card__btn--track').click();
         var incNext = document.querySelectorAll('.scoreboard__inc')[0];
         for (var k = 0; k < 5; k++) incNext.click(); // 0 -> 5, auto-finish must still fire (pointsTo enforcement intact)
         assert(!testRepository.lastSave, 'Local persistence: next match auto-finish also used the LOCAL commitScore branch');
