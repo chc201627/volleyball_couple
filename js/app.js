@@ -70,7 +70,12 @@
   const generateBtn = document.getElementById('generate-btn');
   const generateHint = document.getElementById('generate-hint');
   const regenerateBtn = document.getElementById('regenerate-btn');
+  const editPairsBtn = document.getElementById('edit-pairs-btn');
   const clearBtn = document.getElementById('clear-btn');
+  const teamsOptionsDisclosure = document.getElementById('teams-options-disclosure');
+  const teamsModeFork = document.getElementById('teams-mode-fork');
+  const teamsForkTournamentBtn = document.getElementById('teams-fork-tournament-btn');
+  const teamsForkKingBtn = document.getElementById('teams-fork-king-btn');
 
   const pairingToggle      = document.getElementById('pairing-toggle');
   const modeRandomBtn      = document.getElementById('mode-random-btn');
@@ -82,6 +87,7 @@
   const confirmManualBtn   = document.getElementById('confirm-manual-btn');
 
   const resultsSection = document.getElementById('results-section');
+  const teamsSummaryLine = document.getElementById('teams-summary-line');
   const couplesGrid = document.getElementById('couples-grid');
   const unmatchedNotice = document.getElementById('unmatched-notice');
 
@@ -160,7 +166,10 @@
     importPreview.addEventListener('click', handleImportDelete);
     generateBtn.addEventListener('click', handleGenerate);
     regenerateBtn.addEventListener('click', handleGenerate);
+    editPairsBtn.addEventListener('click', function () { handleNavClick('setup'); });
     clearBtn.addEventListener('click', handleClearAll);
+    teamsForkTournamentBtn.addEventListener('click', handleTeamsForkTournament);
+    teamsForkKingBtn.addEventListener('click', handleTeamsForkKing);
     pairingToggle.addEventListener('click', handlePairingModeClick);
     matchTypeSelection.addEventListener('click', handleMatchTypeClick);
     manualPairBtn.addEventListener('click', handleManualPair);
@@ -750,6 +759,18 @@
     // than disappearing — the organizer needs the "Locked" note and Reset path.
     tournamentSetup.hidden = !couplesGenerated || kingState !== null;
     kingSetup.hidden = !couplesGenerated || tournamentState !== null || kingState !== null;
+
+    // REQ-UX-21/23: Regenerate/Edit pairs live behind a Teams disclosure and
+    // become read-only (not rendered) once a tournament or King game starts —
+    // team cards themselves stay read-only from that point on.
+    var teamsLocked = tournamentState !== null || kingState !== null;
+    regenerateBtn.hidden = isReadOnly || !couplesGenerated || pairingMode !== 'random' || teamsLocked;
+    editPairsBtn.hidden = isReadOnly || !couplesGenerated || pairingMode !== 'manual' || teamsLocked;
+    clearBtn.hidden = clearBtn.hidden || teamsLocked;
+    teamsOptionsDisclosure.hidden = isReadOnly || teamsLocked;
+    // REQ-UX-22: the Tournament | King of the Court fork is Teams' single
+    // "ready to start" state — same reachability window as tournamentSetup/kingSetup.
+    teamsModeFork.hidden = !couplesGenerated || teamsLocked;
     // Keep max selectable groups in sync with available teams
     if (couplesGenerated && lastResult) {
       const teamCount = lastResult.teams ? lastResult.teams.length : (lastResult.couples ? lastResult.couples.length : 0);
@@ -991,11 +1012,24 @@
     workspaceToastTimer = setTimeout(function () { workspaceToastEl.hidden = true; }, 4000);
   }
 
+  /** REQ-UX-20 summary bar above the team cards:
+   * "{teamSize}v{teamSize} · {random|manual} · {N} players · {M} teams". */
+  function renderTeamsSummary(teams) {
+    var parts = [
+      teamSize + 'v' + teamSize,
+      t(pairingMode === 'manual' ? 'pairing.modeManual' : 'pairing.modeRandom'),
+      t('workspace.summary.players', { count: players.length }),
+      t('workspace.summary.teams', { count: teams.length }),
+    ];
+    teamsSummaryLine.textContent = parts.join(' · ');
+  }
+
   function renderResults(result) {
     resultsSection.hidden = false;
     couplesGrid.innerHTML = '';
 
     const teams = result.teams || result.couples || [];
+    renderTeamsSummary(teams);
     const isCouple = teamSize === 2;
 
     const resultsHeading = document.getElementById('results-heading');
@@ -1364,6 +1398,19 @@
     updateActionButtons();
     renderChrome(); // D3: chrome is driven by the caller, never by renderKing() itself
     kingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** REQ-UX-22: the Teams mode fork navigates to Tournament before wiring
+   * into the existing start handlers, so King/Tournament always render
+   * inside the Tournament destination regardless of prior nav history. */
+  function handleTeamsForkTournament() {
+    currentView = 'tournament';
+    handleStartTournament();
+  }
+
+  function handleTeamsForkKing() {
+    currentView = 'tournament';
+    handleStartKing();
   }
 
   function handleResetKing() {
