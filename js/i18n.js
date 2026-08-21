@@ -235,6 +235,24 @@ var t, setLanguage, getLanguage;
       'king.logEntry':             '{team} wins (king at {wins})',
       'king.winnerTitle':          'Champion!',
       'king.error.notEnoughTeams': 'Need at least 2 teams to start King of the Court',
+      // Workspace navigation (REQ-UX-01..07, 60-62)
+      'workspace.nav.setup': 'Setup',
+      'workspace.nav.teams': 'Teams',
+      'workspace.nav.tournament': 'Tournament',
+      'workspace.nav.results': 'Results',
+      'workspace.nav.locked.generateTeamsFirst': 'Generate teams first',
+      'workspace.nav.locked.startFirst': 'Start a tournament first',
+      'workspace.action.addPlayers': 'Add players',
+      'workspace.action.generateTeams': 'Generate teams',
+      'workspace.action.startTournament': 'Start tournament',
+      'workspace.action.scoreNext': 'Score next match',
+      'workspace.action.shareResults': 'Share results',
+      'workspace.action.requestAccess': 'Request scoring access',
+      'workspace.action.blocked.noNextMatch': 'No match ready to score yet',
+      'workspace.readiness.enoughPlayers': 'Add more players',
+      'workspace.readiness.teamsGenerated': 'Generate teams first',
+      'workspace.readiness.groupFeasible': 'Adjust the group count',
+      'workspace.readiness.formatValid': 'Fix the tournament format',
       // Footer
 
       'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.8.1'
@@ -459,6 +477,24 @@ var t, setLanguage, getLanguage;
       'king.logEntry':             '{team} gana (rey en {wins})',
       'king.winnerTitle':          '\u00a1Campe\u00f3n!',
       'king.error.notEnoughTeams': 'Se necesitan al menos 2 equipos para iniciar',
+      // Navegaci\u00f3n del espacio de trabajo (REQ-UX-01..07, 60-62)
+      'workspace.nav.setup': 'Inicio',
+      'workspace.nav.teams': 'Equipos',
+      'workspace.nav.tournament': 'Torneo',
+      'workspace.nav.results': 'Resultados',
+      'workspace.nav.locked.generateTeamsFirst': 'Genera los equipos primero',
+      'workspace.nav.locked.startFirst': 'Inicia un torneo primero',
+      'workspace.action.addPlayers': 'Agregar jugadores',
+      'workspace.action.generateTeams': 'Generar equipos',
+      'workspace.action.startTournament': 'Iniciar torneo',
+      'workspace.action.scoreNext': 'Anotar siguiente partido',
+      'workspace.action.shareResults': 'Compartir resultados',
+      'workspace.action.requestAccess': 'Solicitar acceso para anotar',
+      'workspace.action.blocked.noNextMatch': 'A\u00fan no hay partido listo para anotar',
+      'workspace.readiness.enoughPlayers': 'Agrega m\u00e1s jugadores',
+      'workspace.readiness.teamsGenerated': 'Genera los equipos primero',
+      'workspace.readiness.groupFeasible': 'Ajusta el n\u00famero de grupos',
+      'workspace.readiness.formatValid': 'Corrige el formato del torneo',
       // Pie de p\u00e1gina
 
       'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.8.1'
