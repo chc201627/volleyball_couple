@@ -107,6 +107,12 @@
         <p class="player-list__empty" id="empty-message" data-i18n="players.empty">No players added yet</p>
       </section>
 
+      <!-- Readiness checklist (REQ-UX-11/12) — before both CTAs (Generate/Start) -->
+      <section class="section section--readiness" id="readiness-checklist" aria-labelledby="readiness-heading" data-view-slot="setup">
+        <h2 id="readiness-heading" class="section__heading" data-i18n="workspace.checklist.heading">Ready to start</h2>
+        <ul class="readiness" id="readiness-list"></ul>
+      </section>
+
       <!-- Setup Actions -->
       <section class="section section--actions" id="setup-actions" aria-labelledby="actions-heading" data-view-slot="setup">
         <h2 id="actions-heading" class="sr-only">Actions</h2>
@@ -210,12 +216,6 @@
             </button>
           </div>
         </div>
-      </section>
-
-      <!-- Readiness checklist (REQ-UX-11/12) -->
-      <section class="section section--readiness" id="readiness-checklist" aria-labelledby="readiness-heading" data-view-slot="setup">
-        <h2 id="readiness-heading" class="section__heading" data-i18n="workspace.checklist.heading">Ready to start</h2>
-        <ul class="readiness" id="readiness-list"></ul>
       </section>
 
       <!-- Teams Actions -->
@@ -827,6 +827,16 @@
         'Setup summary: shows the player count before any players are added');
 
       addPlayer('R1', 'male'); addPlayer('R2', 'female'); addPlayer('R3', 'male');
+      appFrame.style.cssText = 'display:block;width:320px';
+      var summaryLineEl = document.getElementById('event-summary-line');
+      assert(summaryLineEl.textContent.indexOf('Random') !== -1, 'Setup summary: pairing mode is shown before teams are generated (unconditional)');
+      assert(summaryLineEl.textContent.indexOf('2M') !== -1 && summaryLineEl.textContent.indexOf('1F') !== -1,
+        'Setup summary: gender counts are included (2M 1F 0U of 3 players)');
+      assert(summaryLineEl.scrollWidth <= summaryLineEl.clientWidth, 'Setup summary (EN): no truncation/overflow within its own box at 320px');
+      setLanguage('es');
+      assert(summaryLineEl.scrollWidth <= summaryLineEl.clientWidth, 'Setup summary (ES): no truncation/overflow within its own box at 320px');
+      setLanguage('en');
+      appFrame.style.cssText = '';
       var readinessItems = document.querySelectorAll('#readiness-list .readiness__item');
       assert(readinessItems.length === 6, 'Setup readiness: 6 items render (Firebase configured in this harness)');
       assert(document.querySelector('#readiness-list [data-readiness-key="enoughPlayers"]').classList.contains('readiness__item--not-ok'),
@@ -856,6 +866,19 @@
         'Format lock: all group options are disabled while locked');
       assert(document.querySelector('#format-preset-options [data-preset="classic"]').disabled,
         'Format lock: format preset buttons are disabled while locked');
+
+      // Hidden (display:none) slots measure 0x0 — force the CSS slot filter
+      // to Setup directly (not via handleNavClick(), which would permanently
+      // mutate the persistent currentView state for later tests) so the real
+      // layout box is measurable (REQ-UX-73 / CLAUDE.md 44px touch target).
+      // The next renderChrome() (setLanguage('es') below) recomputes this
+      // from computeWorkspace() again, so nothing leaks past this check.
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.getElementById('workspace').dataset.view = 'setup';
+      var resetBtnRect = document.getElementById('format-locked-reset-btn').getBoundingClientRect();
+      assert(resetBtnRect.height >= 44, 'Format lock: Reset button is at least 44px tall with Setup active at 320px (REQ-UX-73)');
+      appFrame.style.cssText = '';
+
       setLanguage('es');
       assert(document.getElementById('format-locked-note').textContent.indexOf('Bloqueado') !== -1,
         'Format lock: note text is localized to Spanish');
@@ -921,6 +944,15 @@
       assertSingleRowNoTruncation('ES');
       setLanguage('en');
       appFrame.style.cssText = '';
+
+      // ===== READINESS: firebaseConnected reflects real session connectivity (REQ-UX-11/80) =====
+      testRepository.emit({ role: 'owner', connection: 'offline' });
+      var offlineItem = document.querySelector('#readiness-list [data-readiness-key="firebaseConnected"]');
+      assert(offlineItem.classList.contains('readiness__item--warn'), 'Readiness: firebaseConnected flips to warn when the session reports offline connectivity');
+      assert(offlineItem.textContent.indexOf('⚠') !== -1, 'Readiness: offline connectivity uses the warning icon, not color alone (REQ-UX-72)');
+      testRepository.emit({ role: 'owner', connection: 'online' });
+      assert(document.querySelector('#readiness-list [data-readiness-key="firebaseConnected"]').classList.contains('readiness__item--ok'),
+        'Readiness: firebaseConnected returns to ok once the session reports online again');
 
       testRepository.emit({ role: 'spectator', authState: 'pending', accessStatus: null });
       assert(document.getElementById('request-access-btn').disabled && !document.querySelector('.match-card__btn'), 'Scoring access: auth pending remains readable and disables editing');

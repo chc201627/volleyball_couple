@@ -166,6 +166,10 @@
       'firebaseConnected readiness item only appears when firebaseAvailable is true');
     var withoutFirebase = computeWorkspace(baseInput({ firebaseAvailable: false })).readiness;
     assert(!withoutFirebase.some(function (r) { return r.key === 'firebaseConnected'; }), 'firebaseConnected is omitted when Firebase is not configured');
+    var noSignalYet = computeWorkspace(baseInput({ firebaseAvailable: true })).readiness.filter(function (r) { return r.key === 'firebaseConnected'; })[0];
+    assert(noSignalYet.ok === true, 'firebaseConnected defaults to ok when no session is subscribed yet (undefined input)');
+    var offlineItem = computeWorkspace(baseInput({ firebaseAvailable: true, firebaseConnected: false })).readiness.filter(function (r) { return r.key === 'firebaseConnected'; })[0];
+    assert(offlineItem.ok === false && offlineItem.blocking === false, 'firebaseConnected: false -> not-ok, still non-blocking (REQ-UX-80 offline cell)');
 
     // ===== Summary =====
     const total = passed + failed;
