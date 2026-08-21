@@ -1170,6 +1170,101 @@
       appFrame.style.cssText = '';
       testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
 
+      // ===== SCORING VIEW (slice F): back/context, Finish confirmation, conflict Retry/Discard, revoked — REQ-UX-40..44 =====
+      document.querySelector('.next-match-card__action').click();
+      var scoreboardPanel = document.getElementById('scoreboard-panel');
+      assert(!scoreboardPanel.hidden && !!scoreboardPanel.querySelector('.scoreboard__back') && !!scoreboardPanel.querySelector('#scoring-sync'),
+        'Scoring view: opens with a back affordance and an in-view sync chip (REQ-UX-40/43)');
+      assert(scoreboardPanel.querySelector('.scoreboard__rule').textContent.indexOf('Group') !== -1,
+        'Scoring view: shows the stage/group context (REQ-UX-40)');
+      // #app-frame is display:none by default (:16) — must be visible for any geometry
+      // check (getBoundingClientRect) to return real, non-zero values.
+      appFrame.style.cssText = 'display:block';
+      var scoreCtrlBtns = scoreboardPanel.querySelectorAll('.scoreboard__dec, .scoreboard__inc');
+      assert(scoreCtrlBtns.length === 4 && Array.from(scoreCtrlBtns).every(function (b) {
+        var r = b.getBoundingClientRect(); return r.width >= 56 && r.height >= 56;
+      }), 'Scoring view: +/- controls meet the 56x56 outdoor-readable size (REQ-UX-40)');
+
+      // A forced #app-frame width does NOT change the real (wide, default-run) viewport,
+      // so the >=600px media query padding still applies here — only a genuinely narrow
+      // window (window.innerWidth <= 360, driven by Playwright's setViewportSize in the
+      // true-320 verification pass) makes this assertion meaningful; see slice E's
+      // forward notes on the --window-size clamp for the same class of pitfall.
+      appFrame.style.cssText = 'display:block;width:320px';
+      if (window.innerWidth > 360) {
+        console.log('SKIPPED (window > 360)');
+      } else {
+        assert(scoreboardPanel.scrollWidth <= scoreboardPanel.clientWidth,
+          'Scoring view mobile: 320px has no overflow with the header, context line, teams grid and actions rendered (REQ-UX-73)');
+      }
+      // Stays visible (not reset to '') through the rest of this section: the focus
+      // assertions below need #app-frame actually rendered, not display:none (:16).
+      appFrame.style.cssText = 'display:block';
+
+      var incBtns = scoreboardPanel.querySelectorAll('.scoreboard__inc');
+      for (var si = 0; si < 5; si++) incBtns[0].click();
+      for (var sj = 0; sj < 3; sj++) incBtns[1].click();
+      testRepository.lastSave = null; // isolate this assertion from any earlier section's save
+      document.querySelector('.scoreboard__save--finish').click();
+      assert(testRepository.lastSave === null,
+        'Scoring view: Finish shows an in-view confirmation and does not save until Confirm (REQ-UX-41)');
+      var finishConfirmEl = scoreboardPanel.querySelector('.finish-confirm');
+      assert(!!finishConfirmEl && finishConfirmEl.textContent.indexOf('5') !== -1 && finishConfirmEl.textContent.indexOf('3') !== -1,
+        'Scoring view: the confirm row names the exact score about to be saved (REQ-UX-41)');
+      assert(document.activeElement === scoreboardPanel.querySelector('.finish-confirm__confirm'),
+        'Scoring view: Finish moves focus to Confirm (REQ-UX-41/F.6)');
+
+      scoreboardPanel.querySelector('.finish-confirm__keep-scoring').click();
+      assert(!scoreboardPanel.querySelector('.finish-confirm'), 'Scoring view: Keep scoring dismisses the confirm row without saving');
+      assert(document.activeElement === scoreboardPanel.querySelector('.scoreboard__save--finish'),
+        'Scoring view: Keep scoring returns focus to Finish (REQ-UX-41/F.6)');
+
+      var confirmSave2; testRepository.saveOutcome = new Promise(function (resolve) { confirmSave2 = resolve; });
+      scoreboardPanel.querySelector('.scoreboard__save--finish').click();
+      scoreboardPanel.querySelector('.finish-confirm__confirm').click();
+      assert(document.getElementById('sync-status').dataset.state === 'saving' && scoreboardPanel.querySelector('.scoreboard__inc').disabled,
+        'Scoring view: Confirm saves and disables controls while the write is in flight');
+      confirmSave2({ status: 'conflict', current: { score1: 21, score2: 19, revision: 5 } });
+      await Promise.resolve(); await Promise.resolve();
+      var conflictEl = scoreboardPanel.querySelector('.scoring-conflict');
+      assert(!!conflictEl && conflictEl.textContent.indexOf('5') !== -1 && conflictEl.textContent.indexOf('21') !== -1 && conflictEl.textContent.indexOf('19') !== -1,
+        'Scoring view: conflict shows both the local (not saved) attempt and the server confirmed score in-view (REQ-UX-42)');
+      assert(document.activeElement === conflictEl, 'Scoring view: conflict moves focus to the conflict alert (F.6)');
+
+      var retryOutcome; testRepository.saveOutcome = new Promise(function (resolve) { retryOutcome = resolve; });
+      scoreboardPanel.querySelector('.scoring-conflict__retry').click();
+      assert(testRepository.lastSave && testRepository.lastSave.score1 === 5 && testRepository.lastSave.score2 === 3,
+        'Scoring view: Retry resubmits exactly the local attempt that was rejected, not a stale or adjusted value (REQ-UX-42)');
+      retryOutcome({ status: 'conflict', current: { score1: 21, score2: 19, revision: 6 } });
+      await Promise.resolve(); await Promise.resolve();
+      scoreboardPanel.querySelector('.scoring-conflict__discard').click();
+      var postDiscardScores = Array.from(scoreboardPanel.querySelectorAll('.scoreboard__score')).map(function (el) { return el.textContent; });
+      assert(!scoreboardPanel.querySelector('.scoring-conflict') && postDiscardScores[0] === '21' && postDiscardScores[1] === '19',
+        'Scoring view: Discard clears the local attempt and keeps the confirmed result — never silently overwritten (REQ-UX-42)');
+
+      testRepository.saveOutcome = { status: 'denied' };
+      scoreboardPanel.querySelector('.scoreboard__save--finish').click();
+      scoreboardPanel.querySelector('.finish-confirm__confirm').click();
+      await Promise.resolve();
+      assert(document.getElementById('sync-status').dataset.state === 'denied' &&
+        scoreboardPanel.querySelector('.scoreboard__inc').disabled && !!scoreboardPanel.querySelector('.scoreboard__denied'),
+        'Scoring view: a denied write disables controls and names the reason in-view (REQ-UX-43)');
+
+      testRepository.emit({ role: 'spectator', accessStatus: 'revoked', tournament: mixed });
+      assert(!document.getElementById('scoreboard-panel').hidden && !document.querySelector('.scoreboard__dec'),
+        'Scoring view: access revoked mid-scoring keeps the view open but removes every control (REQ-UX-43)');
+      assert(document.querySelector('.scoreboard__revoked').textContent.indexOf('revoked') !== -1,
+        'Scoring view: names "Access revoked" in-view, mirroring the persistent status strip (REQ-UX-43)');
+      assert(document.getElementById('sync-status').dataset.state === 'revoked',
+        'Scoring view: the 7th sync state (revoked) mirrors in the persistent strip too (REQ-UX-43)');
+      var revokedLabels = document.querySelectorAll('.scoreboard__match-label');
+      assert(revokedLabels.length === 2 && revokedLabels[1].textContent.indexOf('10') !== -1,
+        'Scoring view: the confirmed result stays visible after revoke — the server write is never lost (REQ-UX-42/43)');
+      document.querySelector('.scoreboard__back').click();
+      assert(document.getElementById('scoreboard-panel').hidden, 'Scoring view: Back still closes the revoked view');
+      appFrame.style.cssText = '';
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+
       // ---- Session-not-found (REQ-UX-62) ----
       testRepository.emit({ tournament: null });
       assert(!document.getElementById('session-not-found').hidden, 'Session-not-found: renders the dedicated not-found state');
@@ -1498,7 +1593,9 @@
         // by data-status so this re-opens THAT match, not whichever is first in the array.
         document.querySelector('#tournament-groups .match-card[data-status="live"] .match-card__btn--track').click(); // re-open the same match's scoreboard
         var incToFinish = document.querySelectorAll('.scoreboard__inc')[0];
-        for (var j = 0; j < 5; j++) incToFinish.click(); // 0 -> 5, auto-finish fires on the 5th click
+        for (var j = 0; j < 5; j++) incToFinish.click(); // 0 -> 5, the 5th click requests Finish confirmation (REQ-UX-41)
+        assert(!!document.querySelector('.finish-confirm'), 'Local persistence: auto-finish routes through the same in-view confirm as a manual Finish (REQ-UX-41)');
+        document.querySelector('.finish-confirm__confirm').click(); // Confirm commits — same expectedRevision/local-save transaction as before
 
         assert(!testRepository.lastSave, 'Local persistence: auto-finish used the LOCAL commitScore branch, not tournamentRepository.saveResult()');
         var persistedAfterAutoFinish = JSON.parse(localStorage.getItem('bv-tournament'));
@@ -1513,7 +1610,8 @@
 
         document.querySelector('#tournament-groups .match-card[data-status="pending"] .match-card__btn--track').click();
         var incNext = document.querySelectorAll('.scoreboard__inc')[0];
-        for (var k = 0; k < 5; k++) incNext.click(); // 0 -> 5, auto-finish must still fire (pointsTo enforcement intact)
+        for (var k = 0; k < 5; k++) incNext.click(); // 0 -> 5, pointsTo enforcement still requests Finish confirmation
+        document.querySelector('.finish-confirm__confirm').click(); // Confirm commits, matching the auto-finish above
         assert(!testRepository.lastSave, 'Local persistence: next match auto-finish also used the LOCAL commitScore branch');
         var persistedAfterNextMatch = JSON.parse(localStorage.getItem('bv-tournament'));
         assert(persistedAfterNextMatch.matches.filter(function (m) { return m.status === 'finished'; }).length === 2,
