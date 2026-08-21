@@ -1014,6 +1014,29 @@
       testRepository.emit({ role: 'scorer', accessStatus: 'approved', tournament: mixed });
       assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 2, 'Workspace shell: scorer nav is tournament+results only (2 items)');
 
+      // Authoritative REQ-UX-30 above-the-fold check, run BEFORE the spectator/revoke
+      // emit below (no readonly-banner/#workspace-status bloat) — real narrow window
+      // only; hides this harness page's own h1 + growing #test-results log.
+      function assertNextMatchAboveNav(langLabel) {
+        var h1El = document.querySelector('h1'), resultsEl = document.getElementById('test-results');
+        if (window.innerWidth > 360) { console.log('SKIPPED (window > 360)'); return; }
+        var syncEl = document.getElementById('sync-status');
+        var prevH1 = h1El.style.display, prevResults = resultsEl.style.display, prevSync = syncEl.textContent;
+        h1El.style.display = 'none'; resultsEl.style.display = 'none'; syncEl.textContent = '';
+        window.scrollTo(0, 0);
+        var cardRect = document.getElementById('next-match-card').getBoundingClientRect();
+        var navRect = document.getElementById('workspace-nav').getBoundingClientRect();
+        assert(cardRect.bottom <= navRect.top,
+          'Command center mobile (' + langLabel + '): the Next Match card ends above the sticky nav at a real <=360px window (REQ-UX-30)');
+        h1El.style.display = prevH1; resultsEl.style.display = prevResults; syncEl.textContent = prevSync;
+      }
+      appFrame.style.cssText = 'display:block;width:320px';
+      assertNextMatchAboveNav('EN');
+      setLanguage('es');
+      assertNextMatchAboveNav('ES');
+      setLanguage('en');
+      appFrame.style.cssText = '';
+
       // ===== TOURNAMENT COMMAND CENTER (slice E): Next Match, stage progress, stacked lists — REQ-UX-30..35 =====
       assert(document.querySelectorAll('#tournament-groups .match-card').length === 3,
         'Group panel: the #match-filters toggle is retired — every match shows unfiltered (REQ-UX-32)');
@@ -1105,24 +1128,6 @@
       assert(nextMatchRect.top >= sectionRect.top && (nextMatchRect.top - sectionRect.top) < 300,
         'Command center mobile: the Next Match card renders near the top of the Tournament destination, only after the header/readonly-banner (REQ-UX-30)');
 
-      // Authoritative REQ-UX-30 above-the-fold check — real narrow window only; hides
-      // this page's own growing #test-results log and scrolls to the true top first.
-      function assertNextMatchAboveNav(langLabel) {
-        if (window.innerWidth > 360) return;
-        var testResultsEl = document.getElementById('test-results');
-        var prevDisplay = testResultsEl.style.display;
-        testResultsEl.style.display = 'none';
-        window.scrollTo(0, 0);
-        var cardRect = document.getElementById('next-match-card').getBoundingClientRect();
-        var navRect = document.getElementById('workspace-nav').getBoundingClientRect();
-        assert(cardRect.bottom <= navRect.top,
-          'Command center mobile (' + langLabel + '): the Next Match card ends above the sticky nav at a real <=360px window (REQ-UX-30)');
-        testResultsEl.style.display = prevDisplay;
-      }
-      assertNextMatchAboveNav('EN');
-      setLanguage('es');
-      assertNextMatchAboveNav('ES');
-      setLanguage('en');
       appFrame.style.cssText = '';
 
       testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });

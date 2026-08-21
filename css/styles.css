@@ -2037,8 +2037,8 @@ textarea {
 .next-match-card__inner {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
+  gap: 6px;
+  padding: 8px 16px;
   border: 2px solid var(--color-primary);
   border-radius: var(--radius);
   background: var(--color-white);

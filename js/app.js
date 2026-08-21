@@ -982,7 +982,8 @@
     if (ref.type === 'next-match-action') {
       target = nextMatchCardEl.querySelector('.next-match-card__action');
     } else if (ref.type === 'access-member') {
-      target = accessMembers.querySelector('[data-member="' + ref.member + '"][data-access="' + ref.access + '"]');
+      target = accessMembers.querySelector('[data-member="' + ref.member + '"][data-access="' + ref.access + '"]') ||
+        accessMembers.querySelector('[data-member="' + ref.member + '"]');
     } else if (ref.type === 'show-all-summary') {
       var section = document.getElementById(ref.sectionId);
       target = section && section.querySelector('.match-day-section__more > summary');
