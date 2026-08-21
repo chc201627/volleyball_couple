@@ -680,10 +680,20 @@
     });
   }
 
+  /** Shared source data for both the Players heading's gender breakdown and
+   * the event summary's compact gender-count segment (REQ-UX-10). */
+  function computeGenderCounts() {
+    var male = 0, female = 0, unspecified = 0;
+    players.forEach(function (p) {
+      if (p.gender === 'male') male++;
+      else if (p.gender === 'female') female++;
+      else unspecified++;
+    });
+    return { male: male, female: female, unspecified: unspecified };
+  }
+
   function renderCounts() {
-    const maleCount = players.filter(p => p.gender === 'male').length;
-    const femaleCount = players.filter(p => p.gender === 'female').length;
-    const unspecifiedCount = players.filter(p => p.gender !== 'male' && p.gender !== 'female').length;
+    var counts = computeGenderCounts();
 
     // Reconstruct heading with translatable text and a live count span
     playersHeading.textContent = '';
@@ -698,7 +708,7 @@
       playersHeading.appendChild(document.createTextNode(parts[1]));
     }
 
-    genderCounts.textContent = t('players.genderCounts', { males: maleCount, females: femaleCount, unspecified: unspecifiedCount });
+    genderCounts.textContent = t('players.genderCounts', { males: counts.male, females: counts.female, unspecified: counts.unspecified });
   }
 
   function updateActionButtons() {
@@ -790,6 +800,10 @@
       hasNextMatch: hasNextMatch,
       pendingRequestCount: pendingRequestCount,
       firebaseAvailable: tournamentRepository !== null,
+      // Real per-session connectivity (REQ-UX-11/80) — no signal exists
+      // before a session is subscribed, so this stays undefined (defaults
+      // to ok in workspace.js) until subscribeToSession() populates it.
+      firebaseConnected: sessionSnapshot ? sessionSnapshot.connection !== 'offline' : undefined,
       currentView: currentView,
     };
   }
@@ -814,14 +828,21 @@
     renderTournamentSetupState(view);
   }
 
-  /** REQ-UX-10: compact "{players} · {teamSize}vs{teamSize} · {mode} ·
-   * {teams} · {format|King}" line atop Setup. Reuses existing translated
-   * labels (pairing mode, format preset, King heading) to avoid duplicate
-   * i18n keys. */
+  /** REQ-UX-10: compact "{players} · {genderCounts} · {teamSize}vs{teamSize}
+   * · {mode} · {teams} · {format|King}" line atop Setup. Gender counts reuse
+   * computeGenderCounts()/the badge letters shown in the player list; mode
+   * is shown unconditionally (it is already selected before teams exist),
+   * not gated on couplesGenerated. Wraps via .event-summary__line's
+   * overflow-wrap:anywhere rather than truncating at 320px. */
   function renderEventSummary() {
-    var parts = [t('workspace.summary.players', { count: players.length }), teamSize + 'vs' + teamSize];
+    var counts = computeGenderCounts();
+    var parts = [
+      t('workspace.summary.players', { count: players.length }),
+      counts.male + t('players.badgeMale') + ' ' + counts.female + t('players.badgeFemale') + ' ' + counts.unspecified + t('players.badgeUnspecified'),
+      teamSize + 'vs' + teamSize,
+      t(pairingMode === 'manual' ? 'pairing.modeManual' : 'pairing.modeRandom'),
+    ];
     if (couplesGenerated) {
-      parts.push(t(pairingMode === 'manual' ? 'pairing.modeManual' : 'pairing.modeRandom'));
       var teams = lastResult ? (lastResult.teams || lastResult.couples || []) : [];
       parts.push(t('workspace.summary.teams', { count: teams.length }));
     }

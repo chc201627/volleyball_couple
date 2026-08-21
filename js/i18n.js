@@ -270,6 +270,7 @@ var t, setLanguage, getLanguage;
       'workspace.checklist.formatValid.ok': 'Tournament format is valid',
       'workspace.checklist.formatValid.blocked': 'Fix the tournament format',
       'workspace.checklist.firebaseConnected.ok': 'Connection available',
+      'workspace.checklist.firebaseConnected.warn': 'Connection unavailable — offline',
       'workspace.setup.formatLocked.note': 'Locked — reset tournament to change',
       // Footer
 
@@ -530,6 +531,7 @@ var t, setLanguage, getLanguage;
       'workspace.checklist.formatValid.ok': 'El formato del torneo es v\u00e1lido',
       'workspace.checklist.formatValid.blocked': 'Corrige el formato del torneo',
       'workspace.checklist.firebaseConnected.ok': 'Conexi\u00f3n disponible',
+      'workspace.checklist.firebaseConnected.warn': 'Sin conexi\u00f3n \u2014 modo sin conexi\u00f3n',
       'workspace.setup.formatLocked.note': 'Bloqueado \u2014 reinicia el torneo para cambiarlo',
       // Pie de p\u00e1gina
 
