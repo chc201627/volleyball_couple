@@ -1201,9 +1201,18 @@
       // assertions below need #app-frame actually rendered, not display:none (:16).
       appFrame.style.cssText = 'display:block';
 
+      // ---- Focus survival (corrective pass): an unrelated snapshot must never drop
+      // focus to <body> — refreshScoreboardPanel() now captures/restores it. ----
       var incBtns = scoreboardPanel.querySelectorAll('.scoreboard__inc');
-      for (var si = 0; si < 5; si++) incBtns[0].click();
-      for (var sj = 0; sj < 3; sj++) incBtns[1].click();
+      incBtns[0].focus();
+      assert(document.activeElement === incBtns[0], 'Focus survival (scoring): a +/- control is focused before the re-render');
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+      var incBtnsAfter = scoreboardPanel.querySelectorAll('.scoreboard__inc');
+      assert(document.activeElement === incBtnsAfter[0],
+        'Focus survival (scoring): a +/- control keeps focus across an unrelated snapshot re-render (F.6)');
+
+      for (var si = 0; si < 5; si++) incBtnsAfter[0].click();
+      for (var sj = 0; sj < 3; sj++) incBtnsAfter[1].click();
       testRepository.lastSave = null; // isolate this assertion from any earlier section's save
       document.querySelector('.scoreboard__save--finish').click();
       assert(testRepository.lastSave === null,
@@ -1213,12 +1222,17 @@
         'Scoring view: the confirm row names the exact score about to be saved (REQ-UX-41)');
       assert(document.activeElement === scoreboardPanel.querySelector('.finish-confirm__confirm'),
         'Scoring view: Finish moves focus to Confirm (REQ-UX-41/F.6)');
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+      assert(document.activeElement === scoreboardPanel.querySelector('.finish-confirm__confirm'),
+        'Focus survival (scoring): Confirm keeps focus across an unrelated snapshot re-render (F.6)');
 
       scoreboardPanel.querySelector('.finish-confirm__keep-scoring').click();
       assert(!scoreboardPanel.querySelector('.finish-confirm'), 'Scoring view: Keep scoring dismisses the confirm row without saving');
       assert(document.activeElement === scoreboardPanel.querySelector('.scoreboard__save--finish'),
         'Scoring view: Keep scoring returns focus to Finish (REQ-UX-41/F.6)');
 
+      // ---- Conflict on match A, then a cross-match integrity check (corrective pass, REQ-UX-42) ----
+      var matchAId = mixed.matches[1].id;
       var confirmSave2; testRepository.saveOutcome = new Promise(function (resolve) { confirmSave2 = resolve; });
       scoreboardPanel.querySelector('.scoreboard__save--finish').click();
       scoreboardPanel.querySelector('.finish-confirm__confirm').click();
@@ -1231,16 +1245,36 @@
         'Scoring view: conflict shows both the local (not saved) attempt and the server confirmed score in-view (REQ-UX-42)');
       assert(document.activeElement === conflictEl, 'Scoring view: conflict moves focus to the conflict alert (F.6)');
 
+      document.querySelector('.scoreboard__back').click(); // leaves A's conflict unresolved (lastScoreCommand/syncStatus untouched)
+      document.querySelector('#tournament-groups .match-card[data-status="pending"] .match-card__btn--track').click(); // open a DIFFERENT match, B
+      assert(!scoreboardPanel.querySelector('.scoring-conflict') && !scoreboardPanel.querySelector('.scoreboard__inc').disabled &&
+        !scoreboardPanel.querySelector('.scoring-conflict__retry'),
+        'Scoring view integrity: match A\'s conflict never leaks into match B\'s controls, chip or conflict block (REQ-UX-42)');
+      document.querySelector('.scoreboard__back').click();
+      document.querySelector('#tournament-groups .match-card[data-status="live"] .match-card__btn--track').click(); // reopen A
+      assert(!!scoreboardPanel.querySelector('.scoring-conflict') && scoreboardPanel.querySelector('.scoring-conflict').textContent.indexOf('21') !== -1,
+        'Scoring view integrity: reopening match A still shows its own unresolved conflict (REQ-UX-42)');
+
       var retryOutcome; testRepository.saveOutcome = new Promise(function (resolve) { retryOutcome = resolve; });
       scoreboardPanel.querySelector('.scoring-conflict__retry').click();
-      assert(testRepository.lastSave && testRepository.lastSave.score1 === 5 && testRepository.lastSave.score2 === 3,
-        'Scoring view: Retry resubmits exactly the local attempt that was rejected, not a stale or adjusted value (REQ-UX-42)');
+      assert(testRepository.lastSave && testRepository.lastSave.matchId === matchAId &&
+        testRepository.lastSave.score1 === 5 && testRepository.lastSave.score2 === 3,
+        'Scoring view: Retry resubmits exactly the local attempt that was rejected, for the SAME match (REQ-UX-42)');
       retryOutcome({ status: 'conflict', current: { score1: 21, score2: 19, revision: 6 } });
       await Promise.resolve(); await Promise.resolve();
       scoreboardPanel.querySelector('.scoring-conflict__discard').click();
       var postDiscardScores = Array.from(scoreboardPanel.querySelectorAll('.scoreboard__score')).map(function (el) { return el.textContent; });
       assert(!scoreboardPanel.querySelector('.scoring-conflict') && postDiscardScores[0] === '21' && postDiscardScores[1] === '19',
         'Scoring view: Discard clears the local attempt and keeps the confirmed result — never silently overwritten (REQ-UX-42)');
+
+      // ---- Offline (corrective pass, REQ-UX-43): in-view Retry for THIS match, values kept ----
+      testRepository.saveOutcome = { status: 'offline' };
+      scoreboardPanel.querySelector('.scoreboard__save--finish').click();
+      scoreboardPanel.querySelector('.finish-confirm__confirm').click();
+      await Promise.resolve();
+      var offlineEl = scoreboardPanel.querySelector('.scoring-offline');
+      assert(!!offlineEl && !!offlineEl.querySelector('.scoring-offline__retry') && !scoreboardPanel.querySelector('.scoreboard__inc').disabled,
+        'Scoring view: offline shows an in-view Retry for this match and keeps the local value editable (REQ-UX-43)');
 
       testRepository.saveOutcome = { status: 'denied' };
       scoreboardPanel.querySelector('.scoreboard__save--finish').click();
@@ -1250,6 +1284,35 @@
         scoreboardPanel.querySelector('.scoreboard__inc').disabled && !!scoreboardPanel.querySelector('.scoreboard__denied'),
         'Scoring view: a denied write disables controls and names the reason in-view (REQ-UX-43)');
 
+      // ---- Long team-name clamp (corrective pass, REQ-UX-40/73): never grows past 2 lines ----
+      document.querySelector('.scoreboard__back').click();
+      var longNameTournament = JSON.parse(JSON.stringify(mixed));
+      var longName = 'Extremely Long Beach Volleyball Team Name That Keeps Going On';
+      // Rename whichever team is actually team1 of the live match — teams[] array order
+      // is not guaranteed to match a given match's team1Id/team2Id.
+      var liveMatchForClamp = longNameTournament.matches[1];
+      longNameTournament.teams.find(function (tm) { return tm.id === liveMatchForClamp.team1Id; }).name = longName;
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: longNameTournament });
+      document.querySelector('#tournament-groups .match-card[data-status="live"] .match-card__btn--track').click();
+      if (window.innerWidth > 360) {
+        console.log('SKIPPED (window > 360)');
+      } else {
+        var longNameEl = scoreboardPanel.querySelector('.scoreboard__team-name');
+        var lineHeight = parseFloat(getComputedStyle(longNameEl).lineHeight);
+        assert(longNameEl.getBoundingClientRect().height <= lineHeight * 2 + 1,
+          'Scoring view: a long team name clamps to 2 lines at true 320 EN (REQ-UX-40/73)');
+        assert(longNameEl.title === longName, 'Scoring view: the full team name stays available via title once clamped');
+        setLanguage('es');
+        var longNameElEs = scoreboardPanel.querySelector('.scoreboard__team-name');
+        assert(longNameElEs.getBoundingClientRect().height <= parseFloat(getComputedStyle(longNameElEs).lineHeight) * 2 + 1,
+          'Scoring view: a long team name clamps to 2 lines at true 320 ES (REQ-UX-40/73)');
+        setLanguage('en');
+      }
+      document.querySelector('.scoreboard__back').click();
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+
+      // ---- Revoked mid-scoring ----
+      document.querySelector('#tournament-groups .match-card[data-status="live"] .match-card__btn--track').click();
       testRepository.emit({ role: 'spectator', accessStatus: 'revoked', tournament: mixed });
       assert(!document.getElementById('scoreboard-panel').hidden && !document.querySelector('.scoreboard__dec'),
         'Scoring view: access revoked mid-scoring keeps the view open but removes every control (REQ-UX-43)');

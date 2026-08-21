@@ -1383,7 +1383,11 @@ textarea {
   color: var(--color-text);
   text-align: center;
   line-height: 1.3;
-  word-break: break-word;
+  overflow-wrap: anywhere; /* REQ-UX-40/73: clamp to 2 lines, never grow the card unbounded */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .scoreboard__score {
@@ -1615,6 +1619,34 @@ textarea {
 .scoring-conflict__discard {
   background-color: var(--color-white);
   color: var(--color-error);
+}
+
+/* Offline (REQ-UX-43): in-view Retry for THIS match's queued write */
+.scoring-offline {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background-color: #fff3e0;
+  border: 1.5px solid var(--color-warning);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.scoring-offline__message {
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 10px;
+}
+
+.scoring-offline__retry {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  background-color: var(--color-warning);
+  color: var(--color-white);
+  border: none;
 }
 
 /* Second button in match card */
