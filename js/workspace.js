@@ -30,7 +30,11 @@ function workspaceReadiness(input) {
   var formatValid = !input.formatValidation || input.formatValidation.valid !== false;
   items.push({ key: 'formatValid', ok: formatValid, blocking: true, params: {} });
   if (input.firebaseAvailable) {
-    items.push({ key: 'firebaseConnected', ok: true, blocking: false, params: {} });
+    // input.firebaseConnected reflects the real per-session connectivity
+    // once a Firebase session exists; omitted/undefined means "no signal
+    // yet" (no session subscribed) and defaults to ok — REQ-UX-11/80's
+    // offline warning cell becomes reachable once a session reports it.
+    items.push({ key: 'firebaseConnected', ok: input.firebaseConnected !== false, blocking: false, params: {} });
   }
   return items;
 }

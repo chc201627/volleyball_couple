@@ -1959,3 +1959,25 @@ textarea {
   .workspace-nav__cta { order: 0; flex-basis: auto; max-width: 40%; }
   .toast { bottom: 88px; }
 }
+
+/* --- Guided Setup: event summary, readiness checklist, format lock (REQ-UX-10..13) --- */
+.section--summary { padding: 12px 16px; }
+.event-summary__line { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+
+.readiness { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.readiness__item { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; min-height: 44px; }
+.readiness__icon { flex: 0 0 auto; width: 20px; text-align: center; font-weight: 700; }
+.readiness__text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.readiness__item--ok .readiness__icon { color: var(--color-success); }
+.readiness__item--not-ok .readiness__icon { color: var(--color-error); }
+.readiness__item--not-ok .readiness__text { color: var(--color-error); font-weight: 600; }
+.readiness__item--warn .readiness__icon { color: var(--color-warning-dark); }
+.readiness__item--warn .readiness__text { color: var(--color-text-secondary); }
+
+.format-locked-note {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  width: 100%; padding: 10px 12px; background: var(--color-bg); border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+.format-locked-note__text { margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.format-locked-note .btn { min-height: 44px; } /* REQ-UX-73: .btn--small's 36px is too short here */
