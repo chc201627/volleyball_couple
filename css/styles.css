@@ -3,27 +3,116 @@
    Mobile-first responsive styles (BEM)
    ============================================ */
 
-/* --- CSS Custom Properties --- */
+/* --- CSS Custom Properties ---
+   Dark + neon-lime visual token system (REQ-UX-70/71/72/73). Palette anchors are
+   binding (sampled from the mockup, sdd/organizer-workspace decision-palette-from-mockup):
+   surfaces near-black -> raised, one lime accent, WCAG-verified text/state tiers.
+   Themeable by construction: every color used anywhere else in this sheet resolves
+   through one of these custom properties, so a future theme only edits this block. */
 :root {
-  --color-primary: #2196f3;
-  --color-primary-dark: #1976d2;
-  --color-success: #4caf50;
-  --color-warning: #ff9800;
-  --color-warning-dark: #e68900;
-  --color-error: #dc3545;
-  --color-error-light: #f8d7da;
-  --color-male: #64b5f6;
-  --color-female: #f06292;
-  --color-bg: #f5f5f5;
-  --color-white: #ffffff;
-  --color-text: #212121;
-  --color-text-secondary: #616161;
-  --color-border: #e0e0e0;
+  /* Surfaces (mockup-sampled, binding) */
+  --surface-0: #080808; /* page background */
+  --surface-1: #111111; /* card / panel surface */
+  --surface-2: #181818; /* raised surface, inputs, nav/status strip */
+  --surface-3: #1e1e1e; /* outer canvas — decorative divider only, ~1.1:1, never a sole control boundary */
+
+  /* Text tiers */
+  --text-1: #f5f5f5; /* primary text/icon, >=7:1 on every surface */
+  --text-2: #9a9a9a; /* secondary/muted text, >=4.5:1 on every surface */
+  --text-3: #707070; /* tertiary — decorative-only (dividers, disabled glyphs), >=3:1, never real text */
+  --text-on-accent: #080808; /* label text on the lime accent */
+
+  /* Accent (mockup-sampled, binding) */
+  --accent: #c8ff00; /* lime — CTAs, selected chips, active nav tab */
+  --accent-dim: #a8cc00; /* lime hover/active */
+
+  /* Semantic status — icon+text tier (light/bright, color is supplementary per REQ-UX-72) */
+  --state-ok: #6ee7a0;
+  --state-warn: #ffc24b;
+  --state-error: #ff6b6b;
+  --state-info: #7fd1ff;
+  /* Semantic status — solid-button tier (dark+saturated, paired with light/white label text) */
+  --state-ok-solid: #1a7a3e;
+  --state-warn-solid: #9c6208;
+  --state-error-solid: #b91c1c;
+
+  /* Legacy app tokens (names kept — see design D7 — values remapped to the dark scale;
+     every existing var(--color-*) reference below resolves through this block). */
+  --color-primary: var(--accent);
+  --color-primary-dark: var(--accent-dim);
+  --color-success: var(--state-ok);
+  --color-warning: var(--state-warn);
+  --color-warning-dark: var(--state-warn);
+  --color-error: var(--state-error);
+  --color-error-light: var(--overlay-error-12);
+  --color-bg: var(--surface-2);
+  --color-white: var(--text-1); /* label text on a solid colored background — never a surface */
+  --color-text: var(--text-1);
+  --color-text-secondary: var(--text-2);
+  --color-border: #6e6e6e; /* control-boundary gray, >=3:1 on every surface (REQ-UX-71) */
+
+  /* Gender / level chip accents (approximated from the mockup — anti-aliased in the
+     source PNG, flagged for organizer confirmation; all verified >=6.4:1 on --surface-1) */
+  --gender-male-fg: #3b9eff;
+  --gender-male-bg: rgba(59, 158, 255, 0.16);
+  --gender-female-fg: #ff5c8a;
+  --gender-female-bg: rgba(255, 92, 138, 0.16);
+  --gender-unspecified-fg: var(--text-2);
+  --gender-unspecified-bg: rgba(154, 154, 154, 0.16);
+  --same-gender-fg: #00c2e8; /* mockup-sampled cyan, same-gender pairing chip */
+  --same-gender-bg: rgba(0, 194, 232, 0.14);
+  --level-1-fg: #c4b5fd;
+  --level-1-bg: rgba(196, 181, 253, 0.14);
+  --level-2-fg: #a78bfa;
+  --level-2-bg: rgba(167, 139, 250, 0.2);
+  --level-3-fg: #f97316;
+  --level-3-bg: rgba(249, 115, 22, 0.2);
+
+  /* Group left-border palette (A-H), re-hued for dark, each >=5.9:1 on --surface-1/2 */
+  --group-1: #4fa8ff;
+  --group-2: #ff6fa5;
+  --group-3: #c77dff;
+  --group-4: #ffa53d;
+  --group-5: #2dd4bf;
+  --group-6: #ff8577;
+  --group-7: #7c8cff;
+  --group-8: #9ccc65;
+
+  /* Alpha overlays — every rgba() in the sheet resolves to one of these buckets */
+  --overlay-light-08: rgba(245, 245, 245, 0.08);
+  --overlay-light-16: rgba(245, 245, 245, 0.16);
+  --overlay-accent-04: rgba(200, 255, 0, 0.04);
+  --overlay-accent-08: rgba(200, 255, 0, 0.08);
+  --overlay-accent-12: rgba(200, 255, 0, 0.12);
+  --overlay-accent-15: rgba(200, 255, 0, 0.15);
+  --overlay-accent-35: rgba(200, 255, 0, 0.35);
+  --overlay-ok-05: rgba(110, 231, 160, 0.05);
+  --overlay-ok-12: rgba(110, 231, 160, 0.12);
+  --overlay-ok-15: rgba(110, 231, 160, 0.15);
+  --overlay-warn-03: rgba(255, 194, 75, 0.03);
+  --overlay-warn-07: rgba(255, 194, 75, 0.07);
+  --overlay-warn-10: rgba(255, 194, 75, 0.1);
+  --overlay-warn-12: rgba(255, 194, 75, 0.12);
+  --overlay-error-12: rgba(255, 107, 107, 0.12);
+  --overlay-error-15: rgba(255, 107, 107, 0.15);
+  --overlay-info-12: rgba(127, 209, 255, 0.12);
+  --scrim: rgba(0, 0, 0, 0.6);
 
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  --radius: 8px;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --label-tracking: 0.08em; /* condensed uppercase wide-tracked section labels */
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --touch-min: 44px;
+  --touch-score: 56px;
+  --shadow: 0 2px 8px var(--scrim);
+  --focus-ring: 0 0 0 3px var(--overlay-accent-35);
   --transition: 0.2s ease;
 }
 
@@ -46,7 +135,7 @@ body {
   font-size: 16px;
   line-height: 1.5;
   color: var(--color-text);
-  background-color: var(--color-bg);
+  background-color: var(--surface-0); /* page background — --color-bg is the raised/secondary-panel tier */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -78,12 +167,16 @@ textarea {
 }
 
 /* --- Header --- */
+/* Not lime: a full-bleed accent block would fail outdoor-glare hierarchy (the lime
+   accent is reserved for CTAs/selected chips, REQ-UX-70/71) — the header is a plain
+   dark surface with primary-tier text. */
 .header {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: var(--color-white);
+  background: var(--surface-1);
+  color: var(--text-1);
   text-align: center;
   padding: 24px 16px;
   position: relative;
+  border-bottom: 1px solid var(--surface-3);
 }
 
 /* --- Language Switcher --- */
@@ -96,9 +189,9 @@ textarea {
 }
 
 .lang-switcher__btn {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--color-white);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--overlay-light-08);
+  color: var(--text-1);
+  border: 1px solid var(--overlay-light-16);
   border-radius: 4px;
   padding: 4px 10px;
   font-size: 0.75rem;
@@ -109,13 +202,13 @@ textarea {
 }
 
 .lang-switcher__btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--overlay-light-16);
 }
 
 .lang-switcher__btn--active {
-  background: var(--color-white);
-  color: var(--color-primary-dark);
-  border-color: var(--color-white);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
 }
 
 .header__title {
@@ -143,7 +236,7 @@ textarea {
 
 /* --- Section --- */
 .section {
-  background: var(--color-white);
+  background: var(--surface-1);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px 16px;
@@ -186,7 +279,8 @@ textarea {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: 1rem;
-  background: var(--color-white);
+  background: var(--surface-2);
+  color: var(--text-1);
   transition: border-color var(--transition);
 }
 
@@ -194,7 +288,7 @@ textarea {
 .form__select:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.15);
+  box-shadow: var(--focus-ring);
 }
 
 .form__input--error,
@@ -204,7 +298,7 @@ textarea {
 
 .form__input--error:focus,
 .form__select--error:focus {
-  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+  box-shadow: 0 0 0 3px var(--overlay-error-15);
 }
 
 .form__error {
@@ -235,8 +329,8 @@ textarea {
 /* --- Bulk player review --- */
 .entry-tabs { display: flex; margin: 0 0 16px; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
 .entry-tab { flex: 1; min-height: 44px; border: 0; background: var(--color-bg); font-weight: 600; cursor: pointer; }
-.entry-tab--active { background: var(--color-primary); color: var(--color-white); }
-.entry-tab:focus-visible { outline: 3px solid rgba(33, 150, 243, 0.35); outline-offset: -3px; }
+.entry-tab--active { background: var(--accent); color: var(--text-on-accent); }
+.entry-tab:focus-visible { outline: 3px solid var(--overlay-accent-35); outline-offset: -3px; }
 .import-panel { display: grid; gap: 10px; }
 .import-panel__text { width: 100%; min-height: 120px; resize: vertical; }
 .import-panel__hint, .import-summary { color: var(--color-text-secondary); font-size: 0.8125rem; }
@@ -246,23 +340,29 @@ textarea {
 .import-row__delete { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--color-error); cursor: pointer; }
 .import-row__fields { display: grid; gap: 8px; }
 .import-row__field { display: grid; gap: 4px; min-width: 0; font-size: 0.8125rem; }
-.import-row__field input, .import-row__field select { width: 100%; min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-white); }
+.import-row__field input, .import-row__field select { width: 100%; min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--surface-2); color: var(--text-1); }
 .import-row [aria-invalid="true"] { border-color: var(--color-error); }
 .import-row__issues { margin-top: 8px; color: var(--color-error); font-size: 0.8125rem; }
 .import-row__notices { margin-top: 6px; color: var(--color-text-secondary); font-size: 0.8125rem; }
-.import-feedback { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 10px; background: #e8f5e9; border-radius: var(--radius); }
+.import-feedback { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 10px; background: var(--overlay-ok-12); border-radius: var(--radius); }
 
 /* --- Buttons --- */
+/* Base button gets an explicit dark secondary treatment so any unmodified .btn (no
+   --primary/--success/--warning) never falls back to the browser's light default,
+   which would be unreadable in a dark theme (REQ-UX-71). Every modifier below
+   overrides background-color/color with its own token. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 10px 20px;
-  border: none;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
+  background: var(--surface-2);
+  color: var(--text-1);
   transition: background-color var(--transition), opacity var(--transition);
   min-height: 44px;
 }
@@ -274,7 +374,8 @@ textarea {
 
 .btn--primary {
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
+  border: none;
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -282,12 +383,14 @@ textarea {
 }
 
 .btn--warning {
-  background-color: var(--color-warning);
+  background-color: var(--state-warn-solid);
   color: var(--color-white);
+  border: none;
 }
 
 .btn--warning:hover:not(:disabled) {
-  background-color: var(--color-warning-dark);
+  background-color: var(--state-warn-solid);
+  filter: brightness(1.15);
 }
 
 .btn--large {
@@ -332,35 +435,37 @@ textarea {
 }
 
 .player-list__badge--male {
-  background-color: rgba(100, 181, 246, 0.2);
-  color: #1565c0;
+  background-color: var(--gender-male-bg);
+  color: var(--gender-male-fg);
 }
 
 .player-list__badge--female {
-  background-color: rgba(240, 98, 146, 0.2);
-  color: #ad1457;
+  background-color: var(--gender-female-bg);
+  color: var(--gender-female-fg);
 }
 
 .player-list__badge--unspecified {
-  background-color: rgba(158, 158, 158, 0.2);
-  color: #616161;
+  background-color: var(--gender-unspecified-bg);
+  color: var(--gender-unspecified-fg);
 }
 
 /* Skill level: one purple hue, deeper as skill rises — avoids reusing
-   the gender blue/pink and the error red already carrying meaning */
+   the gender blue/pink and the error red already carrying meaning.
+   Level 3 breaks to the mockup's flagged orange for maximum separation
+   from levels 1-2 (approximated — see decision-palette-from-mockup). */
 .player-list__badge--level-1 {
-  background-color: rgba(126, 87, 194, 0.12);
-  color: #7e57c2;
+  background-color: var(--level-1-bg);
+  color: var(--level-1-fg);
 }
 
 .player-list__badge--level-2 {
-  background-color: rgba(126, 87, 194, 0.22);
-  color: #5e35b1;
+  background-color: var(--level-2-bg);
+  color: var(--level-2-fg);
 }
 
 .player-list__badge--level-3 {
-  background-color: rgba(126, 87, 194, 0.34);
-  color: #4527a0;
+  background-color: var(--level-3-bg);
+  color: var(--level-3-fg);
 }
 
 .player-list__remove {
@@ -430,7 +535,7 @@ textarea {
 .pairing-toggle__opt {
   padding: 8px 18px;
   border: none;
-  background: var(--color-white);
+  background: var(--surface-2);
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   font-weight: 600;
@@ -440,13 +545,13 @@ textarea {
 }
 
 .pairing-toggle__opt:hover:not(.pairing-toggle__opt--active) {
-  background-color: var(--color-bg);
+  background-color: var(--overlay-light-08);
   color: var(--color-text);
 }
 
 .pairing-toggle__opt--active {
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
 }
 
 /* --- Match Type Selector --- */
@@ -474,7 +579,7 @@ textarea {
 .match-type__opt {
   padding: 8px 18px;
   border: none;
-  background: var(--color-white);
+  background: var(--surface-2);
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   font-weight: 600;
@@ -484,13 +589,13 @@ textarea {
 }
 
 .match-type__opt:hover:not(.match-type__opt--active) {
-  background-color: var(--color-bg);
+  background-color: var(--overlay-light-08);
   color: var(--color-text);
 }
 
 .match-type__opt--active {
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
 }
 
 /* --- Manual Pairing Panel --- */
@@ -539,7 +644,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--color-white);
+  background: var(--surface-1);
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
   font-size: 0.9375rem;
@@ -598,22 +703,24 @@ textarea {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 16px;
-  background: var(--color-white);
+  background: var(--surface-1);
 }
 
 .couple-card--mixed {
   border-left: 4px solid var(--color-primary);
 }
 
+/* Same-gender pairing uses the mockup's dedicated cyan, not the warning color
+   (a same-gender pairing is not a warning) */
 .couple-card--same {
-  border-left: 4px solid var(--color-warning);
+  border-left: 4px solid var(--same-gender-fg);
 }
 
 .couple-card__title {
   font-size: 0.875rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
   margin-bottom: 8px;
   display: flex;
@@ -631,13 +738,13 @@ textarea {
 }
 
 .couple-card__type--mixed {
-  background-color: rgba(33, 150, 243, 0.12);
+  background-color: var(--overlay-accent-12);
   color: var(--color-primary-dark);
 }
 
 .couple-card__type--same {
-  background-color: rgba(255, 152, 0, 0.12);
-  color: var(--color-warning-dark);
+  background-color: var(--same-gender-bg);
+  color: var(--same-gender-fg);
 }
 
 .couple-card__player {
@@ -650,7 +757,7 @@ textarea {
 .unmatched {
   margin-top: 16px;
   padding: 16px;
-  background-color: #fff3e0;
+  background-color: var(--overlay-warn-12);
   border: 1px solid var(--color-warning);
   border-radius: var(--radius);
   text-align: center;
@@ -695,7 +802,7 @@ textarea {
   padding: 6px 12px;
   border: 2px solid var(--color-border);
   border-radius: 6px;
-  background: var(--color-white);
+  background: var(--surface-2);
   color: var(--color-text-secondary);
   font-size: 0.8125rem;
   font-weight: 700;
@@ -710,8 +817,8 @@ textarea {
 }
 
 .tournament-setup__opt--active {
-  border-color: var(--color-success);
-  background-color: var(--color-success);
+  border-color: var(--state-ok-solid);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
 }
 
@@ -739,7 +846,7 @@ textarea {
   padding: 8px 14px;
   border: 2px solid var(--color-border);
   border-radius: 6px;
-  background: var(--color-white);
+  background: var(--surface-2);
   color: var(--color-text-secondary);
   font-size: 0.8125rem;
   font-weight: 700;
@@ -755,8 +862,8 @@ textarea {
 }
 
 .format-setup__opt--active {
-  border-color: var(--color-success);
-  background-color: var(--color-success);
+  border-color: var(--state-ok-solid);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
 }
 
@@ -842,12 +949,14 @@ textarea {
 
 /* --- Success Button --- */
 .btn--success {
-  background-color: var(--color-success);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
+  border: none;
 }
 
 .btn--success:hover:not(:disabled) {
-  background-color: #388e3c;
+  background-color: var(--state-ok-solid);
+  filter: brightness(1.15);
 }
 
 /* --- Small Button --- */
@@ -860,7 +969,7 @@ textarea {
 /* --- Share Button --- */
 .btn--share {
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
   border: none;
 }
 
@@ -869,7 +978,7 @@ textarea {
 }
 
 .btn--share--copied {
-  background-color: var(--color-success);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
 }
 
@@ -900,11 +1009,11 @@ textarea {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background-color: #e3f2fd;
-  border: 1px solid #90caf9;
+  background-color: var(--overlay-info-12);
+  border: 1px solid var(--state-info);
   border-radius: var(--radius);
   font-size: 0.875rem;
-  color: var(--color-primary-dark);
+  color: var(--state-info);
   margin-bottom: 16px;
 }
 
@@ -979,18 +1088,18 @@ textarea {
 
 /* --- Tournament Group --- */
 
-/* Color palette for group left-borders (cycles for A-H) */
-.tournament-group[data-group-index="0"] { --group-color: #2196f3; }
-.tournament-group[data-group-index="1"] { --group-color: #e91e63; }
-.tournament-group[data-group-index="2"] { --group-color: #9c27b0; }
-.tournament-group[data-group-index="3"] { --group-color: #ff9800; }
-.tournament-group[data-group-index="4"] { --group-color: #009688; }
-.tournament-group[data-group-index="5"] { --group-color: #f44336; }
-.tournament-group[data-group-index="6"] { --group-color: #3f51b5; }
-.tournament-group[data-group-index="7"] { --group-color: #8bc34a; }
+/* Color palette for group left-borders (cycles for A-H), re-hued for dark (>=5.9:1 on --surface-1/2) */
+.tournament-group[data-group-index="0"] { --group-color: var(--group-1); }
+.tournament-group[data-group-index="1"] { --group-color: var(--group-2); }
+.tournament-group[data-group-index="2"] { --group-color: var(--group-3); }
+.tournament-group[data-group-index="3"] { --group-color: var(--group-4); }
+.tournament-group[data-group-index="4"] { --group-color: var(--group-5); }
+.tournament-group[data-group-index="5"] { --group-color: var(--group-6); }
+.tournament-group[data-group-index="6"] { --group-color: var(--group-7); }
+.tournament-group[data-group-index="7"] { --group-color: var(--group-8); }
 
 .tournament-group {
-  background: var(--color-white);
+  background: var(--surface-1);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px 16px;
@@ -1001,7 +1110,7 @@ textarea {
   font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--group-color, var(--color-primary));
   margin-bottom: 16px;
 }
@@ -1017,7 +1126,7 @@ textarea {
 }
 
 .tournament-stage {
-  background: var(--color-white);
+  background: var(--surface-1);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px 16px;
@@ -1032,7 +1141,7 @@ textarea {
   font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
@@ -1086,7 +1195,7 @@ textarea {
 
 .standings__row--leader {
   font-weight: 700;
-  background-color: #e8f5e9;
+  background-color: var(--overlay-ok-12);
 }
 
 .standings__pts {
@@ -1105,7 +1214,7 @@ textarea {
   font-size: 0.8125rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
@@ -1128,7 +1237,7 @@ textarea {
 
 .match-card--active {
   border: 2px solid var(--color-primary);
-  background: rgba(33, 150, 243, 0.04);
+  background: var(--overlay-accent-04);
 }
 
 /* Row: team names + score + action button */
@@ -1168,7 +1277,7 @@ textarea {
 }
 
 .match-card__score--played {
-  color: #388e3c;
+  color: var(--color-success);
 }
 
 /* Per-match Set Rules caption (REQ-FMT-01/08) — visible to every role */
@@ -1198,7 +1307,7 @@ textarea {
 
 .match-card__btn:hover {
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
 }
 
 /* Score form: compact row inside the card */
@@ -1216,7 +1325,8 @@ textarea {
   border-radius: var(--radius);
   text-align: center;
   font-size: 1rem;
-  background: var(--color-white);
+  background: var(--surface-2);
+  color: var(--text-1);
   transition: border-color var(--transition);
   min-height: 40px;
   flex-shrink: 0;
@@ -1225,7 +1335,7 @@ textarea {
 .score-form__input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.15);
+  box-shadow: var(--focus-ring);
 }
 
 .score-form__sep {
@@ -1236,7 +1346,7 @@ textarea {
 
 .score-form__save {
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
   border: none;
   border-radius: 4px;
   padding: 6px 14px;
@@ -1281,13 +1391,13 @@ textarea {
 .tournament-complete {
   margin-top: 16px;
   padding: 16px;
-  background-color: #e8f5e9;
+  background-color: var(--overlay-ok-12);
   border: 1px solid var(--color-success);
   border-radius: var(--radius);
   text-align: center;
   font-weight: 700;
   font-size: 1.125rem;
-  color: #388e3c;
+  color: var(--color-success);
 }
 
 /* --- Live Scoreboard Panel --- */
@@ -1296,7 +1406,7 @@ textarea {
 }
 
 .scoreboard {
-  background: var(--color-white);
+  background: var(--surface-1);
   border: 2px solid var(--color-primary);
   border-radius: var(--radius);
   padding: 20px 16px 16px;
@@ -1371,7 +1481,7 @@ textarea {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  background: #f0f7ff;
+  background: var(--surface-2); /* score digits/team names sit here — >=7:1 (REQ-UX-71) */
   border: 1.5px solid var(--color-primary);
   border-radius: var(--radius);
   padding: 16px 12px;
@@ -1428,24 +1538,24 @@ textarea {
 }
 
 .scoreboard__dec {
-  background-color: #ffebee;
+  background-color: var(--overlay-error-12);
   color: var(--color-error);
   border: 1.5px solid var(--color-error);
 }
 
 .scoreboard__dec:hover {
-  background-color: var(--color-error);
+  background-color: var(--state-error-solid);
   color: var(--color-white);
 }
 
 .scoreboard__inc {
-  background-color: #e8f5e9;
+  background-color: var(--overlay-ok-12);
   color: var(--color-success);
   border: 1.5px solid var(--color-success);
 }
 
 .scoreboard__inc:hover {
-  background-color: var(--color-success);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
 }
 
@@ -1469,7 +1579,7 @@ textarea {
   flex: 1;
   max-width: 160px;
   padding: 10px 16px;
-  background-color: #ffebee;
+  background-color: var(--overlay-error-12);
   color: var(--color-error);
   border: 1.5px solid var(--color-error);
   border-radius: var(--radius);
@@ -1481,7 +1591,7 @@ textarea {
 }
 
 .scoreboard__cancel:hover {
-  background-color: var(--color-error);
+  background-color: var(--state-error-solid);
   color: var(--color-white);
 }
 
@@ -1490,7 +1600,7 @@ textarea {
   max-width: 160px;
   padding: 10px 16px;
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
   border: none;
   border-radius: var(--radius);
   font-size: 0.9375rem;
@@ -1525,7 +1635,7 @@ textarea {
 .finish-confirm {
   margin-top: 12px;
   padding: 16px 14px;
-  background-color: #e8f5e9;
+  background-color: var(--overlay-ok-12);
   border: 1.5px solid var(--color-success);
   border-radius: var(--radius);
   text-align: center;
@@ -1557,13 +1667,13 @@ textarea {
 }
 
 .finish-confirm__confirm {
-  background-color: var(--color-success);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
   border: none;
 }
 
 .finish-confirm__keep-scoring {
-  background-color: var(--color-white);
+  background-color: var(--surface-2);
   color: var(--color-text-secondary);
   border: 1.5px solid var(--color-border);
 }
@@ -1572,7 +1682,7 @@ textarea {
 .scoring-conflict {
   margin-top: 16px;
   padding: 12px 14px;
-  background-color: #ffebee;
+  background-color: var(--overlay-error-12);
   border: 1.5px solid var(--color-error);
   border-radius: var(--radius);
   text-align: center;
@@ -1611,13 +1721,13 @@ textarea {
 }
 
 .scoring-conflict__retry {
-  background-color: var(--color-error);
+  background-color: var(--state-error-solid);
   color: var(--color-white);
   border: none;
 }
 
 .scoring-conflict__discard {
-  background-color: var(--color-white);
+  background-color: var(--surface-2);
   color: var(--color-error);
 }
 
@@ -1625,7 +1735,7 @@ textarea {
 .scoring-offline {
   margin-top: 16px;
   padding: 12px 14px;
-  background-color: #fff3e0;
+  background-color: var(--overlay-warn-12);
   border: 1.5px solid var(--color-warning);
   border-radius: var(--radius);
   text-align: center;
@@ -1644,7 +1754,7 @@ textarea {
   font-weight: 600;
   cursor: pointer;
   min-height: 44px;
-  background-color: var(--color-warning);
+  background-color: var(--state-warn-solid);
   color: var(--color-white);
   border: none;
 }
@@ -1668,12 +1778,12 @@ textarea {
 }
 
 .match-card__btn--track:hover {
-  background-color: var(--color-success);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
 }
 
 .match-card__btn--track-active {
-  background-color: var(--color-success);
+  background-color: var(--state-ok-solid);
   color: var(--color-white);
 }
 
@@ -1828,7 +1938,7 @@ textarea {
 .king-setup__opt {
   padding: 8px 16px;
   border: none;
-  background: var(--color-white);
+  background: var(--surface-2);
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   font-weight: 600;
@@ -1838,13 +1948,13 @@ textarea {
 }
 
 .king-setup__opt:hover:not(.king-setup__opt--active) {
-  background-color: var(--color-bg);
+  background-color: var(--overlay-light-08);
   color: var(--color-text);
 }
 
 .king-setup__opt--active {
   background-color: var(--color-primary);
-  color: var(--color-white);
+  color: var(--text-on-accent);
 }
 
 /* Section header */
@@ -1878,8 +1988,7 @@ textarea {
   justify-content: center;
   gap: 4px;
   padding: 16px;
-  background: linear-gradient(135deg,
-    rgba(33,150,243,0.12), rgba(33,150,243,0.04));
+  background: var(--overlay-accent-08);
   border-right: 2px solid var(--color-border);
 }
 
@@ -1893,7 +2002,7 @@ textarea {
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
 }
 
@@ -1942,8 +2051,7 @@ textarea {
   justify-content: center;
   gap: 4px;
   padding: 16px;
-  background: linear-gradient(135deg,
-    rgba(255,152,0,0.10), rgba(255,152,0,0.03));
+  background: var(--overlay-warn-07);
 }
 
 /* Rally action buttons */
@@ -1969,7 +2077,7 @@ textarea {
   font-weight: 600;
   color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--label-tracking);
   margin: 0 0 8px;
 }
 
@@ -1993,7 +2101,7 @@ textarea {
 
 .king-queue__item--next {
   border-color: var(--color-warning);
-  background: rgba(255,152,0,0.07);
+  background: var(--overlay-warn-07);
   font-weight: 600;
 }
 
@@ -2049,8 +2157,7 @@ textarea {
 .king-winner {
   text-align: center;
   padding: 24px;
-  background: linear-gradient(135deg,
-    rgba(76,175,80,0.15), rgba(76,175,80,0.05));
+  background: var(--overlay-ok-12);
   border: 2px solid var(--color-success);
   border-radius: var(--radius);
   margin-top: 16px;
@@ -2061,7 +2168,7 @@ textarea {
   font-weight: 700;
   color: var(--color-success);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--label-tracking);
   margin: 0 0 4px;
 }
 
@@ -2104,7 +2211,7 @@ textarea {
 [data-view="tournament"] [data-view-slot~="tournament"],
 [data-view="results"] [data-view-slot~="results"] { display: revert; }
 
-.workspace-status { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: var(--color-white); border-bottom: 1px solid var(--color-border); }
+.workspace-status { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: var(--surface-2); border-bottom: 1px solid var(--color-border); }
 .workspace-status .sync-status { margin: 0; flex: 1; min-width: 0; }
 .workspace { padding-bottom: 76px; } /* clears the sticky bottom nav */
 
@@ -2112,7 +2219,7 @@ textarea {
    rows — CTA (order:-1, full width) above the 4 tabs — since REQ-UX-07 forbids truncating
    either and a single row has no room for both. The >=600px override below (placed AFTER
    these — equal-specificity cascade needs it) restores the single-row center CTA slot. */
-.workspace-nav { position: sticky; bottom: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; padding: 6px 8px; background: var(--color-white); border-top: 1px solid var(--color-border); box-shadow: var(--shadow); }
+.workspace-nav { position: sticky; bottom: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; padding: 6px 8px; background: var(--surface-2); border-top: 1px solid var(--color-border); box-shadow: var(--shadow); }
 .workspace-nav__items { flex: 1; min-width: 0; display: flex; gap: 4px; }
 .workspace-nav__item {
   flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column;
@@ -2120,21 +2227,23 @@ textarea {
   background: none; border-radius: var(--radius); font-size: 0.7rem; font-weight: 600;
   color: var(--color-text-secondary); cursor: pointer; position: relative;
 }
-.workspace-nav__item[aria-current="page"] { color: var(--color-primary); background: rgba(33, 150, 243, 0.08); }
+/* Active nav tab: lime accent (REQ-UX-70 restyle) */
+.workspace-nav__item[aria-current="page"] { color: var(--color-primary); background: var(--overlay-accent-12); }
 .workspace-nav__item[aria-disabled="true"] { color: var(--color-border); cursor: not-allowed; }
 .workspace-nav__item--attention { color: var(--color-warning-dark); }
 .workspace-nav__item__label { text-align: center; line-height: 1.2; white-space: nowrap; } /* nowrap is a guard only — never truncated */
-.workspace-nav__badge { position: absolute; top: 0; right: 8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--color-error); color: var(--color-white); font-size: 0.625rem; line-height: 16px; text-align: center; }
+.workspace-nav__badge { position: absolute; top: 0; right: 8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--state-error-solid); color: var(--color-white); font-size: 0.625rem; line-height: 16px; text-align: center; }
 
+/* Full-width lime CTA (REQ-UX-70 restyle) */
 .workspace-nav__cta {
   order: -1; flex-basis: 100%; max-width: none; min-width: 44px; min-height: 44px; padding: 0 14px;
-  border: none; border-radius: var(--radius); background: var(--color-primary); color: var(--color-white);
+  border: none; border-radius: var(--radius); background: var(--color-primary); color: var(--text-on-accent);
   font-weight: 700; font-size: 0.75rem; white-space: nowrap; cursor: pointer; align-self: center;
 }
 .workspace-nav__cta:disabled { background: var(--color-border); color: var(--color-text-secondary); cursor: not-allowed; }
 
 /* Taller stacked (2-row) nav below 600px needs more toast clearance than the single-row nav. */
-.toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; background: var(--color-text); color: var(--color-white); border-radius: var(--radius); font-size: 0.875rem; text-align: center; z-index: 20; }
+.toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; background: var(--surface-3); color: var(--text-1); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; text-align: center; z-index: 20; }
 
 /* >=600px: single row, CTA back in its center slot (design wireframe). */
 @media (min-width: 600px) {
@@ -2202,7 +2311,7 @@ textarea {
   font-size: 0.8125rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
   text-align: center;
 }
@@ -2227,14 +2336,14 @@ textarea {
   padding: 8px 16px;
   border: 2px solid var(--color-primary);
   border-radius: var(--radius);
-  background: var(--color-white);
+  background: var(--surface-1);
 }
 .next-match-card__label {
   margin: 0;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
 }
 .next-match-card__teams { margin: 0; font-size: 1.125rem; font-weight: 700; overflow-wrap: anywhere; }
@@ -2249,7 +2358,7 @@ textarea {
   font-size: 0.8125rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
 }
 .stage-progress__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -2261,7 +2370,7 @@ textarea {
   font-size: 0.8125rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
 }
 .match-day-section__more { margin-top: 8px; }
@@ -2276,7 +2385,7 @@ textarea {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background-color: #fff3e0;
+  background-color: var(--overlay-warn-12);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: 0.875rem;
@@ -2299,7 +2408,7 @@ textarea {
   padding: 20px 16px;
   border: 2px solid var(--color-primary);
   border-radius: var(--radius);
-  background: var(--color-white);
+  background: var(--surface-1);
   text-align: center;
   margin-bottom: 16px;
 }
@@ -2309,7 +2418,7 @@ textarea {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
 }
 .champion-card__name {
@@ -2341,7 +2450,7 @@ textarea {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--label-tracking);
   color: var(--color-text-secondary);
 }
 .champion-card__winner-name {
