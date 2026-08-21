@@ -1909,10 +1909,6 @@ textarea {
   .king-court__team-name {
     font-size: 1.125rem;
   }
-
-  /* >=600px: single-row nav, CTA back in its center slot (REQ-UX-01 stack below 600px only) */
-  .workspace-nav { flex-wrap: nowrap; }
-  .workspace-nav__cta { order: 0; flex-basis: auto; max-width: 38%; }
 }
 
 /* --- Workspace shell (Setup / Teams / Tournament / Results) — REQ-UX-01..07 --- */
@@ -1929,9 +1925,10 @@ textarea {
 .workspace-status .sync-status { margin: 0; flex: 1; min-width: 0; }
 .workspace { padding-bottom: 76px; } /* clears the sticky bottom nav */
 
-/* D8: sticky, never fixed — REQ-UX-01's 320px check measures #app-frame's own scrollWidth.
-   Below 600px the nav wraps to two rows — CTA (order:-1, full width) above the 4 tabs —
-   because REQ-UX-07 forbids truncating either; a single row has no room for both untruncated. */
+/* D8: sticky, never fixed. Below 600px (unqualified/mobile-first rules) the nav wraps to two
+   rows — CTA (order:-1, full width) above the 4 tabs — since REQ-UX-07 forbids truncating
+   either and a single row has no room for both. The >=600px override below (placed AFTER
+   these — equal-specificity cascade needs it) restores the single-row center CTA slot. */
 .workspace-nav { position: sticky; bottom: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; padding: 6px 8px; background: var(--color-white); border-top: 1px solid var(--color-border); box-shadow: var(--shadow); }
 .workspace-nav__items { flex: 1; min-width: 0; display: flex; gap: 4px; }
 .workspace-nav__item {
@@ -1953,4 +1950,12 @@ textarea {
 }
 .workspace-nav__cta:disabled { background: var(--color-border); color: var(--color-text-secondary); cursor: not-allowed; }
 
-.toast { position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; background: var(--color-text); color: var(--color-white); border-radius: var(--radius); font-size: 0.875rem; text-align: center; z-index: 20; }
+/* Taller stacked (2-row) nav below 600px needs more toast clearance than the single-row nav. */
+.toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; background: var(--color-text); color: var(--color-white); border-radius: var(--radius); font-size: 0.875rem; text-align: center; z-index: 20; }
+
+/* >=600px: single row, CTA back in its center slot (design wireframe). */
+@media (min-width: 600px) {
+  .workspace-nav { flex-wrap: nowrap; }
+  .workspace-nav__cta { order: 0; flex-basis: auto; max-width: 40%; }
+  .toast { bottom: 88px; }
+}
