@@ -1918,13 +1918,28 @@
       // ===== RESULTS / COMPLETION (slice G): champion card variants, summary, export, in-progress banner — REQ-UX-50..53 =====
       await (async function () {
         var savedConfirmResults = window.confirm;
-        window.confirm = function () { return true; };
-        document.getElementById('reset-king-btn').click(); // tear down the King game left running by the previous block
-        window.confirm = savedConfirmResults;
-        assert(document.getElementById('king-section').hidden, 'Results setup: the previous King game is torn down before these fixtures run');
 
         function resultsNavBtn() { return document.querySelector('#workspace-nav-items [data-view-id="results"]'); }
         function goToResults() { resultsNavBtn().click(); }
+
+        // ---- King winner (REQ-UX-50 kingChampion): finish the King game already running from
+        // the previous block — win condition/target were never changed in this file (defaults:
+        // consecutive/5), and the king never loses below, so it is deterministic. ----
+        var expectedKingWinnerName = document.getElementById('king-team-name').textContent;
+        for (var kw = 0; kw < 5; kw++) document.getElementById('king-wins-btn').click();
+        assert(!document.getElementById('king-winner-banner').hidden, 'Results setup: the King game actually finished (sanity check before testing Results)');
+        goToResults();
+        assert(!document.getElementById('completion-champion').hidden &&
+          document.querySelector('.champion-card__name').textContent.indexOf(expectedKingWinnerName) !== -1,
+          'Results: King of the Court champion renders from kingState.winner (REQ-UX-50)');
+        assert(document.querySelector('.champion-card__heading').textContent === 'Champion',
+          'Results: a King win uses the same "Champion" heading as a tournament champion');
+
+        // ---- tear down the King game before the tournament fixtures below ----
+        window.confirm = function () { return true; };
+        document.getElementById('reset-king-btn').click();
+        window.confirm = savedConfirmResults;
+        assert(document.getElementById('king-section').hidden, 'Results setup: the King game is torn down before these fixtures run');
 
         // ---- REQ-UX-53: pre-completion shows the in-progress banner + live standings, no champion ----
         testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
@@ -1936,6 +1951,19 @@
         assert(!document.getElementById('completion-standings').hidden && document.getElementById('completion-standings').textContent.length > 0,
           'Results: live standings render before completion (REQ-UX-53)');
         assert(document.getElementById('completion-empty').hidden, 'Results: the empty state does not show once a tournament exists');
+
+        // ---- REQ-UX-60 role matrix: reset is organizer-only, even though isReadOnly alone is
+        // false for an approved scorer (corrective pass — a scorer previously saw this button) ----
+        testRepository.emit({ role: 'scorer', accessStatus: 'approved', tournament: mixed });
+        goToResults();
+        assert(document.getElementById('completion-start-another-btn').hidden,
+          'Results: a scorer never sees "Start another tournament" — reset is organizer-only (REQ-UX-60)');
+        assert(!document.getElementById('completion-share-btn').hidden,
+          'Results: Share stays visible to a scorer — only reset is organizer-gated (REQ-UX-60)');
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+        goToResults();
+        assert(!document.getElementById('completion-start-another-btn').hidden,
+          'Results: the owner still sees "Start another tournament" (REQ-UX-60)');
 
         // ---- Tied lead (REQ-UX-50): a 3-way tie on points/diff/setsFor — top two tie, no champion ----
         var tiedFixture = {
@@ -2006,7 +2034,7 @@
         // ---- Export (REQ-UX-52): Web Share first, distinct "Shared" confirmation ----
         var shareCalls = [];
         var originalShare = navigator.share;
-        navigator.share = function (data) { shareCalls.push(data); return Promise.resolve(); };
+        Object.defineProperty(navigator, 'share', { configurable: true, value: function (data) { shareCalls.push(data); return Promise.resolve(); } });
         var exportBtn = document.getElementById('completion-export-btn');
         var exportOriginalLabel = exportBtn.textContent;
         exportBtn.click();
@@ -2017,9 +2045,13 @@
           'Export: the plain-text summary includes final standings, appended alongside the champion/group-winner lines (REQ-UX-51/52)');
         assert(exportBtn.textContent.indexOf('Shared') !== -1,
           'Export: a successful share shows a distinct "Shared" confirmation (REQ-UX-52)');
-        navigator.share = originalShare;
 
         // ---- Export: clipboard fallback when Web Share is unavailable, distinct "Copied" confirmation ----
+        // Chrome 151 macOS headless implements navigator.share natively, so merely restoring the
+        // captured "original" here would still route through the real Web Share (which silently
+        // rejects/no-ops without a user gesture, never reaching the clipboard) — explicitly stub
+        // it to undefined for this block instead (corrective pass).
+        Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
         var clipboardCalls = [];
         var originalClipboard = navigator.clipboard;
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (text) { clipboardCalls.push(text); return Promise.resolve(); } } });
@@ -2030,6 +2062,77 @@
         assert(exportBtn.textContent.indexOf('Copied') !== -1 && exportBtn.textContent.indexOf('Shared') === -1,
           'Export: the clipboard path shows a distinct "Copied" confirmation, not "Shared" (REQ-UX-52)');
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: originalClipboard });
+        Object.defineProperty(navigator, 'share', { configurable: true, value: originalShare });
+
+        // ---- Formatted tournament (Groups + Final): bracket read-only pre-completion, then
+        // champion-via-final once the final is played, plus the summary's own-format label ----
+        var formatTeams = [
+          { id: 'fa0', name: 'Format One' }, { id: 'fa1', name: 'Format Two' },
+          { id: 'fa2', name: 'Format Three' }, { id: 'fa3', name: 'Format Four' },
+        ];
+        var formatGroups = createGroups(formatTeams, 1);
+        var format = presetFormat('groupsFinal', formatGroups);
+        var formatMatches = generateStageMatches(format, formatGroups);
+        function formatTeamIndex(id) { return parseInt(id.replace('fa', ''), 10); }
+        formatMatches.forEach(function (m) {
+          if (m.stageId !== 'group') return;
+          var lowerIndexWins = formatTeamIndex(m.team1Id) < formatTeamIndex(m.team2Id);
+          m.played = true; m.status = 'finished'; m.revision = 1;
+          m.score1 = lowerIndexWins ? 21 : 15;
+          m.score2 = lowerIndexWins ? 15 : 21;
+        }); // deterministic ranking: fa0 > fa1 > fa2 > fa3 — final (A1 vs A2) is fa0 vs fa1
+        var formatFinalMatch = formatMatches.filter(function (m) { return m.stageId === 'final'; })[0];
+        var formattedFixture = { players: [], teams: formatTeams, groups: formatGroups, matches: formatMatches, format: format };
+
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: formattedFixture });
+        goToResults();
+        assert(!document.getElementById('completion-banner').hidden,
+          'Results: a formatted tournament with an unplayed final still shows the in-progress banner (REQ-UX-53)');
+        assert(!document.getElementById('completion-bracket').hidden,
+          'Results: the bracket disclosure renders once a knockout stage exists, even pre-completion (REQ-UX-51)');
+        assert(document.querySelectorAll('#completion-bracket-content button').length === 0,
+          'Results: the bracket is read-only for the owner — no Track/Edit score button even though the final is scorable (REQ-UX-51 corrective pass)');
+        assert(document.getElementById('completion-standings').textContent.indexOf('Format One') !== -1,
+          'Results: standings render for a formatted session too');
+
+        testRepository.emit({ role: 'scorer', accessStatus: 'approved', tournament: formattedFixture });
+        goToResults();
+        assert(document.querySelectorAll('#completion-bracket-content button').length === 0,
+          'Results: the bracket stays read-only for a scorer too — Results is never a shortcut into scoring (REQ-UX-51 corrective pass)');
+        assert(document.getElementById('completion-start-another-btn').hidden,
+          'Results: a scorer viewing a formatted in-progress tournament still has Start-another hidden (REQ-UX-60)');
+
+        formatFinalMatch.played = true; formatFinalMatch.status = 'finished'; formatFinalMatch.revision = 1;
+        formatFinalMatch.score1 = 21; formatFinalMatch.score2 = 15;
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: formattedFixture });
+        goToResults();
+        assert(document.getElementById('completion-banner').hidden,
+          'Results: a formatted tournament completes once its final knockout stage is played (REQ-UX-50)');
+        assert(document.querySelector('.champion-card__heading').textContent === 'Champion' &&
+          document.querySelector('.champion-card__name').textContent.indexOf('Format One') !== -1,
+          'Results: champion resolves to the final match winner for a formatted session (REQ-UX-50)');
+        var formatSummaryText = document.getElementById('completion-summary').textContent;
+        assert(formatSummaryText.indexOf('Groups + Final') !== -1 && formatSummaryText.indexOf('Classic') === -1,
+          'Results: the summary reads the SESSION\'s own format, not the stale Setup draft (REQ-UX-51 corrective pass — previously always showed "Classic")');
+        assert(document.querySelectorAll('#completion-bracket-content button').length === 0,
+          'Results: the completed bracket stays read-only (no Edit button either)');
+
+        // ---- Single-group classic champion (REQ-UX-50 standings[0], no tie) ----
+        var clearChampionFixture = {
+          players: [],
+          teams: [{ id: 'ct0', name: 'Clear Winner' }, { id: 'ct1', name: 'Clear Second' }, { id: 'ct2', name: 'Clear Third' }],
+          groups: [{ id: 'A', teams: [{ id: 'ct0' }, { id: 'ct1' }, { id: 'ct2' }] }],
+          matches: [
+            { id: 'A-ct0-ct1', groupId: 'A', order: 0, status: 'finished', played: true, score1: 21, score2: 10, revision: 1, team1Id: 'ct0', team2Id: 'ct1' },
+            { id: 'A-ct0-ct2', groupId: 'A', order: 1, status: 'finished', played: true, score1: 21, score2: 5, revision: 1, team1Id: 'ct0', team2Id: 'ct2' },
+            { id: 'A-ct1-ct2', groupId: 'A', order: 2, status: 'finished', played: true, score1: 21, score2: 15, revision: 1, team1Id: 'ct1', team2Id: 'ct2' },
+          ],
+        };
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: clearChampionFixture });
+        goToResults();
+        assert(document.querySelector('.champion-card__heading').textContent === 'Champion' &&
+          document.querySelector('.champion-card__name').textContent.indexOf('Clear Winner') !== -1,
+          'Results: a single-group classic tournament with a clear standings[0] leader renders a plain champion (REQ-UX-50)');
 
         // ---- Start another tournament: wired to the existing reset flow, returns to a resettable Setup ----
         var confirmedReset = false;
