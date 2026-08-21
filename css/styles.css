@@ -2227,9 +2227,11 @@ textarea {
   background: none; border-radius: var(--radius); font-size: 0.7rem; font-weight: 600;
   color: var(--color-text-secondary); cursor: pointer; position: relative;
 }
-/* Active nav tab: lime accent (REQ-UX-70 restyle) */
-.workspace-nav__item[aria-current="page"] { color: var(--color-primary); background: var(--overlay-accent-12); }
-.workspace-nav__item[aria-disabled="true"] { color: var(--color-border); cursor: not-allowed; }
+/* Active nav tab: solid lime pill with a dark label — never lime text on a pale/tinted
+   surface, which reads as nearly invisible (REQ-UX-71, >=7:1 verified). */
+.workspace-nav__item[aria-current="page"] { color: var(--text-on-accent); background: var(--accent); }
+/* Disabled nav item: stays legible (>=4.5:1), never grey-on-grey below that bar. */
+.workspace-nav__item[aria-disabled="true"] { color: var(--text-2); cursor: not-allowed; }
 .workspace-nav__item--attention { color: var(--color-warning-dark); }
 .workspace-nav__item__label { text-align: center; line-height: 1.2; white-space: nowrap; } /* nowrap is a guard only — never truncated */
 .workspace-nav__badge { position: absolute; top: 0; right: 8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--state-error-solid); color: var(--color-white); font-size: 0.625rem; line-height: 16px; text-align: center; }
@@ -2240,7 +2242,9 @@ textarea {
   border: none; border-radius: var(--radius); background: var(--color-primary); color: var(--text-on-accent);
   font-weight: 700; font-size: 0.75rem; white-space: nowrap; cursor: pointer; align-self: center;
 }
-.workspace-nav__cta:disabled { background: var(--color-border); color: var(--color-text-secondary); cursor: not-allowed; }
+/* Disabled CTA: surface-3 + muted text stays >=4.5:1 (was color-border-on-color-border,
+   ~1.8:1 — illegible; the blocking reason is still exposed via title/aria-describedby). */
+.workspace-nav__cta:disabled { background: var(--surface-3); color: var(--text-2); cursor: not-allowed; }
 
 /* Taller stacked (2-row) nav below 600px needs more toast clearance than the single-row nav. */
 .toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; background: var(--surface-3); color: var(--text-1); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; text-align: center; z-index: 20; }
