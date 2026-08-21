@@ -2145,6 +2145,63 @@
           'Results: after reset, Results is either empty or no longer the active destination (no stale champion state)');
       })();
 
+      // ===== Slice H: visual token system (REQ-UX-70/71/72) =====
+      await (async function () {
+        const rootStyle = getComputedStyle(document.documentElement);
+        function token(name) { return rootStyle.getPropertyValue(name).trim(); }
+
+        assert(token('--surface-0').toLowerCase() === '#080808', 'Tokens: --surface-0 equals the mockup page background #080808');
+        assert(token('--surface-1').toLowerCase() === '#111111', 'Tokens: --surface-1 equals the mockup card surface #111111');
+        assert(token('--accent').toLowerCase() === '#c8ff00', 'Tokens: --accent equals the mockup lime #c8ff00');
+        assert(token('--text-on-accent').toLowerCase() === '#080808', 'Tokens: --text-on-accent equals #080808 for CTA labels on lime');
+
+        // Note: this harness nests the whole app inside #app-frame (a <div>, not a real
+        // <body>) so the `body { background: var(--surface-0) }` tag-selector rule cannot
+        // be exercised here — it is verified against the real index.html separately.
+        const sectionEl = document.querySelector('.section');
+        assert(!!sectionEl, 'Computed style: at least one .section card exists to check');
+        if (sectionEl) {
+          const cardBg = getComputedStyle(sectionEl).backgroundColor;
+          assert(cardBg === 'rgb(17, 17, 17)', 'Computed style: .section card background-color resolves to --surface-1 (rgb(17, 17, 17))', cardBg);
+        }
+
+        // Synthetic, detached elements decouple this check from whatever state the CTA
+        // happens to be in after the preceding scenarios (enabled/disabled/hidden).
+        const ctaProbe = document.createElement('button');
+        ctaProbe.className = 'workspace-nav__cta';
+        document.body.appendChild(ctaProbe);
+        const ctaBg = getComputedStyle(ctaProbe).backgroundColor;
+        const ctaColor = getComputedStyle(ctaProbe).color;
+        ctaProbe.remove();
+        assert(ctaBg === 'rgb(200, 255, 0)', 'Computed style: primary CTA background-color resolves to --accent lime (rgb(200, 255, 0))', ctaBg);
+        assert(ctaColor === 'rgb(8, 8, 8)', 'Computed style: primary CTA label color resolves to --text-on-accent (rgb(8, 8, 8))', ctaColor);
+
+        // No raw hex/rgba literal remains outside :root (REQ-UX-70) — read the source stylesheet text directly.
+        const cssResponse = await fetch('../css/styles.css');
+        const cssText = await cssResponse.text();
+        const rootEnd = cssText.indexOf('\n}', cssText.indexOf(':root'));
+        const bodyText = cssText.slice(rootEnd + 2);
+        const literalMatches = bodyText.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [];
+        assert(literalMatches.length === 0,
+          'Tokens: zero raw hex/rgba literals remain in css/styles.css outside :root (REQ-UX-70)',
+          literalMatches.join(', '));
+
+        // Focus ring visibility (REQ-UX-71 >=3:1): a focusable control must define a
+        // non-"none" outline or box-shadow declaration referencing the accent/focus tokens.
+        const hasFocusRingRule = /:focus(-visible)?[^{]*\{[^}]*(outline|box-shadow)\s*:\s*[^;]*var\(--(accent|overlay-accent|focus-ring)/i.test(cssText);
+        assert(hasFocusRingRule, 'Tokens: at least one :focus/:focus-visible rule sets a visible lime-accent outline/box-shadow (REQ-UX-71)');
+
+        // Reduced-motion: the blanket rule already zeroes animation/transition durations app-wide (REQ-UX-73).
+        const reducedMotionRuleExists = Array.from(document.styleSheets).some(function (sheet) {
+          try {
+            return Array.from(sheet.cssRules).some(function (rule) {
+              return rule.media && rule.media.mediaText && rule.media.mediaText.indexOf('prefers-reduced-motion') !== -1;
+            });
+          } catch (e) { return false; }
+        });
+        assert(reducedMotionRuleExists, 'Tokens: a prefers-reduced-motion media rule exists (REQ-UX-73)');
+      })();
+
       // ===== Summary =====
       const total = passed + failed;
       const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
