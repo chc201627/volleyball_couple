@@ -346,6 +346,11 @@
       <div class="tournament-readonly-banner" id="readonly-banner" hidden>
         <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
       </div>
+
+      <!-- Next Match card (REQ-UX-30/31) — first content block below the status strip -->
+      <div class="next-match-card" id="next-match-card" hidden></div>
+
+      <!-- Inline scorer-access-request card (REQ-UX-34), reusing #access-request/#access-members -->
       <div class="tournament-ops" id="tournament-ops" hidden>
         <p id="access-status" class="tournament-ops__status" role="status" aria-live="polite"></p>
         <div id="access-request" class="access-request" hidden>
@@ -353,12 +358,16 @@
           <button id="request-access-btn" class="btn btn--primary" type="button" data-i18n="tournament.access.request">Request scoring access</button>
         </div>
         <ul id="access-members" class="access-members" hidden></ul>
-        <div id="match-filters" class="match-filters" role="group" data-i18n-aria-label="tournament.filter.label">
-          <button class="match-filters__btn match-filters__btn--active" type="button" data-filter="pending" data-i18n="tournament.filter.pending">Pending</button>
-          <button class="match-filters__btn" type="button" data-filter="live" data-i18n="tournament.filter.live">Live</button>
-          <button class="match-filters__btn" type="button" data-filter="finished" data-i18n="tournament.filter.finished">Finished</button>
-        </div>
       </div>
+
+      <!-- Stage progress (REQ-UX-33) -->
+      <div class="stage-progress" id="tournament-stage-progress" hidden></div>
+
+      <!-- Stacked Live / Up next / Recently finished sections, collapse after 5 (REQ-UX-32) -->
+      <div class="match-day-section" id="tournament-live-section" hidden></div>
+      <div class="match-day-section" id="tournament-pending-section" hidden></div>
+      <div class="match-day-section" id="tournament-recently-finished-section" hidden></div>
+
       <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
         <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
         <p class="tournament-custom-rules__text" id="tournament-custom-rules-text"></p>
@@ -373,6 +382,14 @@
         <!-- Live scoreboard rendered by JS -->
       </div>
     </section>
+
+    <!-- Session-not-found state (REQ-UX-62) -->
+    <div class="session-missing" id="session-not-found" data-view-slot="tournament" hidden>
+      <p class="session-missing__icon" aria-hidden="true">⛔</p>
+      <h2 class="section__heading" data-i18n="workspace.tournament.notFound.heading">Session unavailable</h2>
+      <p class="session-missing__text" data-i18n="workspace.tournament.notFound.text">This link is missing, expired, or you do not have permission to read it. Ask the organizer for a new link.</p>
+      <button class="btn btn--primary" id="session-not-found-reset-btn" type="button" data-i18n="workspace.tournament.notFound.startLocalSetup">Start a local setup</button>
+    </div>
 
     <!-- Workspace bottom nav: 4 destinations (owner) / 2 (scorer, spectator) / 1
          (session-not-found), plus the single contextual center action (REQ-UX-01/04). -->
