@@ -41,6 +41,7 @@ Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a b
 | `js/i18n.js` | Flat EN/ES dictionaries; `t(key)` falls back to English, then the key. |
 | `js/tournament.js` | Group creation, schedule, match states, scores, and standings. |
 | `js/tournament-format.js` | Pure tournament-format engine: presets, validation, knockout stage generation with slot descriptors, deterministic client-side resolution, and per-match rules. |
+| `js/tournament-day.js` | Pure, DOM-free selectors for the Tournament command center and Results screen: next match, live/pending/recently-finished lists, stage progress, and champion/outcome resolution. |
 | `js/tournament-repository.js` | Repository boundary for shared tournaments: schema codecs, in-memory tests, Firebase subscriptions, access requests, and transactional result saves. |
 | `js/king-of-court.js` | Throne/challenger queue and win conditions. |
 | `js/app.js` | IIFE-based application state, rendering, events, localStorage, localization, and repository orchestration. |
@@ -50,7 +51,7 @@ Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a b
 
 Script order is contractual. Firebase CDN SDKs load first, followed by:
 
-`firebase-config.js` → `pairing.js` → `player-import.js` → `i18n.js` → `tournament.js` → `tournament-format.js` → `tournament-repository.js` → `king-of-court.js` → `app.js`.
+`firebase-config.js` → `pairing.js` → `player-import.js` → `i18n.js` → `tournament.js` → `tournament-format.js` → `tournament-day.js` → `tournament-repository.js` → `king-of-court.js` → `app.js`.
 
 ## Collaborative scoring model
 

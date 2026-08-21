@@ -331,6 +331,7 @@
   <script src="../js/i18n.js"></script>
   <script src="../js/tournament.js"></script>
   <script src="../js/tournament-format.js"></script>
+  <script src="../js/tournament-day.js"></script>
   <script src="../js/tournament-repository.js"></script>
   <script>
     var testRepository = {
@@ -384,6 +385,10 @@
 
     // Wait for DOMContentLoaded handlers (app.js, i18n.js) to finish
     setTimeout(async function runTests() {
+
+      // ===== TEST 0: script order — tournament-day.js is loaded and exposed =====
+      assert(typeof tournamentDay === 'function', 'Script order: tournamentDay is a global function (js/tournament-day.js loaded)');
+      assert(typeof formatTournamentSummary === 'function', 'Script order: formatTournamentSummary is a global function (js/tournament-day.js loaded)');
 
       // ===== TEST 1: Initial empty state =====
       assert(getPlayerItems().length === 0, 'Initial: player list is empty');
