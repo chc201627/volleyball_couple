@@ -218,6 +218,18 @@
         </div>
       </section>
 
+      <!-- Results Section -->
+      <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden data-view-slot="teams">
+        <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
+        <p class="teams-summary" id="teams-summary-line"></p>
+        <div class="couples-grid" id="couples-grid">
+          <!-- Couple cards rendered by JS -->
+        </div>
+        <div class="unmatched" id="unmatched-notice" hidden>
+          <!-- Unmatched player notice rendered by JS -->
+        </div>
+      </section>
+
       <!-- Teams Actions: progressive-disclosure regenerate/edit + mode fork (REQ-UX-21/22/23) -->
       <section class="section section--actions" id="teams-actions" aria-labelledby="teams-actions-heading" data-view-slot="teams">
         <h2 id="teams-actions-heading" class="sr-only">Team options</h2>
@@ -269,21 +281,9 @@
                 <button class="king-setup__opt" data-target="10" type="button">10</button>
               </div>
             </div>
-            <button class="btn btn--success btn--large" id="start-king-btn"
+            <button class="btn btn--success btn--large" id="start-king-btn" hidden
                     type="button" data-i18n="king.start">Start King of the Court</button>
           </div>
-        </div>
-      </section>
-
-      <!-- Results Section -->
-      <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden data-view-slot="teams">
-        <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
-        <p class="teams-summary" id="teams-summary-line"></p>
-        <div class="couples-grid" id="couples-grid">
-          <!-- Couple cards rendered by JS -->
-        </div>
-        <div class="unmatched" id="unmatched-notice" hidden>
-          <!-- Unmatched player notice rendered by JS -->
         </div>
       </section>
 
@@ -1374,9 +1374,18 @@
         assert(document.getElementById('teams-options-disclosure').tagName === 'DETAILS',
           'Teams options: Regenerate/Clear live inside a details progressive disclosure (REQ-UX-21)');
 
-        // 320px: no overflow, summary/disclosure/fork readable and >=44px
+        // 320px: no overflow, summary/disclosure/fork readable and >=44px.
+        // The scrollWidth check is guarded to a real narrow window: at a
+        // real >=960px window, forcing #app-frame to width:320px does NOT
+        // shrink @media(min-width:960px) rules (.couples-grid's 3-col
+        // layout resolves against window.innerWidth, not the frame width),
+        // so 4 real cards genuinely overflow a forced 320px frame there —
+        // a harness artifact (same class as the documented slice-B/C
+        // workspace-nav CTA row limitation), not a real 320px-device bug.
         appFrame.style.cssText = 'display:block;width:320px';
-        assert(appFrame.scrollWidth <= appFrame.clientWidth, 'Teams workspace: 320px has no horizontal overflow with the mode fork rendered');
+        if (window.innerWidth < 960) {
+          assert(appFrame.scrollWidth <= appFrame.clientWidth, 'Teams workspace: 320px has no horizontal overflow with the mode fork rendered');
+        }
         var summaryEl = document.getElementById('teams-summary-line');
         assert(summaryEl.scrollWidth <= summaryEl.getBoundingClientRect().width + 1,
           'Teams summary: the summary line does not truncate/overflow at 320px (EN)');
@@ -1386,6 +1395,23 @@
         assert(document.getElementById('teams-fork-tournament-btn').getBoundingClientRect().height >= 44 &&
           document.getElementById('teams-fork-king-btn').getBoundingClientRect().height >= 44,
           'Mode fork: both Tournament and King of the Court buttons meet the 44px touch target (REQ-UX-73)');
+
+        // REQ-UX-22 order: summary + cards + unmatched notice come BEFORE
+        // the disclosure/fork at the end of Teams, both in DOM and visual
+        // order — fixed: teams-actions previously preceded results-section.
+        assert(!!(document.getElementById('results-section').compareDocumentPosition(document.getElementById('teams-actions')) & Node.DOCUMENT_POSITION_FOLLOWING),
+          'Teams layout: results (summary/cards/unmatched) precede teams-actions (disclosure/fork) in DOM order (REQ-UX-22)');
+        var lastCardRect = document.querySelectorAll('#couples-grid .couple-card')[cards.length - 1].getBoundingClientRect();
+        var forkRect = document.getElementById('teams-mode-fork').getBoundingClientRect();
+        assert(forkRect.top > lastCardRect.top, 'Teams layout: the mode fork renders visually below the last team card at 320px (REQ-UX-22)');
+
+        // REQ-UX-22/23: king-setup's own Start button is now hidden — the
+        // fork's King of the Court button is the single trigger; the
+        // win-condition/target inputs stay reachable for customization.
+        assert(document.getElementById('start-king-btn').hidden,
+          'King setup: the duplicate Start King button is hidden — the mode fork is the single trigger (REQ-UX-22)');
+        assert(!document.getElementById('king-win-condition-toggle').closest('.king-setup').hidden,
+          'King setup: win-condition/target inputs stay visible for customization before choosing King of the Court');
         appFrame.style.cssText = '';
 
         // ---- Deterministic 40-char unbroken name: exactly 2 players/2v2 so the
@@ -1428,11 +1454,45 @@
         setLanguage('en');
         appFrame.style.cssText = '';
 
-        // ---- Fork wiring: Tournament (REQ-UX-22/23) ----
+        // ---- Readiness gate on the fork (REQ-UX-12/21/22/23): an invalid
+        // format disables both fork buttons and names the blocker — fixed:
+        // previously the fork ignored readiness entirely (enabled whenever
+        // couplesGenerated) and a click on an invalid format ran
+        // handleStartTournament(), which wrote its error into Setup's
+        // hidden #format-error (invisible from Teams) while the view had
+        // already jumped to an empty, state-less Tournament. ----
+        document.querySelector('[data-preset="groupsTo"]').click();
+        var groupsPointsInput = document.getElementById('format-points-group');
+        groupsPointsInput.value = '0';
+        groupsPointsInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        var viewBeforeBlockedFork = document.getElementById('workspace').dataset.view;
+        assert(document.getElementById('teams-fork-tournament-btn').disabled,
+          'Mode fork: Tournament is disabled while the format is invalid (REQ-UX-12/21)');
+        assert(document.getElementById('teams-fork-king-btn').disabled,
+          'Mode fork: King of the Court is disabled by the same readiness gate (REQ-UX-12/21)');
+        assert(document.getElementById('teams-fork-tournament-btn').title.length > 0,
+          'Mode fork: the disabled Tournament button names its blocker (REQ-UX-03/12)');
+
+        document.getElementById('teams-fork-tournament-btn').click();
+        assert(document.getElementById('tournament-section').hidden,
+          'Mode fork: a blocked Tournament click is a no-op — no tournament is created');
+        assert(document.getElementById('workspace').dataset.view === viewBeforeBlockedFork,
+          'Mode fork: a blocked click leaves the active view unchanged');
+        document.getElementById('teams-fork-king-btn').click();
+        assert(document.getElementById('king-section').hidden,
+          'Mode fork: a blocked King of the Court click is also a no-op — no King game is created');
+
+        groupsPointsInput.value = '11';
+        groupsPointsInput.dispatchEvent(new Event('input', { bubbles: true }));
+        assert(!document.getElementById('teams-fork-tournament-btn').disabled,
+          'Mode fork: Tournament re-enables once the format becomes valid again');
+
+        // ---- Fork wiring: Tournament (REQ-UX-22/23) — now valid, the click actually starts ----
         document.getElementById('teams-fork-tournament-btn').click();
         assert(!document.getElementById('tournament-section').hidden, 'Mode fork: Tournament wires into the existing handleStartTournament()');
         assert(document.getElementById('workspace').dataset.view === 'tournament',
-          'Mode fork: choosing Tournament navigates into the Tournament destination (REQ-UX-22)');
+          'Mode fork: choosing Tournament navigates into the Tournament destination only after it actually starts (REQ-UX-22)');
         assert(document.getElementById('teams-mode-fork').hidden, 'Mode fork: hidden once a tournament has started (REQ-UX-23)');
         assert(document.getElementById('teams-options-disclosure').hidden, 'Teams options: disclosure hidden once a tournament has started (REQ-UX-23)');
         assert(document.getElementById('clear-btn').hidden, 'Teams options: Clear All hidden once a tournament has started (REQ-UX-23)');
