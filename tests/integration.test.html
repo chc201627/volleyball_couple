@@ -36,6 +36,11 @@
     </div>
     <main class="main">
     <div class="workspace" id="workspace" data-view="setup">
+      <!-- Compact event summary (REQ-UX-10) -->
+      <section class="section section--summary" id="event-summary" data-view-slot="setup">
+        <p class="event-summary__line" id="event-summary-line"></p>
+      </section>
+
       <!-- Input Section -->
       <section class="section section--input" aria-labelledby="input-heading" data-view-slot="setup">
         <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
@@ -196,11 +201,21 @@
               </div>
               <p class="form__error" id="format-error" role="alert" aria-live="polite"></p>
             </div>
+            <div class="format-locked-note" id="format-locked-note" hidden>
+              <p class="format-locked-note__text" data-i18n="workspace.setup.formatLocked.note">Locked — reset tournament to change</p>
+              <button class="btn btn--warning btn--small" id="format-locked-reset-btn" type="button" data-i18n="tournament.reset">Reset Tournament</button>
+            </div>
             <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
               Start Tournament
             </button>
           </div>
         </div>
+      </section>
+
+      <!-- Readiness checklist (REQ-UX-11/12) -->
+      <section class="section section--readiness" id="readiness-checklist" aria-labelledby="readiness-heading" data-view-slot="setup">
+        <h2 id="readiness-heading" class="section__heading" data-i18n="workspace.checklist.heading">Ready to start</h2>
+        <ul class="readiness" id="readiness-list"></ul>
       </section>
 
       <!-- Teams Actions -->
@@ -803,6 +818,56 @@
       var genderCountsText = document.getElementById('gender-counts').textContent;
       assert(genderCountsText.includes('Unspecified: 1') || genderCountsText.includes('Sin especificar: 1'),
         'Unspecified Gender: gender counts text includes Unspecified: 1');
+
+      // ===== SETUP: event summary, readiness checklist, format lock (REQ-UX-10..13) =====
+      var origConfirmSetup = window.confirm; window.confirm = function () { return true; };
+      document.getElementById('clear-btn').click();
+      document.getElementById('type-2v2-btn').click(); document.getElementById('mode-random-btn').click();
+      assert(document.getElementById('event-summary-line').textContent.indexOf('0 players') !== -1,
+        'Setup summary: shows the player count before any players are added');
+
+      addPlayer('R1', 'male'); addPlayer('R2', 'female'); addPlayer('R3', 'male');
+      var readinessItems = document.querySelectorAll('#readiness-list .readiness__item');
+      assert(readinessItems.length === 6, 'Setup readiness: 6 items render (Firebase configured in this harness)');
+      assert(document.querySelector('#readiness-list [data-readiness-key="enoughPlayers"]').classList.contains('readiness__item--not-ok'),
+        '3 players/2v2: Enough players is not-ok');
+      assert(document.querySelector('#readiness-list [data-readiness-key="enoughPlayers"]').textContent.indexOf('1') !== -1,
+        '3 players/2v2: shortfall names the missing player count');
+      assert(document.querySelector('#readiness-list [data-readiness-key="teamsGenerated"]').classList.contains('readiness__item--not-ok'),
+        '3 players/2v2: Teams generated is not-ok before generation');
+      assert(document.querySelector('#readiness-list [data-readiness-key="firebaseConnected"]').classList.contains('readiness__item--ok'),
+        'Readiness: firebaseConnected renders as a non-blocking ok item when Firebase is configured');
+      assert(document.getElementById('workspace-nav-cta').disabled, '3 players/2v2: primary CTA (Add players) is disabled');
+
+      addPlayer('R4', 'female');
+      assert(document.querySelector('#readiness-list [data-readiness-key="enoughPlayers"]').classList.contains('readiness__item--ok'),
+        '4 players/2v2: Enough players becomes ok');
+
+      document.getElementById('generate-btn').click();
+      assert(document.querySelector('#readiness-list [data-readiness-key="teamsGenerated"]').classList.contains('readiness__item--ok'),
+        'After generate: Teams generated becomes ok');
+      assert(!document.getElementById('tournament-setup').hidden, 'After generate: group/format/start controls are visible');
+      assert(!document.getElementById('start-tournament-btn').disabled, 'After generate: Start Tournament is enabled (no blocking item left)');
+
+      document.getElementById('start-tournament-btn').click();
+      assert(!document.getElementById('format-locked-note').hidden, 'Format lock: note visible once the tournament starts');
+      assert(document.getElementById('start-tournament-btn').hidden, 'Format lock: Start Tournament button hidden while locked');
+      assert(document.querySelectorAll('#group-count-options .tournament-setup__opt:disabled').length === 4,
+        'Format lock: all group options are disabled while locked');
+      assert(document.querySelector('#format-preset-options [data-preset="classic"]').disabled,
+        'Format lock: format preset buttons are disabled while locked');
+      setLanguage('es');
+      assert(document.getElementById('format-locked-note').textContent.indexOf('Bloqueado') !== -1,
+        'Format lock: note text is localized to Spanish');
+      setLanguage('en');
+
+      await Promise.resolve(); await Promise.resolve(); // let createSession() settle before resetting
+      document.getElementById('format-locked-reset-btn').click();
+      assert(document.getElementById('format-locked-note').hidden, 'Format lock: Reset from Setup unlocks the format editor');
+      assert(!document.getElementById('start-tournament-btn').hidden, 'Format lock: Start Tournament button reappears after reset');
+      assert(!document.querySelector('#group-count-options [data-groups="1"]').disabled,
+        'Format lock: the feasible group option is re-enabled after reset');
+      window.confirm = origConfirmSetup;
 
       // ===== COLLABORATIVE MOBILE TOURNAMENT =====
       window.confirm = function () { return true; }; document.getElementById('clear-btn').click();
