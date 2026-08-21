@@ -847,6 +847,7 @@
     renderEventSummary();
     renderReadiness(view);
     renderTournamentSetupState(view);
+    renderTeamsForkState(view);
   }
 
   /** REQ-UX-10: compact "{players} · {genderCounts} · {teamSize}vs{teamSize}
@@ -912,6 +913,28 @@
     startTournamentBtn.disabled = !!blockedReasonKey;
     if (blockedReasonKey) startTournamentBtn.title = t(blockedReasonKey);
     else startTournamentBtn.removeAttribute('title');
+  }
+
+  /** REQ-UX-21/22: gates the Teams mode fork exactly like startTournamentBtn
+   * — disabled while any blocking readiness item is unmet (same
+   * view.primaryAction.blockedReasonKey the center CTA and Setup's Start
+   * Tournament button already use), naming the blocker via title/aria-label
+   * so a blocked tap is explained rather than silently starting an invalid
+   * tournament (fixed: previously gated on couplesGenerated only). */
+  function renderTeamsForkState(view) {
+    var blockedReasonKey = (view.primaryAction && view.primaryAction.id === 'startTournament')
+      ? view.primaryAction.blockedReasonKey : null;
+    [teamsForkTournamentBtn, teamsForkKingBtn].forEach(function (btn) {
+      btn.disabled = !!blockedReasonKey;
+      if (blockedReasonKey) {
+        var reason = t(blockedReasonKey);
+        btn.title = reason;
+        btn.setAttribute('aria-label', t(btn.getAttribute('data-i18n')) + ' — ' + reason);
+      } else {
+        btn.removeAttribute('title');
+        btn.removeAttribute('aria-label');
+      }
+    });
   }
 
   /** Rebuilds buttons only when the nav-id list itself changes (role/session
@@ -1400,17 +1423,40 @@
     kingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  /** REQ-UX-22: the Teams mode fork navigates to Tournament before wiring
-   * into the existing start handlers, so King/Tournament always render
-   * inside the Tournament destination regardless of prior nav history. */
+  /** REQ-UX-21/22: gates the fork exactly like startTournamentBtn — a
+   * blocked action never even calls the start handler (belt-and-suspenders
+   * with the native `disabled` attribute renderTeamsForkState() sets, which
+   * already stops a real click from firing at all). The view only switches
+   * to Tournament AFTER the handler actually creates state, never before —
+   * fixed: previously currentView was set to 'tournament' unconditionally
+   * BEFORE calling the handler, so an invalid format (which makes
+   * handleStartTournament() return early after writing its error into
+   * Setup's #format-error) still jumped the organizer into an empty,
+   * state-less Tournament view. */
+  function handleTeamsForkBlocked() {
+    var view = computeWorkspace(buildWorkspaceInput());
+    return (view.primaryAction && view.primaryAction.id === 'startTournament')
+      ? view.primaryAction.blockedReasonKey : null;
+  }
+
   function handleTeamsForkTournament() {
-    currentView = 'tournament';
+    var blocked = handleTeamsForkBlocked();
+    if (blocked) { showWorkspaceToast(t(blocked)); return; }
     handleStartTournament();
+    if (tournamentState) {
+      currentView = 'tournament';
+      renderChrome();
+    }
   }
 
   function handleTeamsForkKing() {
-    currentView = 'tournament';
+    var blocked = handleTeamsForkBlocked();
+    if (blocked) { showWorkspaceToast(t(blocked)); return; }
     handleStartKing();
+    if (kingState) {
+      currentView = 'tournament';
+      renderChrome();
+    }
   }
 
   function handleResetKing() {
