@@ -392,6 +392,40 @@
         <button class="btn btn--primary" id="session-not-found-reset-btn" type="button" data-i18n="workspace.tournament.notFound.startLocalSetup">Start a local setup</button>
       </div>
 
+      <!-- Results / completion (REQ-UX-50..53) -->
+      <section class="section section--completion" id="completion-section" aria-labelledby="completion-heading" data-view-slot="results">
+        <h2 id="completion-heading" class="section__heading" data-i18n="workspace.results.heading">Results</h2>
+
+        <div class="results-banner" id="completion-banner" hidden>
+          <span aria-hidden="true">⏳</span>
+          <span data-i18n="workspace.results.inProgress">Tournament in progress — live standings, no champion yet</span>
+        </div>
+
+        <div class="results-empty" id="completion-empty" hidden>
+          <p data-i18n="workspace.results.empty">No results yet</p>
+          <button class="btn btn--primary" id="completion-empty-setup-btn" type="button" data-i18n="workspace.results.emptyLink">Go to Setup</button>
+        </div>
+
+        <div class="champion-card" id="completion-champion" hidden></div>
+
+        <p class="completion-summary" id="completion-summary"></p>
+
+        <div class="completion-standings" id="completion-standings" hidden>
+          <!-- Standings tables rendered by JS (renderStandingsTable(), read-only) -->
+        </div>
+
+        <details class="disclosure completion-bracket" id="completion-bracket" hidden>
+          <summary class="disclosure__summary" data-i18n="workspace.results.bracket">Bracket</summary>
+          <div class="completion-bracket__content" id="completion-bracket-content"></div>
+        </details>
+
+        <div class="completion-actions" id="completion-actions" hidden>
+          <button class="btn btn--share" id="completion-share-btn" type="button" data-i18n="tournament.share">Share</button>
+          <button class="btn" id="completion-export-btn" type="button" data-i18n="workspace.results.export">Copy / share summary</button>
+          <button class="btn btn--warning" id="completion-start-another-btn" type="button" data-i18n="workspace.results.startAnother">Start another tournament</button>
+        </div>
+      </section>
+
       <!-- Workspace bottom nav + toast -->
       <nav class="workspace-nav" id="workspace-nav" aria-label="Workspace">
         <div class="workspace-nav__items" id="workspace-nav-items"></div>
@@ -1879,6 +1913,133 @@
         assert(document.getElementById('teams-mode-fork').hidden, 'Mode fork: hidden once a King game has started (REQ-UX-23)');
 
         window.confirm = savedConfirm;
+      })();
+
+      // ===== RESULTS / COMPLETION (slice G): champion card variants, summary, export, in-progress banner — REQ-UX-50..53 =====
+      await (async function () {
+        var savedConfirmResults = window.confirm;
+        window.confirm = function () { return true; };
+        document.getElementById('reset-king-btn').click(); // tear down the King game left running by the previous block
+        window.confirm = savedConfirmResults;
+        assert(document.getElementById('king-section').hidden, 'Results setup: the previous King game is torn down before these fixtures run');
+
+        function resultsNavBtn() { return document.querySelector('#workspace-nav-items [data-view-id="results"]'); }
+        function goToResults() { resultsNavBtn().click(); }
+
+        // ---- REQ-UX-53: pre-completion shows the in-progress banner + live standings, no champion ----
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
+        assert(!resultsNavBtn().hasAttribute('aria-disabled'), 'Results: the destination is reachable as soon as a tournament exists, even before completion (REQ-UX-53)');
+        goToResults();
+        assert(document.getElementById('workspace').dataset.view === 'results', 'Results: nav click activates the destination');
+        assert(!document.getElementById('completion-banner').hidden, 'Results: "Tournament in progress" banner shows before completion (REQ-UX-53)');
+        assert(document.getElementById('completion-champion').hidden, 'Results: no champion card while the tournament is still in progress');
+        assert(!document.getElementById('completion-standings').hidden && document.getElementById('completion-standings').textContent.length > 0,
+          'Results: live standings render before completion (REQ-UX-53)');
+        assert(document.getElementById('completion-empty').hidden, 'Results: the empty state does not show once a tournament exists');
+
+        // ---- Tied lead (REQ-UX-50): a 3-way tie on points/diff/setsFor — top two tie, no champion ----
+        var tiedFixture = {
+          players: [],
+          teams: [
+            { id: 'gt0', name: 'Team Alpha' },
+            { id: 'gt1', name: 'Team Beta' },
+            { id: 'gt2', name: 'Team Gamma' },
+          ],
+          groups: [{ id: 'A', teams: [{ id: 'gt0' }, { id: 'gt1' }, { id: 'gt2' }] }],
+          matches: [
+            { id: 'A-gt0-gt1', groupId: 'A', order: 0, status: 'finished', played: true, score1: 21, score2: 15, revision: 1, team1Id: 'gt0', team2Id: 'gt1' },
+            { id: 'A-gt1-gt2', groupId: 'A', order: 1, status: 'finished', played: true, score1: 21, score2: 15, revision: 1, team1Id: 'gt1', team2Id: 'gt2' },
+            { id: 'A-gt2-gt0', groupId: 'A', order: 2, status: 'finished', played: true, score1: 21, score2: 15, revision: 1, team1Id: 'gt2', team2Id: 'gt0' },
+          ],
+        };
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: tiedFixture });
+        goToResults();
+        assert(document.getElementById('completion-banner').hidden, 'Results: the in-progress banner is hidden once complete');
+        assert(!document.getElementById('completion-champion').hidden, 'Results: the champion card shows once complete');
+        assert(document.querySelector('.champion-card__heading').textContent === 'Tied lead',
+          'Results: a top-two tie renders the "Tied lead" heading, not a champion');
+        assert(document.getElementById('completion-champion').textContent.indexOf('Champion') === -1,
+          'Results: a tied-lead outcome never renders the word "Champion" (REQ-UX-50)');
+        var tiedNamesText = document.querySelector('.champion-card__name').textContent;
+        assert(tiedNamesText.indexOf('Team Alpha') !== -1 && tiedNamesText.indexOf('Team Beta') !== -1,
+          'Results: tied lead lists both tied teams (REQ-UX-50)');
+
+        // ---- Group winners (REQ-UX-50): 2-group classic, all played, no knockout ----
+        var groupWinnersFixture = {
+          players: [],
+          teams: [
+            { id: 'ga0', name: 'Alpha One' }, { id: 'ga1', name: 'Alpha Two' },
+            { id: 'gb0', name: 'Bravo One' }, { id: 'gb1', name: 'Bravo Two' },
+          ],
+          groups: [
+            { id: 'A', teams: [{ id: 'ga0' }, { id: 'ga1' }] },
+            { id: 'B', teams: [{ id: 'gb0' }, { id: 'gb1' }] },
+          ],
+          matches: [
+            { id: 'A-ga0-ga1', groupId: 'A', order: 0, status: 'finished', played: true, score1: 21, score2: 10, revision: 1, team1Id: 'ga0', team2Id: 'ga1' },
+            { id: 'B-gb0-gb1', groupId: 'B', order: 0, status: 'finished', played: true, score1: 21, score2: 10, revision: 1, team1Id: 'gb0', team2Id: 'gb1' },
+          ],
+        };
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: groupWinnersFixture });
+        goToResults();
+        assert(document.querySelectorAll('.champion-card__winner').length === 2,
+          'Results: a 2-group classic tournament with no knockout renders exactly two group-winner cards (REQ-UX-50)');
+        assert(document.getElementById('completion-champion').textContent.indexOf('Champion') === -1,
+          'Results: group winners never renders the word "Champion" heading (REQ-UX-50)');
+        var winnerNames = Array.from(document.querySelectorAll('.champion-card__winner-name')).map(function (el) { return el.textContent; });
+        assert(winnerNames.some(function (n) { return n.indexOf('Alpha One') !== -1; }) && winnerNames.some(function (n) { return n.indexOf('Bravo One') !== -1; }),
+          'Results: each group-winner card names that group\'s actual winner (REQ-UX-50)');
+        assert(document.getElementById('completion-standings').querySelectorAll('.standings').length === 2,
+          'Results: renderStandingsTable() is reused read-only for every group (REQ-UX-51)');
+        assert(!document.getElementById('completion-actions').hidden && !document.getElementById('completion-start-another-btn').hidden,
+          'Results: Share/Export/Start another are visible to the owner once complete (REQ-UX-51)');
+
+        // ---- 320px: no horizontal overflow with champion card, standings and actions rendered ----
+        appFrame.style.cssText = 'display:block;width:320px';
+        var completionSectionEl = document.getElementById('completion-section');
+        assert(completionSectionEl.scrollWidth <= completionSectionEl.clientWidth,
+          'Results mobile: 320px has no overflow with the champion card, standings and action buttons rendered (REQ-UX-73/75)');
+        assert(Array.from(document.querySelectorAll('#completion-actions .btn')).every(function (b) { return b.getBoundingClientRect().height >= 44; }),
+          'Results mobile: Share/Export/Start another all meet the 44px touch target (REQ-UX-73)');
+        appFrame.style.cssText = '';
+
+        // ---- Export (REQ-UX-52): Web Share first, distinct "Shared" confirmation ----
+        var shareCalls = [];
+        var originalShare = navigator.share;
+        navigator.share = function (data) { shareCalls.push(data); return Promise.resolve(); };
+        var exportBtn = document.getElementById('completion-export-btn');
+        var exportOriginalLabel = exportBtn.textContent;
+        exportBtn.click();
+        await Promise.resolve(); await Promise.resolve();
+        assert(shareCalls.length === 1 && typeof shareCalls[0].text === 'string' && shareCalls[0].text.indexOf('Alpha One') !== -1,
+          'Export: navigator.share is preferred when available and receives the plain-text summary (REQ-UX-52)');
+        assert(shareCalls[0].text.indexOf('Alpha One') !== -1 && shareCalls[0].text.indexOf('PTS') !== -1,
+          'Export: the plain-text summary includes final standings, appended alongside the champion/group-winner lines (REQ-UX-51/52)');
+        assert(exportBtn.textContent.indexOf('Shared') !== -1,
+          'Export: a successful share shows a distinct "Shared" confirmation (REQ-UX-52)');
+        navigator.share = originalShare;
+
+        // ---- Export: clipboard fallback when Web Share is unavailable, distinct "Copied" confirmation ----
+        var clipboardCalls = [];
+        var originalClipboard = navigator.clipboard;
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (text) { clipboardCalls.push(text); return Promise.resolve(); } } });
+        exportBtn.textContent = exportOriginalLabel;
+        exportBtn.click();
+        await Promise.resolve(); await Promise.resolve();
+        assert(clipboardCalls.length === 1 && clipboardCalls[0].indexOf('Alpha One') !== -1, 'Export: falls back to navigator.clipboard.writeText() without Web Share (REQ-UX-52)');
+        assert(exportBtn.textContent.indexOf('Copied') !== -1 && exportBtn.textContent.indexOf('Shared') === -1,
+          'Export: the clipboard path shows a distinct "Copied" confirmation, not "Shared" (REQ-UX-52)');
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: originalClipboard });
+
+        // ---- Start another tournament: wired to the existing reset flow, returns to a resettable Setup ----
+        var confirmedReset = false;
+        window.confirm = function () { confirmedReset = true; return true; };
+        document.getElementById('completion-start-another-btn').click();
+        window.confirm = savedConfirmResults;
+        assert(confirmedReset && document.getElementById('tournament-section').hidden,
+          'Results: "Start another tournament" runs the existing reset confirmation flow (REQ-UX-51)');
+        assert(document.getElementById('completion-empty').hidden === false || document.getElementById('workspace').dataset.view !== 'results',
+          'Results: after reset, Results is either empty or no longer the active destination (no stale champion state)');
       })();
 
       // ===== Summary =====
