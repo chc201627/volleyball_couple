@@ -47,28 +47,41 @@ function workspaceFirstBlocker(readiness) {
   return null;
 }
 
-/** Default-view derivation table (design "Default-view / primary-action"). */
+/** Default-view derivation table (design "Default-view / primary-action").
+ * `hasTournament`/`hasKingGame` is checked BEFORE `couplesGenerated` — fixed:
+ * after a page reload restoring a running LOCAL tournament/king game,
+ * `couplesGenerated` (a separate, non-persisted module flag in app.js) is
+ * still false, which previously forced 'setup' even though a tournament was
+ * already active, contradicting REQ-UX-05's "tournament or king in progress
+ * → Tournament" row. A tournament/king existing already implies teams were
+ * generated, so it takes precedence over the couplesGenerated-based
+ * Setup/Teams split below it. */
 function workspaceDefaultView(input) {
   if (input.sessionState === 'notFound') return 'tournament';
   if (input.role !== 'owner') return input.complete ? 'results' : 'tournament';
+  if (input.hasTournament || input.hasKingGame) return input.complete ? 'results' : 'tournament';
   if (!input.couplesGenerated) return 'setup';
-  if (!input.hasTournament && !input.hasKingGame) return 'teams';
-  if (input.complete) return 'results';
-  return 'tournament';
+  return 'teams';
 }
 
 /** Whether a destination is reachable for the given input, plus its
  * lock reason key when it is not (invariant 7 — every locked item carries
- * a non-null lockReasonKey). */
+ * a non-null lockReasonKey). Teams/Tournament are reachable once
+ * `couplesGenerated` OR a tournament/king game already exists — fixed: same
+ * post-reload desync as workspaceDefaultView() above previously left the
+ * Tournament nav item locked (and Teams unreachable) even while a real
+ * tournament/king game was active, because `couplesGenerated` alone gated
+ * both. */
 function workspaceViewEnabled(id, input) {
   if (id === 'setup') return { enabled: true, lockReasonKey: null };
+  var teamsOrTournamentExist = !!(input.couplesGenerated || input.hasTournament || input.hasKingGame);
   if (id === 'teams') {
-    return input.couplesGenerated
+    return teamsOrTournamentExist
       ? { enabled: true, lockReasonKey: null }
       : { enabled: false, lockReasonKey: 'workspace.nav.locked.generateTeamsFirst' };
   }
   if (id === 'tournament') {
-    return input.couplesGenerated
+    return teamsOrTournamentExist
       ? { enabled: true, lockReasonKey: null }
       : { enabled: false, lockReasonKey: 'workspace.nav.locked.generateTeamsFirst' };
   }

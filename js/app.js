@@ -24,7 +24,6 @@
   var repositoryUnsubscribe = null;
   var sessionId = null;         // Active session ID written to / read from Firebase
   var sessionSnapshot = null;
-  var matchFilter = 'pending';
   var lastScoreCommand = null;
   let pairingMode = 'random';  // 'random' | 'manual'
   let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
@@ -116,7 +115,6 @@
   const accessLabel = document.getElementById('access-label');
   const requestAccessBtn = document.getElementById('request-access-btn');
   const accessMembers = document.getElementById('access-members');
-  const matchFilters = document.getElementById('match-filters');
   const syncStatus = document.getElementById('sync-status');
   const retryScoreBtn = document.getElementById('retry-score-btn');
   const workspaceEl = document.getElementById('workspace');
@@ -130,6 +128,15 @@
   const tournamentCustomRules = document.getElementById('tournament-custom-rules');
   const tournamentCustomRulesSummary = document.getElementById('tournament-custom-rules-summary');
   const tournamentCustomRulesText = document.getElementById('tournament-custom-rules-text');
+
+  // --- Command center (REQ-UX-30..35) DOM references ---
+  const nextMatchCardEl = document.getElementById('next-match-card');
+  const tournamentStageProgressEl = document.getElementById('tournament-stage-progress');
+  const tournamentLiveSectionEl = document.getElementById('tournament-live-section');
+  const tournamentPendingSectionEl = document.getElementById('tournament-pending-section');
+  const tournamentRecentlyFinishedSectionEl = document.getElementById('tournament-recently-finished-section');
+  const sessionNotFoundEl = document.getElementById('session-not-found');
+  const sessionNotFoundResetBtn = document.getElementById('session-not-found-reset-btn');
 
   const kingSetup              = document.getElementById('king-setup');
   const startKingBtn           = document.getElementById('start-king-btn');
@@ -180,7 +187,7 @@
     shareTournamentBtn.addEventListener('click', handleShareTournament);
     requestAccessBtn.addEventListener('click', handleRequestAccess);
     accessMembers.addEventListener('click', handleAccessDecision);
-    matchFilters.addEventListener('click', handleMatchFilter);
+    sessionNotFoundResetBtn.addEventListener('click', handleStartLocalSetup);
     retryScoreBtn.addEventListener('click', function () {
       if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, null, lastScoreCommand.status);
     });
@@ -848,6 +855,7 @@
     renderReadiness(view);
     renderTournamentSetupState(view);
     renderTeamsForkState(view);
+    renderCommandCenter();
   }
 
   /** REQ-UX-10: compact "{players} · {genderCounts} · {teamSize}vs{teamSize}
@@ -935,6 +943,310 @@
         btn.removeAttribute('aria-label');
       }
     });
+  }
+
+  // --- Tournament command center (REQ-UX-30..35) ---
+
+  /** Snapshot survival (design "restore focus by element id"): captures enough
+   * to re-find the focused control (Next Match action, a match-day row, a
+   * "Show all" summary, or an access Approve/Deny button) after an async
+   * snapshot rebuilds it. Null when focus is elsewhere. */
+  function captureCommandCenterFocus() {
+    var active = document.activeElement;
+    if (!active || active === document.body) return null;
+    if (active === nextMatchCardEl.querySelector('.next-match-card__action')) {
+      return { type: 'next-match-action' };
+    }
+    if (accessMembers.contains(active) && active.dataset.member) {
+      return { type: 'access-member', member: active.dataset.member, access: active.dataset.access };
+    }
+    var summary = active.closest && active.closest('.match-day-section__more > summary');
+    if (summary) {
+      var section = summary.closest('.match-day-section');
+      if (section) return { type: 'show-all-summary', sectionId: section.id };
+    }
+    var rowBtn = active.closest && active.closest('.match-card[data-match-id] .match-card__btn');
+    if (rowBtn) {
+      var row = rowBtn.closest('.match-card[data-match-id]');
+      if (row) return { type: 'match-row-action', matchId: row.dataset.matchId };
+    }
+    return null;
+  }
+
+  /** Restores focus captured by captureCommandCenterFocus() after the
+   * relevant subtree has been rebuilt. A missing target (e.g. the match
+   * finished and its row/button no longer exists) is a silent no-op. */
+  function restoreCommandCenterFocus(ref) {
+    if (!ref) return;
+    var target = null;
+    if (ref.type === 'next-match-action') {
+      target = nextMatchCardEl.querySelector('.next-match-card__action');
+    } else if (ref.type === 'access-member') {
+      target = accessMembers.querySelector('[data-member="' + ref.member + '"][data-access="' + ref.access + '"]') ||
+        accessMembers.querySelector('[data-member="' + ref.member + '"]');
+    } else if (ref.type === 'show-all-summary') {
+      var section = document.getElementById(ref.sectionId);
+      target = section && section.querySelector('.match-day-section__more > summary');
+    } else if (ref.type === 'match-row-action') {
+      var row = document.querySelector('.match-card[data-match-id="' + ref.matchId + '"]');
+      target = row && row.querySelector('.match-card__btn');
+    }
+    if (target) target.focus();
+  }
+
+  /** Owns everything below the status strip inside the Tournament destination:
+   * Next Match card, stage progress and the stacked Live/Pending/Recently
+   * finished sections — called from renderChrome() only (D3/R3), never from
+   * renderTournament()/renderKing(), so it always sees a fresh
+   * currentResolution/tournamentState and tolerates a full re-render on every
+   * snapshot without resetting focus or scroll elsewhere in the page. The
+   * inline access-request card's content is still owned by
+   * renderTournamentOps() (called from renderTournament()) — only its DOM
+   * position moved; this function does not touch it.
+   * King of the Court mode (REQ-UX-35) replaces this whole block with its own
+   * throne/queue UI, so everything here stays hidden while a King game is
+   * active. */
+  function renderCommandCenter() {
+    sessionNotFoundEl.hidden = workspaceSessionState !== 'notFound';
+    if (workspaceSessionState === 'notFound') {
+      tournamentSection.hidden = true;
+      kingSection.hidden = true;
+      return;
+    }
+    if (!tournamentState) {
+      nextMatchCardEl.hidden = true;
+      tournamentStageProgressEl.hidden = true;
+      tournamentLiveSectionEl.hidden = true;
+      tournamentPendingSectionEl.hidden = true;
+      tournamentRecentlyFinishedSectionEl.hidden = true;
+      return;
+    }
+    var resolution = tournamentState.format ? currentResolution : null;
+    var day = tournamentDay({
+      matches: tournamentState.matches,
+      groups: tournamentState.groups,
+      format: tournamentState.format || null,
+      resolution: resolution,
+    });
+    renderNextMatchCard(day);
+    renderStageProgress(day);
+    renderMatchDaySection(tournamentLiveSectionEl, 'live', day.live, day.counts.live);
+    renderMatchDaySection(tournamentPendingSectionEl, 'pending', day.pending, day.counts.pending);
+    renderMatchDaySection(tournamentRecentlyFinishedSectionEl, 'recentlyFinished', day.recentlyFinished, day.counts.recentlyFinished);
+  }
+
+  /** REQ-UX-31: the Next Match card and its 4 reason states. The action
+   * button reuses the existing handleScoreboard() flow (same live-scoreboard
+   * panel, expectedRevision/conflict semantics as every other entry point). */
+  function renderNextMatchCard(day) {
+    nextMatchCardEl.hidden = false;
+    nextMatchCardEl.innerHTML = '';
+    var complete = currentResolution ? currentResolution.complete : isTournamentComplete(tournamentState.matches);
+
+    var card = document.createElement('div');
+    card.className = 'next-match-card__inner';
+
+    var heading = document.createElement('h3');
+    heading.className = 'next-match-card__label';
+    heading.textContent = t('workspace.tournament.nextMatch.heading');
+    card.appendChild(heading);
+
+    if (day.nextMatch) {
+      var match = day.nextMatch;
+      var name1 = match.team1Id ? resolveMatchTeamName(match.team1Id) : formatSlotLabel(match.team1Slot);
+      var name2 = match.team2Id ? resolveMatchTeamName(match.team2Id) : formatSlotLabel(match.team2Slot);
+
+      var teamsEl = document.createElement('p');
+      teamsEl.className = 'next-match-card__teams';
+      teamsEl.innerHTML = escapeHTML(name1) +
+        ' <span class="next-match-card__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+        escapeHTML(name2);
+      card.appendChild(teamsEl);
+
+      var metaParts = [];
+      if (match.groupId) {
+        metaParts.push(t('tournament.group', { id: match.groupId }));
+      } else if (match.stageId) {
+        // Knockout matches carry no groupId — name the knockout stage instead
+        // (e.g. "Quarterfinals"), looked up from the same stageProgress list
+        // rendered just above.
+        var matchStage = (day.stageProgress || []).filter(function (s) { return s.id === match.stageId; })[0];
+        if (matchStage) metaParts.push(t(matchStage.label));
+      }
+      // Set Rules are unset (pointsTo: null) for classic sessions — same guard
+      // already used by renderStagePanel()/renderScoreboardPanel().
+      if (match.rules && match.rules.pointsTo != null) metaParts.push(formatStageRuleLabel(match.rules));
+      if (metaParts.length) {
+        var meta = document.createElement('p');
+        meta.className = 'next-match-card__meta';
+        meta.textContent = metaParts.join(' · ');
+        card.appendChild(meta);
+      }
+
+      if (!isReadOnly) {
+        var actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
+        actionBtn.className = 'btn btn--success btn--large next-match-card__action';
+        actionBtn.textContent = match.status === 'live'
+          ? t('workspace.tournament.nextMatch.resumeBtn') : t('workspace.tournament.nextMatch.scoreBtn');
+        actionBtn.addEventListener('click', (function (mid) { return function () { handleScoreboard(mid); }; })(match.matchId));
+        card.appendChild(actionBtn);
+      }
+    } else {
+      var reasonEl = document.createElement('p');
+      reasonEl.className = 'next-match-card__reason';
+      reasonEl.textContent = t(complete
+        ? 'workspace.tournament.nextMatch.reason.complete'
+        : 'workspace.tournament.nextMatch.reason.' + day.nextMatchReason);
+      card.appendChild(reasonEl);
+
+      if (complete) {
+        var resultsLink = document.createElement('button');
+        resultsLink.type = 'button';
+        resultsLink.className = 'btn btn--large next-match-card__results-link';
+        resultsLink.textContent = t('workspace.tournament.nextMatch.seeResults');
+        resultsLink.addEventListener('click', function () { handleNavClick('results'); });
+        card.appendChild(resultsLink);
+      }
+    }
+
+    nextMatchCardEl.appendChild(card);
+  }
+
+  /** REQ-UX-33: played/total per group (classic) or per stage (formatted
+   * sessions), rendered as text — never color-only (REQ-UX-72). Classic
+   * group labels use the forward-registered 'tournament.day.stageProgress.group'
+   * key (js/tournament-day.js); formatted stage labels reuse the same
+   * t(stage.label) pattern already used by renderStagePanel(). */
+  function renderStageProgress(day) {
+    var stages = day.stageProgress || [];
+    tournamentStageProgressEl.hidden = stages.length === 0;
+    tournamentStageProgressEl.innerHTML = '';
+    if (stages.length === 0) return;
+
+    var heading = document.createElement('h3');
+    heading.className = 'stage-progress__heading';
+    heading.textContent = t('workspace.tournament.stageProgress.heading');
+    tournamentStageProgressEl.appendChild(heading);
+
+    var ul = document.createElement('ul');
+    ul.className = 'stage-progress__list';
+    stages.forEach(function (stage) {
+      var li = document.createElement('li');
+      li.className = 'stage-progress__item';
+      var label = stage.kind === 'group' ? t(stage.label, { group: stage.id }) : t(stage.label);
+      // A classic group has no real stage dependency, so its 'pending' status
+      // (0 played) reads as neutral "Not started" rather than the formatted
+      // engine's "Locked" — 'pending' legitimately means locked-by-a-prior-
+      // stage only for a real (formatted) stage.
+      var statusLabel = (stage.kind === 'group' && stage.status === 'pending')
+        ? t('workspace.tournament.stageProgress.notStarted')
+        : formatStageStatusLabel(stage.status);
+      li.textContent = label + ' — ' +
+        t('workspace.tournament.stageProgress.count', { played: stage.played, total: stage.total }) +
+        ' · ' + statusLabel;
+      ul.appendChild(li);
+    });
+    tournamentStageProgressEl.appendChild(ul);
+  }
+
+  /** REQ-UX-32: Live / Pending / Recently finished, each showing its count and
+   * collapsing anything past TOURNAMENT_DAY_COLLAPSE_AFTER (5) behind a
+   * "Show all (N)" disclosure — tournamentDay() always returns the full
+   * array; the collapse itself is this rendering concern. */
+  function renderMatchDaySection(container, kind, matches, count) {
+    // Snapshot survival: a "Show all" disclosure the organizer already opened
+    // must stay open across a re-render triggered by an unrelated snapshot —
+    // captured before innerHTML clears it, restored on the rebuilt <details>.
+    var wasOpen = !!container.querySelector('.match-day-section__more[open]');
+    container.hidden = count === 0;
+    container.innerHTML = '';
+    if (count === 0) return;
+
+    var heading = document.createElement('h3');
+    heading.className = 'match-day-section__heading';
+    heading.textContent = t('workspace.tournament.section.' + kind, { count: count });
+    container.appendChild(heading);
+
+    var ul = document.createElement('ul');
+    ul.className = 'match-list';
+    matches.slice(0, TOURNAMENT_DAY_COLLAPSE_AFTER).forEach(function (m) { ul.appendChild(renderMatchDayRow(m)); });
+    container.appendChild(ul);
+
+    if (count > TOURNAMENT_DAY_COLLAPSE_AFTER) {
+      var details = document.createElement('details');
+      details.className = 'disclosure match-day-section__more';
+      details.open = wasOpen;
+      var summary = document.createElement('summary');
+      summary.className = 'disclosure__summary';
+      summary.textContent = t('workspace.tournament.showAll', { count: count });
+      details.appendChild(summary);
+      var moreUl = document.createElement('ul');
+      moreUl.className = 'match-list disclosure__content';
+      matches.slice(TOURNAMENT_DAY_COLLAPSE_AFTER).forEach(function (m) { moreUl.appendChild(renderMatchDayRow(m)); });
+      details.appendChild(moreUl);
+      container.appendChild(details);
+    }
+  }
+
+  /** One row for a command-center list — reuses the existing .match-card
+   * markup/CSS (same as renderMatchList()/renderStagePanel()) so no new
+   * match-row styling is needed. data-match-id backs snapshot-survival focus
+   * restoration (captureCommandCenterFocus()/restoreCommandCenterFocus()). */
+  function renderMatchDayRow(match) {
+    var name1 = match.team1Id ? resolveMatchTeamName(match.team1Id) : formatSlotLabel(match.team1Slot);
+    var name2 = match.team2Id ? resolveMatchTeamName(match.team2Id) : formatSlotLabel(match.team2Slot);
+    var hasScore = match.score1 != null && match.score2 != null;
+
+    var li = document.createElement('li');
+    li.dataset.status = match.status;
+    li.dataset.matchId = match.matchId;
+    li.className = 'match-card' + (match.played ? ' match-card--played' : '');
+
+    var row = document.createElement('div');
+    row.className = 'match-card__row';
+
+    var teamsEl = document.createElement('span');
+    teamsEl.className = 'match-card__teams';
+    teamsEl.innerHTML = escapeHTML(name1) +
+      ' <span class="match-card__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+      escapeHTML(name2);
+    row.appendChild(teamsEl);
+
+    var scoreEl = document.createElement('span');
+    scoreEl.className = 'match-card__score' + (hasScore ? ' match-card__score--played' : '');
+    scoreEl.textContent = hasScore ? (match.score1 + ' – ' + match.score2) : '–';
+    row.appendChild(scoreEl);
+
+    if (!isReadOnly && match.scorable) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'match-card__btn';
+      btn.textContent = match.status === 'live'
+        ? t('workspace.tournament.matchRow.resume') : t('workspace.tournament.matchRow.score');
+      btn.addEventListener('click', (function (mid) { return function () { handleScoreboard(mid); }; })(match.matchId));
+      row.appendChild(btn);
+    }
+
+    li.appendChild(row);
+    return li;
+  }
+
+  /** REQ-UX-62: leaves the not-found state and returns to a fresh local
+   * organizer flow — clears the session/hash rather than reloading. */
+  function handleStartLocalSetup() {
+    if (repositoryUnsubscribe) { repositoryUnsubscribe(); repositoryUnsubscribe = null; }
+    sessionId = null;
+    sessionSnapshot = null;
+    workspaceSessionState = 'ok';
+    isReadOnly = false;
+    tournamentState = null;
+    kingState = null;
+    currentView = null;
+    tournamentSection.hidden = true;
+    kingSection.hidden = true;
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    updateUI();
   }
 
   /** Rebuilds buttons only when the nav-id list itself changes (role/session
@@ -1695,10 +2007,14 @@
     if (!tournamentRepository || !sid) return;
     if (repositoryUnsubscribe) repositoryUnsubscribe();
     repositoryUnsubscribe = tournamentRepository.watchSession(sid, function (snapshot) {
+      // Snapshot survival: this listener fires async/independently of user action —
+      // capture focus before the rebuild so an in-progress tap is never dropped.
+      var focusRef = captureCommandCenterFocus();
       if (!snapshot || !snapshot.tournament) {
         if (snapshot && snapshot.error) console.warn(snapshot.error);
         workspaceSessionState = 'notFound';
         renderChrome();
+        restoreCommandCenterFocus(focusRef);
         return;
       }
       workspaceSessionState = 'ok';
@@ -1716,6 +2032,7 @@
       tournamentSection.hidden = false;
       renderTournament();
       updateUI();
+      restoreCommandCenterFocus(focusRef);
     });
   }
 
@@ -1765,16 +2082,6 @@
     var button = event.target.closest('[data-access]');
     if (!button || !tournamentRepository) return;
     tournamentRepository.setAccess(sessionId, button.dataset.member, button.dataset.access).then(function (result) { setSyncState(result.status); });
-  }
-
-  function handleMatchFilter(event) {
-    var button = event.target.closest('[data-filter]'); if (!button) return;
-    matchFilter = button.dataset.filter;
-    matchFilters.querySelectorAll('[data-filter]').forEach(function (item) {
-      item.classList.toggle('match-filters__btn--active', item === button);
-      item.setAttribute('aria-pressed', String(item === button));
-    });
-    activeMatchId = null; scoreboardMatchId = null; renderTournament();
   }
 
   // --- URL Sharing ---
@@ -2289,7 +2596,10 @@
     var ul = document.createElement('ul');
     ul.className = 'match-list';
 
-    matches.filter(function (match) { return (match.status || (match.played ? 'finished' : 'pending')) === matchFilter; }).forEach(function (match) {
+    // REQ-UX-32: the #match-filters toggle is retired — the command center's
+    // stacked Live/Pending/Recently finished sections own status filtering
+    // now, so every per-group match shows here unfiltered.
+    matches.forEach(function (match) {
       var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
       var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
       var name1 = team1 ? team1.name : match.team1Id;
