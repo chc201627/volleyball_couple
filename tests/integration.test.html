@@ -2200,6 +2200,64 @@
           } catch (e) { return false; }
         });
         assert(reducedMotionRuleExists, 'Tokens: a prefers-reduced-motion media rule exists (REQ-UX-73)');
+
+        // ---- WCAG 2.1 contrast helper (mirrors the scratchpad Python verification script) ----
+        function srgbToLin(c) { c = c / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+        function relLum(rgbString) {
+          const m = rgbString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (!m) return null;
+          const r = srgbToLin(+m[1]), g = srgbToLin(+m[2]), b = srgbToLin(+m[3]);
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+        function contrastRatio(fg, bg) {
+          const l1 = relLum(fg), l2 = relLum(bg);
+          const lighter = Math.max(l1, l2), darker = Math.min(l1, l2);
+          return (lighter + 0.05) / (darker + 0.05);
+        }
+        function effectiveBg(el) {
+          // Walk up until a non-transparent background-color is found (matches how a
+          // "background: none" item visually composites over its container in the browser).
+          let node = el;
+          while (node) {
+            const bg = getComputedStyle(node).backgroundColor;
+            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+            node = node.parentElement;
+          }
+          return 'rgb(8, 8, 8)';
+        }
+
+        // Synthetic nav probe: real nesting (nav container > items/cta), decoupled from app state.
+        const navProbe = document.createElement('div');
+        navProbe.className = 'workspace-nav';
+        navProbe.innerHTML =
+          '<button class="workspace-nav__item" aria-current="page">Active</button>' +
+          '<button class="workspace-nav__item">Inactive</button>' +
+          '<button class="workspace-nav__cta" disabled>CTA</button>';
+        document.body.appendChild(navProbe);
+        const [activeItem, inactiveItem, disabledCta] = navProbe.children;
+
+        const activeFg = getComputedStyle(activeItem).color;
+        const activeBg = effectiveBg(activeItem);
+        const activeRatio = contrastRatio(activeFg, activeBg);
+        assert(activeRatio >= 7,
+          'Contrast: active nav tab (aria-current) label vs its own pill background is >=7:1 (measured ' + activeRatio.toFixed(2) + ':1)',
+          'fg=' + activeFg + ' bg=' + activeBg);
+
+        const inactiveFg = getComputedStyle(inactiveItem).color;
+        const inactiveBg = effectiveBg(inactiveItem);
+        const inactiveRatio = contrastRatio(inactiveFg, inactiveBg);
+        assert(inactiveRatio >= 4.5,
+          'Contrast: inactive nav label vs the nav surface is >=4.5:1 (measured ' + inactiveRatio.toFixed(2) + ':1)',
+          'fg=' + inactiveFg + ' bg=' + inactiveBg);
+
+        const disabledCtaFg = getComputedStyle(disabledCta).color;
+        const disabledCtaBg = effectiveBg(disabledCta);
+        const disabledCtaRatio = contrastRatio(disabledCtaFg, disabledCtaBg);
+        assert(disabledCtaRatio >= 4.5,
+          'Contrast: disabled CTA label vs its own background is >=4.5:1, never grey-on-grey (measured ' + disabledCtaRatio.toFixed(2) + ':1)',
+          'fg=' + disabledCtaFg + ' bg=' + disabledCtaBg);
+
+        navProbe.remove();
       })();
 
       // ===== Summary =====
