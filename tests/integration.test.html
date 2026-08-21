@@ -334,14 +334,6 @@
       <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden data-view-slot="tournament">
         <div class="tournament-header">
           <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
-          <div class="tournament-header__actions">
-            <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
-              Share
-            </button>
-            <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
-              Reset Tournament
-            </button>
-          </div>
         </div>
         <div class="tournament-readonly-banner" id="readonly-banner" hidden>
           <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
@@ -378,6 +370,17 @@
         <div class="tournament-stages" id="tournament-stages" hidden>
           <!-- Knockout stage panels rendered by JS (formatted sessions only) -->
         </div>
+
+        <!-- REQ-UX-30 order: moved out of the header so Next Match + nav never overlap. -->
+        <div class="tournament-header__actions" id="tournament-quick-actions">
+          <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
+            Share
+          </button>
+          <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
+            Reset Tournament
+          </button>
+        </div>
+
         <div class="scoreboard-panel" id="scoreboard-panel" hidden></div>
       </section>
 
@@ -1037,6 +1040,21 @@
         document.getElementById('tournament-recently-finished-section').textContent.indexOf('Recently finished (1)') !== -1,
         'Command center: Recently finished section shows its count (REQ-UX-32)');
 
+      // ---- Snapshot survival: Next Match action focus survives an unrelated re-render ----
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.querySelector('.next-match-card__action').focus();
+      assert(document.activeElement === document.querySelector('.next-match-card__action'),
+        'Snapshot survival (setup): the Next Match action button is focused before the re-render');
+      testRepository.emit({ role: 'scorer', accessStatus: 'approved', tournament: mixed });
+      assert(document.activeElement === document.querySelector('.next-match-card__action'),
+        'Snapshot survival: focus returns to the equivalent Next Match action button after the re-render');
+      // REQ-UX-73: command-center row buttons must meet 44px (fixed: a later, same-
+      // specificity .match-card__btn rule was overriding it with 32px).
+      var commandCenterRowBtns = document.querySelectorAll('#tournament-live-section .match-card__btn, #tournament-pending-section .match-card__btn');
+      assert(commandCenterRowBtns.length >= 2 && Array.from(commandCenterRowBtns).every(function (b) { return b.getBoundingClientRect().height >= 44; }),
+        'Command center rows: Live/Pending row action buttons meet the 44px touch target (REQ-UX-73)');
+      appFrame.style.cssText = '';
+
       document.querySelector('.next-match-card__action').click();
       var scoreboardPanelText = document.getElementById('scoreboard-panel').textContent;
       assert(!document.getElementById('scoreboard-panel').hidden &&
@@ -1086,6 +1104,25 @@
       var nextMatchRect = document.getElementById('next-match-card').getBoundingClientRect();
       assert(nextMatchRect.top >= sectionRect.top && (nextMatchRect.top - sectionRect.top) < 300,
         'Command center mobile: the Next Match card renders near the top of the Tournament destination, only after the header/readonly-banner (REQ-UX-30)');
+
+      // Authoritative REQ-UX-30 above-the-fold check — real narrow window only; hides
+      // this page's own growing #test-results log and scrolls to the true top first.
+      function assertNextMatchAboveNav(langLabel) {
+        if (window.innerWidth > 360) return;
+        var testResultsEl = document.getElementById('test-results');
+        var prevDisplay = testResultsEl.style.display;
+        testResultsEl.style.display = 'none';
+        window.scrollTo(0, 0);
+        var cardRect = document.getElementById('next-match-card').getBoundingClientRect();
+        var navRect = document.getElementById('workspace-nav').getBoundingClientRect();
+        assert(cardRect.bottom <= navRect.top,
+          'Command center mobile (' + langLabel + '): the Next Match card ends above the sticky nav at a real <=360px window (REQ-UX-30)');
+        testResultsEl.style.display = prevDisplay;
+      }
+      assertNextMatchAboveNav('EN');
+      setLanguage('es');
+      assertNextMatchAboveNav('ES');
+      setLanguage('en');
       appFrame.style.cssText = '';
 
       testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
@@ -1101,6 +1138,10 @@
         });
       }
       testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: manyMatches });
+      // All 7 matches are finished, so the tournament is complete and the default view
+      // resolves to Results (REQ-UX-05) — navigate back to Tournament explicitly so the
+      // command center (and the focus-survival check below) is actually visible/focusable.
+      document.querySelector('#workspace-nav-items [data-view-id="tournament"]').click();
       var finishedSection = document.getElementById('tournament-recently-finished-section');
       assert(finishedSection.textContent.indexOf('Recently finished (7)') !== -1, 'Collapse: the section heading names the full count (REQ-UX-32)');
       assert(finishedSection.querySelectorAll(':scope > ul.match-list > li').length === 5,
@@ -1109,6 +1150,19 @@
       assert(!!showAllDetails && !showAllDetails.open && showAllDetails.querySelector('summary').textContent.indexOf('Show all (7)') !== -1,
         'Collapse: "Show all (7)" discloses the remaining 2 rows, closed by default (REQ-UX-32)');
       assert(showAllDetails.querySelectorAll('li').length === 2, 'Collapse: the disclosure holds exactly the remaining 2 rows');
+
+      // ---- Snapshot survival: an open "Show all" disclosure + its focus must survive ----
+      appFrame.style.cssText = 'display:block;width:320px';
+      showAllDetails.open = true;
+      showAllDetails.querySelector('summary').focus();
+      assert(document.activeElement === showAllDetails.querySelector('summary'), 'Snapshot survival (setup): the "Show all" summary is focused before the re-render');
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: manyMatches });
+      var showAllDetailsAfter = document.getElementById('tournament-recently-finished-section').querySelector('details.disclosure');
+      assert(!!showAllDetailsAfter && showAllDetailsAfter.open,
+        'Snapshot survival: an open "Show all" disclosure stays open across an unrelated snapshot re-render (REQ-UX-06)');
+      assert(document.activeElement === showAllDetailsAfter.querySelector('summary'),
+        'Snapshot survival: focus returns to the equivalent "Show all" summary after the re-render (design "restore focus by element id")');
+      appFrame.style.cssText = '';
       testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: mixed });
 
       // ---- Session-not-found (REQ-UX-62) ----
@@ -1127,6 +1181,28 @@
       assert(document.getElementById('workspace').dataset.view === 'teams', 'Session-not-found: "Start a local setup" returns to the organizer flow (Teams, since teams already existed)');
       assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 4,
         'Session-not-found: leaving restores the full 4-item owner nav');
+
+      // ===== RELOAD SIMULATION (REQ-UX-05 fix): couplesGenerated desync =====
+      // This harness's init() only runs once at real page load, so a literal reload can't
+      // run mid-suite. Calls the same global computeWorkspace() with the exact input shape
+      // init()'s local-tournament-restore path produces: tournamentState restored, but the
+      // separate (unpersisted) couplesGenerated flag still false.
+      var reloadInput = {
+        role: 'owner', isReadOnly: false, sessionState: 'ok',
+        playerCount: 4, teamSize: 2,
+        couplesGenerated: false, teamCount: 2, unmatchedCount: 0,
+        groupCount: 1, formatValidation: null,
+        hasTournament: true, hasKingGame: false,
+        complete: false, hasNextMatch: true, pendingRequestCount: 0,
+        firebaseAvailable: false, currentView: null,
+      };
+      var reloadView = computeWorkspace(reloadInput);
+      assert(reloadView.view === 'tournament',
+        'Reload simulation: couplesGenerated:false + hasTournament:true -> tournament, not setup (REQ-UX-05)');
+      assert(reloadView.navItems.filter(function (i) { return i.id === 'tournament'; })[0].enabled === true,
+        'Reload simulation: the Tournament nav item is not locked after a reload');
+      assert(reloadView.navItems.filter(function (i) { return i.id === 'teams'; })[0].enabled === true,
+        'Reload simulation: the Teams nav item is also reachable after a reload (teams already exist)');
 
       // ===== REFERENCE FORMAT END-TO-END (2×4 crossover bracket, REQ-FMT-01..05/09/23) =====
       await (async function () {
