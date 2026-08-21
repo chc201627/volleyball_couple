@@ -1980,3 +1980,4 @@ textarea {
   border-radius: var(--radius);
 }
 .format-locked-note__text { margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.format-locked-note .btn { min-height: 44px; } /* REQ-UX-73: .btn--small's 36px is too short here */
