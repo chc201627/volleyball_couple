@@ -141,6 +141,20 @@
   const sessionNotFoundEl = document.getElementById('session-not-found');
   const sessionNotFoundResetBtn = document.getElementById('session-not-found-reset-btn');
 
+  // --- Results / completion (REQ-UX-50..53) DOM references ---
+  const completionBannerEl = document.getElementById('completion-banner');
+  const completionEmptyEl = document.getElementById('completion-empty');
+  const completionEmptySetupBtn = document.getElementById('completion-empty-setup-btn');
+  const completionChampionEl = document.getElementById('completion-champion');
+  const completionSummaryEl = document.getElementById('completion-summary');
+  const completionStandingsEl = document.getElementById('completion-standings');
+  const completionBracketEl = document.getElementById('completion-bracket');
+  const completionBracketContentEl = document.getElementById('completion-bracket-content');
+  const completionActionsEl = document.getElementById('completion-actions');
+  const completionShareBtn = document.getElementById('completion-share-btn');
+  const completionExportBtn = document.getElementById('completion-export-btn');
+  const completionStartAnotherBtn = document.getElementById('completion-start-another-btn');
+
   const kingSetup              = document.getElementById('king-setup');
   const startKingBtn           = document.getElementById('start-king-btn');
   const resetKingBtn           = document.getElementById('reset-king-btn');
@@ -191,6 +205,13 @@
     requestAccessBtn.addEventListener('click', handleRequestAccess);
     accessMembers.addEventListener('click', handleAccessDecision);
     sessionNotFoundResetBtn.addEventListener('click', handleStartLocalSetup);
+    completionEmptySetupBtn.addEventListener('click', function () { handleNavClick('setup'); });
+    completionShareBtn.addEventListener('click', handleShareTournament);
+    completionExportBtn.addEventListener('click', handleCompletionExport);
+    completionStartAnotherBtn.addEventListener('click', function () {
+      if (tournamentState) handleResetTournament();
+      else if (kingState) handleResetKing();
+    });
     retryScoreBtn.addEventListener('click', function () {
       if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, null, lastScoreCommand.status);
     });
@@ -859,6 +880,7 @@
     renderTournamentSetupState(view);
     renderTeamsForkState(view);
     renderCommandCenter();
+    renderCompletion();
   }
 
   /** REQ-UX-10: compact "{players} · {genderCounts} · {teamSize}vs{teamSize}
@@ -1233,6 +1255,254 @@
 
     li.appendChild(row);
     return li;
+  }
+
+  // --- Results / completion (REQ-UX-50..53) ---
+
+  /** Recomputes the pure day/standings/resolution/complete projection Results
+   * needs from scratch every call — mirrors renderCommandCenter()'s pattern
+   * but, unlike it, MUST pass full standings/king/groups (the command center
+   * never needed outcome, so it omits them). Deliberately independent of
+   * currentResolution (only fresh once renderTournament() has run) so Results
+   * stays correct even when Tournament never rendered this session. Returns
+   * null when neither a tournament nor a King game exists. */
+  function buildCompletionDay() {
+    if (!tournamentState && !kingState) return null;
+    var standings = tournamentState
+      ? calculateStandings(tournamentState.groups, tournamentState.matches, tournamentState.format ? { extendedTiebreak: true } : undefined)
+      : null;
+    var resolution = (tournamentState && tournamentState.format)
+      ? resolveFormat(tournamentState.format, { groups: tournamentState.groups, matches: tournamentState.matches, standings: standings })
+      : null;
+    var complete = tournamentState
+      ? (resolution ? resolution.complete : isTournamentComplete(tournamentState.matches))
+      : isKingGameOver(kingState);
+    var day = tournamentDay({
+      matches: tournamentState ? tournamentState.matches : [],
+      teams: tournamentState ? tournamentState.teams : [],
+      groups: tournamentState ? tournamentState.groups : [],
+      format: tournamentState ? (tournamentState.format || null) : null,
+      resolution: resolution,
+      standings: standings,
+      king: kingState,
+    });
+    return { day: day, standings: standings, resolution: resolution, complete: complete };
+  }
+
+  /** Team display name for the champion card / export — resolveMatchTeamName()
+   * only knows tournamentState.teams, so a King champion (no tournamentState)
+   * falls back to the winning team object tournamentDay() already resolved. */
+  function resolveCompletionTeamName(teamId) {
+    if (tournamentState) return resolveMatchTeamName(teamId);
+    if (kingState && kingState.winner && kingState.winner.id === teamId) return kingState.winner.name;
+    return teamId;
+  }
+
+  /** REQ-UX-50: the 4 champion-card variants (champion/groupWinners/tiedLead/
+   * kingChampion) plus the "none" no-op — hidden entirely before completion
+   * (the in-progress banner owns that state) or when there is nothing to
+   * declare. Every branch uses .textContent, never innerHTML (no escapeHTML()
+   * needed) and clamps long names to 2 lines with a title fallback (REQ-UX-73,
+   * matching the scoreboard team-name pattern from slice F). */
+  function renderCompletionChampion(outcome, complete) {
+    completionChampionEl.innerHTML = '';
+    completionChampionEl.hidden = !complete || outcome.kind === 'none';
+    if (completionChampionEl.hidden) return;
+
+    var icon = document.createElement('p');
+    icon.className = 'champion-card__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '🏆';
+    completionChampionEl.appendChild(icon);
+
+    if (outcome.kind === 'champion' || outcome.kind === 'kingChampion') {
+      var heading = document.createElement('p');
+      heading.className = 'champion-card__heading';
+      heading.textContent = t('workspace.results.champion.heading');
+      completionChampionEl.appendChild(heading);
+
+      var name = document.createElement('p');
+      name.className = 'champion-card__name';
+      var championName = resolveCompletionTeamName(outcome.championTeamId);
+      name.textContent = championName;
+      name.title = championName;
+      completionChampionEl.appendChild(name);
+    } else if (outcome.kind === 'groupWinners') {
+      var gHeading = document.createElement('p');
+      gHeading.className = 'champion-card__heading';
+      gHeading.textContent = t('workspace.results.groupWinners.heading');
+      completionChampionEl.appendChild(gHeading);
+
+      var winnersEl = document.createElement('div');
+      winnersEl.className = 'champion-card__winners';
+      outcome.groupWinners.forEach(function (winner) {
+        var card = document.createElement('div');
+        card.className = 'champion-card__winner';
+
+        var groupLabel = document.createElement('p');
+        groupLabel.className = 'champion-card__winner-group';
+        groupLabel.textContent = t('tournament.group', { id: winner.groupId });
+        card.appendChild(groupLabel);
+
+        var winnerName = document.createElement('p');
+        winnerName.className = 'champion-card__winner-name';
+        var teamText = resolveCompletionTeamName(winner.teamId) + (winner.tied ? ' ' + t('workspace.results.groupWinners.tied') : '');
+        winnerName.textContent = teamText;
+        winnerName.title = teamText;
+        card.appendChild(winnerName);
+
+        winnersEl.appendChild(card);
+      });
+      completionChampionEl.appendChild(winnersEl);
+    } else if (outcome.kind === 'tiedLead') {
+      var tHeading = document.createElement('p');
+      tHeading.className = 'champion-card__heading';
+      tHeading.textContent = t('workspace.results.tiedLead.heading');
+      completionChampionEl.appendChild(tHeading);
+
+      var tiedNames = document.createElement('p');
+      tiedNames.className = 'champion-card__name';
+      var tiedText = outcome.tiedTeamIds.map(resolveCompletionTeamName).join(' · ');
+      tiedNames.textContent = tiedText;
+      tiedNames.title = tiedText;
+      completionChampionEl.appendChild(tiedNames);
+    }
+  }
+
+  /** REQ-UX-51 summary line: "{format|King} · {N} teams · {played}/{total}
+   * matches played" (tournament) or "{King of the Court} · {N} rallies
+   * played" (King). Elapsed date/time is intentionally omitted — the design
+   * left it an open question (updatedAt is null on local saves). */
+  function renderCompletionSummary(day) {
+    var parts = [];
+    if (tournamentState) {
+      parts.push(t('tournament.format.preset.' + selectedFormatPreset));
+      parts.push(t('workspace.summary.teams', { count: tournamentState.teams.length }));
+      parts.push(t('workspace.results.summary.matches', { played: day.progress.played, total: day.progress.total }));
+    } else if (kingState) {
+      parts.push(t('king.heading'));
+      parts.push(t('workspace.results.summary.rallies', { count: kingState.rallyLog.length }));
+    }
+    completionSummaryEl.textContent = parts.join(' · ');
+  }
+
+  /** REQ-UX-52 label callbacks for formatTournamentSummary() (js/tournament-day.js,
+   * pure/i18n-free by design — D6) — this is the one place that supplies the
+   * already-translated strings the pure module asks for. */
+  function buildCompletionSummaryLabels() {
+    return {
+      title: t('workspace.results.export.title'),
+      championLine: function (teamId) {
+        return t('workspace.results.export.championLine', { team: resolveCompletionTeamName(teamId) });
+      },
+      groupWinnerLine: function (groupId, teamId, tied) {
+        return t('workspace.results.export.groupWinnerLine', { group: t('tournament.group', { id: groupId }), team: resolveCompletionTeamName(teamId) }) +
+          (tied ? ' ' + t('workspace.results.groupWinners.tied') : '');
+      },
+      tiedLeadLine: function (teamIds) {
+        return t('workspace.results.export.tiedLeadLine', { teams: teamIds.map(resolveCompletionTeamName).join(' / ') });
+      },
+      noChampionLine: t('workspace.results.export.noChampion'),
+      stageLine: function (stage) {
+        var label = stage.kind === 'group' ? t(stage.label, { group: stage.id }) : t(stage.label);
+        return label + ': ' + t('workspace.tournament.stageProgress.count', { played: stage.played, total: stage.total });
+      },
+      matchLine: function (match) {
+        var name1 = match.team1Id ? resolveCompletionTeamName(match.team1Id) : formatSlotLabel(match.team1Slot);
+        var name2 = match.team2Id ? resolveCompletionTeamName(match.team2Id) : formatSlotLabel(match.team2Slot);
+        return name1 + ' ' + match.score1 + ' – ' + match.score2 + ' ' + name2;
+      },
+    };
+  }
+
+  /** REQ-UX-52: builds the plain-text summary via the pure formatTournamentSummary()
+   * contract, then appends per-team final standings (outside that contract — it has
+   * no per-row standings label, only stage/match lines) before handing the text to
+   * Web Share, else the clipboard, else the existing fallback textarea. */
+  function handleCompletionExport() {
+    var built = buildCompletionDay();
+    if (!built) return;
+    var text = formatTournamentSummary(built.day, buildCompletionSummaryLabels());
+    if (tournamentState && built.standings) {
+      var standingsLines = [];
+      tournamentState.groups.forEach(function (group) {
+        var rows = built.standings.get(group.id) || [];
+        standingsLines.push(t('tournament.group', { id: group.id }) + ':');
+        rows.forEach(function (row, idx) {
+          standingsLines.push((idx + 1) + '. ' + resolveMatchTeamName(row.teamId) + ' — ' + row.points + ' ' + t('tournament.col.points'));
+        });
+      });
+      if (standingsLines.length) text += '\n' + standingsLines.join('\n');
+    }
+    if (navigator.share) {
+      navigator.share({ text: text }).then(function () {
+        showCompletionExportConfirmation('workspace.results.export.shared');
+      }).catch(function () { /* user cancelled the share sheet — no confirmation, no fallback */ });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        showCompletionExportConfirmation('workspace.results.export.copied');
+      }).catch(function () { fallbackCopyText(text, function () { showCompletionExportConfirmation('workspace.results.export.copied'); }); });
+    } else {
+      fallbackCopyText(text, function () { showCompletionExportConfirmation('workspace.results.export.copied'); });
+    }
+  }
+
+  /** Same temporary-label pattern as showShareCopied() (REQ-UX-52), reusing its
+   * confirmed-state class but scoped to the export button and its own distinct
+   * "Copied"/"Shared" text depending on which delivery path actually ran. */
+  function showCompletionExportConfirmation(labelKey) {
+    var originalText = completionExportBtn.textContent;
+    completionExportBtn.textContent = t(labelKey);
+    completionExportBtn.classList.add('btn--share--copied');
+    setTimeout(function () {
+      completionExportBtn.textContent = originalText;
+      completionExportBtn.classList.remove('btn--share--copied');
+    }, 2500);
+  }
+
+  /** Owns #completion-section — called from renderChrome() only (D3), never
+   * from renderTournament()/renderKing(), so it tolerates a snapshot re-render
+   * without depending on either having run first this cycle. Every rebuilt
+   * subtree (champion card, standings, bracket) holds no focusable controls —
+   * the Share/Export/Start-another buttons are static index.html nodes only
+   * toggled via .hidden, never recreated — so no explicit focus capture/
+   * restore is needed here (REQ-UX-06). */
+  function renderCompletion() {
+    var built = buildCompletionDay();
+    completionEmptyEl.hidden = !!built;
+    if (!built) {
+      completionBannerEl.hidden = true;
+      completionChampionEl.hidden = true;
+      completionSummaryEl.textContent = '';
+      completionStandingsEl.innerHTML = '';
+      completionStandingsEl.hidden = true;
+      completionBracketEl.hidden = true;
+      completionActionsEl.hidden = true;
+      return;
+    }
+
+    completionBannerEl.hidden = built.complete;
+    renderCompletionChampion(built.day.outcome, built.complete);
+    renderCompletionSummary(built.day);
+
+    completionStandingsEl.innerHTML = '';
+    completionStandingsEl.hidden = !tournamentState;
+    if (tournamentState) {
+      tournamentState.groups.forEach(function (group) {
+        completionStandingsEl.appendChild(renderStandingsTable(group, built.standings.get(group.id) || []));
+      });
+    }
+
+    var knockoutStages = built.resolution
+      ? built.resolution.stages.filter(function (stage) { return stage.kind === 'knockout'; })
+      : [];
+    completionBracketEl.hidden = knockoutStages.length === 0;
+    completionBracketContentEl.innerHTML = '';
+    knockoutStages.forEach(function (stage) { completionBracketContentEl.appendChild(renderStagePanel(stage)); });
+
+    completionActionsEl.hidden = false;
+    completionShareBtn.hidden = !tournamentState;
+    completionStartAnotherBtn.hidden = isReadOnly;
   }
 
   /** REQ-UX-62: leaves the not-found state and returns to a fresh local
@@ -2190,14 +2460,17 @@
     }
   }
 
-  function fallbackCopyText(text) {
+  /** `onSuccess` defaults to showShareCopied() for the existing tournament
+   * Share flow; the Results export flow (REQ-UX-52) passes its own confirmation
+   * so "Copied"/"Shared" text lands on the export button, not Share's. */
+  function fallbackCopyText(text, onSuccess) {
     var ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
     ta.style.top = '-9999px';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); showShareCopied(); } catch (e) { /* silent */ }
+    try { document.execCommand('copy'); (onSuccess || showShareCopied)(); } catch (e) { /* silent */ }
     document.body.removeChild(ta);
   }
 
