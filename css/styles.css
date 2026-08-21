@@ -1910,3 +1910,42 @@ textarea {
     font-size: 1.125rem;
   }
 }
+
+/* --- Workspace shell (Setup / Teams / Tournament / Results) — REQ-UX-01..07 --- */
+
+/* D1: destination visibility is a CSS slot filter, not a routing mechanism —
+   non-active-view content leaves the accessibility tree via display:none. */
+[data-view] [data-view-slot] { display: none; }
+[data-view="setup"] [data-view-slot~="setup"],
+[data-view="teams"] [data-view-slot~="teams"],
+[data-view="tournament"] [data-view-slot~="tournament"],
+[data-view="results"] [data-view-slot~="results"] { display: revert; }
+
+.workspace-status { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: var(--color-white); border-bottom: 1px solid var(--color-border); }
+.workspace-status .sync-status { margin: 0; flex: 1; min-width: 0; }
+.workspace { padding-bottom: 76px; } /* clears the sticky bottom nav */
+
+/* D8: sticky, never fixed — REQ-UX-01's 320px check measures #app-frame's own scrollWidth */
+.workspace-nav { position: sticky; bottom: 0; z-index: 10; display: flex; align-items: stretch; gap: 4px; padding: 6px 8px; background: var(--color-white); border-top: 1px solid var(--color-border); box-shadow: var(--shadow); }
+.workspace-nav__items { flex: 1; min-width: 0; display: flex; gap: 4px; }
+.workspace-nav__item {
+  flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; padding: 4px; border: none;
+  background: none; border-radius: var(--radius); font-size: 0.7rem; font-weight: 600;
+  color: var(--color-text-secondary); cursor: pointer; position: relative;
+}
+.workspace-nav__item[aria-current="page"] { color: var(--color-primary); background: rgba(33, 150, 243, 0.08); }
+.workspace-nav__item[aria-disabled="true"] { color: var(--color-border); cursor: not-allowed; }
+.workspace-nav__item--attention { color: var(--color-warning-dark); }
+.workspace-nav__item__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; line-height: 1.2; }
+.workspace-nav__badge { position: absolute; top: 0; right: 8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--color-error); color: var(--color-white); font-size: 0.625rem; line-height: 16px; text-align: center; }
+
+.workspace-nav__cta {
+  flex: 0 1 auto; max-width: 38%; min-width: 44px; min-height: 44px; padding: 0 14px;
+  border: none; border-radius: var(--radius); background: var(--color-primary); color: var(--color-white);
+  font-weight: 700; font-size: 0.75rem; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; cursor: pointer; align-self: center;
+}
+.workspace-nav__cta:disabled { background: var(--color-border); color: var(--color-text-secondary); cursor: not-allowed; }
+
+.toast { position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; background: var(--color-text); color: var(--color-white); border-radius: var(--radius); font-size: 0.875rem; text-align: center; z-index: 20; }
