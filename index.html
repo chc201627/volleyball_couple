@@ -334,14 +334,6 @@
     <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden data-view-slot="tournament">
       <div class="tournament-header">
         <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
-        <div class="tournament-header__actions">
-          <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
-            Share
-          </button>
-          <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
-            Reset Tournament
-          </button>
-        </div>
       </div>
       <div class="tournament-readonly-banner" id="readonly-banner" hidden>
         <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
@@ -378,6 +370,17 @@
       <div class="tournament-stages" id="tournament-stages" hidden>
         <!-- Knockout stage panels rendered by JS (formatted sessions only) -->
       </div>
+
+      <!-- REQ-UX-30 order: moved out of the header so Next Match + nav never overlap. -->
+      <div class="tournament-header__actions" id="tournament-quick-actions">
+        <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
+          Share
+        </button>
+        <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
+          Reset Tournament
+        </button>
+      </div>
+
       <div class="scoreboard-panel" id="scoreboard-panel" hidden>
         <!-- Live scoreboard rendered by JS -->
       </div>
