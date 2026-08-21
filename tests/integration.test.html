@@ -829,17 +829,23 @@
         'Workspace shell: nav button identity and focus survive a snapshot re-render (renderChrome() patches in place)');
       assert(document.getElementById('workspace').dataset.view === 'tournament', 'Workspace shell: a snapshot re-render does not reset the active destination');
       assert(appFrame.scrollWidth <= appFrame.clientWidth, 'Workspace shell: 320px has no horizontal overflow with the sticky nav rendered');
-      var navItemHeights = Array.from(document.querySelectorAll('.workspace-nav__item')).map(function (el) { return el.getBoundingClientRect().height; });
-      assert(navItemHeights.length === 4 && navItemHeights.every(function (h) { return h >= 44; }), 'Workspace shell: every nav item is at least 44px tall');
-      var labelHeightsEn = Array.from(document.querySelectorAll('.workspace-nav__item__label')).map(function (el) { return el.getBoundingClientRect().height; });
-      var ctaHeightEn = document.getElementById('workspace-nav-cta').getBoundingClientRect().height;
-      assert(labelHeightsEn.every(function (h) { return h > 0 && h <= 16; }), 'Workspace shell (EN): every nav label renders on one line at 320px', labelHeightsEn.join(','));
-      assert(ctaHeightEn <= 44, 'Workspace shell (EN): center CTA does not grow past its 44px row at 320px', String(ctaHeightEn));
+      var navItemRects = Array.from(document.querySelectorAll('.workspace-nav__item')).map(function (el) { return el.getBoundingClientRect(); });
+      assert(navItemRects.length === 4 && navItemRects.every(function (r) { return r.height >= 44 && r.width >= 44; }), 'Workspace shell: every nav item is at least 44x44px');
+      // REQ-UX-07 forbids truncation: no label/CTA may be shorter (scrollWidth) than its rendered box, in EN or ES,
+      // with a long CTA (ES "Anotar siguiente partido") visible. This must fail if ellipsis/overflow:hidden return.
+      function assertNoTruncation(langLabel) {
+        var labels = Array.from(document.querySelectorAll('.workspace-nav__item__label'));
+        assert(labels.every(function (l) { return l.getBoundingClientRect().height > 0 && l.getBoundingClientRect().height <= 16; }),
+          'Workspace shell (' + langLabel + '): every nav label renders on one line at 320px');
+        assert(labels.every(function (l) { return l.scrollWidth <= Math.ceil(l.getBoundingClientRect().width); }),
+          'Workspace shell (' + langLabel + '): no nav label is truncated');
+        var cta = document.getElementById('workspace-nav-cta');
+        assert(cta.getBoundingClientRect().height <= 44, 'Workspace shell (' + langLabel + '): center CTA does not grow past its 44px row at 320px');
+        assert(cta.scrollWidth <= cta.clientWidth, 'Workspace shell (' + langLabel + '): center CTA text ("' + cta.textContent + '") is not clipped');
+      }
+      assertNoTruncation('EN');
       setLanguage('es');
-      var labelHeightsEs = Array.from(document.querySelectorAll('.workspace-nav__item__label')).map(function (el) { return el.getBoundingClientRect().height; });
-      var ctaHeightEs = document.getElementById('workspace-nav-cta').getBoundingClientRect().height;
-      assert(labelHeightsEs.every(function (h) { return h > 0 && h <= 16; }), 'Workspace shell (ES): every nav label renders on one line at 320px', labelHeightsEs.join(','));
-      assert(ctaHeightEs <= 44, 'Workspace shell (ES): center CTA does not grow past its 44px row at 320px', String(ctaHeightEs));
+      assertNoTruncation('ES');
       setLanguage('en');
       appFrame.style.cssText = '';
 
