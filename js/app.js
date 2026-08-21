@@ -25,6 +25,9 @@
   var sessionId = null;         // Active session ID written to / read from Firebase
   var sessionSnapshot = null;
   var lastScoreCommand = null;
+  var pendingFinish = null;        // { score1, score2 } awaiting in-view Finish confirmation (REQ-UX-41)
+  var conflictServerResult = null; // { score1, score2, revision } from the last saveResult() conflict (REQ-UX-42)
+  var scoreboardErrorMessage = null; // survives a refreshScoreboardPanel() rebuild while state stays 'invalid'
   let pairingMode = 'random';  // 'random' | 'manual'
   let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
   let kingState = null;        // KingState object or null when no game active
@@ -1686,6 +1689,16 @@
     activeMatchId = null;
     scoreboardMatchId = null;
     liveScore = { score1: 0, score2: 0 };
+    // Match ids are deterministic (groupId-team1Id-team2Id from index-based team ids,
+    // e.g. "A-t1-t2") — a brand-new, same-shaped tournament can legitimately reuse an
+    // OLD tournament's match id. Any lingering conflict/offline/denied scratch state
+    // MUST be dropped on reset, or a stale command from the discarded tournament could
+    // wrongly "restore" onto an unrelated match in the new one (REQ-UX-42 integrity).
+    pendingFinish = null;
+    conflictServerResult = null;
+    scoreboardErrorMessage = null;
+    lastScoreCommand = null;
+    setSyncState(null);
     localStorage.removeItem('bv-tournament');
     history.replaceState(null, '', window.location.pathname + window.location.search);
     tournamentSection.hidden = true;
@@ -1885,16 +1898,26 @@
       var confirmedMatch = tournamentState.matches.find(function (match) { return match.id === matchId; });
       var command = { matchId: matchId, score1: score1, score2: score2, status: status, expectedRevision: confirmedMatch.revision || 0 };
       if (tournamentRepository && sessionId) {
-        lastScoreCommand = command; setSyncState('saving');
+        lastScoreCommand = command; setSyncState('saving'); refreshScoreboardPanel();
         tournamentRepository.saveResult(sessionId, command).then(function (result) {
           if (result.status !== 'synced') {
+            conflictServerResult = result.status === 'conflict' ? (result.current || null) : null;
             setSyncState(result.status); if (errorEl) errorEl.textContent = t('tournament.sync.' + result.status);
+            refreshScoreboardPanel();
+            if (result.status === 'conflict') {
+              var conflictAlert = scoreboardPanelEl.querySelector('.scoring-conflict');
+              if (conflictAlert) conflictAlert.focus();
+            }
             return;
           }
-          lastScoreCommand = null; setSyncState('synced');
+          lastScoreCommand = null;
+          conflictServerResult = null;
           activeMatchId = null;
           scoreboardMatchId = null;
           liveScore = { score1: 0, score2: 0 };
+          setSyncState('synced');
+          refreshScoreboardPanel();
+          focusAfterScoreSynced();
         });
         return;
       }
@@ -1908,13 +1931,19 @@
       activeMatchId = null;
       scoreboardMatchId = null;
       liveScore = { score1: 0, score2: 0 };
+      conflictServerResult = null;
       saveTournamentState();
       pushShareURL();
       renderTournament();
       renderChrome(); // local (non-Firebase) score commit — hasNextMatch may change
+      focusAfterScoreSynced(); // REQ-UX-44: local mode reuses the synced-state focus target too
     } catch (e) {
       setSyncState('invalid');
-      if (errorEl) errorEl.textContent = t(e.message) || e.message;
+      scoreboardErrorMessage = t(e.message) || e.message;
+      if (errorEl) errorEl.textContent = scoreboardErrorMessage;
+      // A manual Finish confirmed against a since-invalid score (e.g. Set Rules reject
+      // it) must drop back out of the confirm row instead of leaving it stuck on screen.
+      if (pendingFinish) { pendingFinish = null; refreshScoreboardPanel(); }
     }
   }
 
@@ -1931,11 +1960,24 @@
     }
     activeMatchId = null;
     scoreboardMatchId = matchId;
+    pendingFinish = null;
+    scoreboardErrorMessage = null;
     var match = tournamentState.matches.find(function (m) { return m.id === matchId; });
-    liveScore = {
-      score1: (match && match.played) ? match.score1 : 0,
-      score2: (match && match.played) ? match.score2 : 0,
-    };
+    // Reopening a match with an unresolved write (conflict/offline/denied) restores the
+    // exact local not-saved attempt instead of wiping it — REQ-UX-42's "labelled as not
+    // saved" only means something if the attempt is still visible when the view reopens.
+    // conflictServerResult is intentionally NOT cleared here: its lifecycle is owned by
+    // commitScore() (set fresh on every conflict) and Discard, so it survives a Back ->
+    // reopen of the SAME match and stays simply unread — via the commandForThisMatch
+    // gate in renderScoreboardPanel() — whenever a DIFFERENT match is open.
+    if (lastScoreCommand && lastScoreCommand.matchId === matchId) {
+      liveScore = { score1: lastScoreCommand.score1, score2: lastScoreCommand.score2 };
+    } else {
+      liveScore = {
+        score1: (match && match.played) ? match.score1 : 0,
+        score2: (match && match.played) ? match.score2 : 0,
+      };
+    }
     renderTournament();
     scoreboardPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -2023,6 +2065,9 @@
       isReadOnly = snapshot.legacy || (snapshot.role !== 'owner' && snapshot.role !== 'scorer');
       readonlyBanner.hidden = !isReadOnly;
       resetTournamentBtn.hidden = snapshot.role !== 'owner';
+      // Revoked mid-scoring (REQ-UX-43): mirror the 7th sync state in the persistent
+      // strip only for a genuine revocation, never for an ordinary first-time spectator.
+      if (snapshot.accessStatus === 'revoked') setSyncState('revoked');
       if (tournamentState.players) {
         players.length = 0;
         players.push.apply(players, tournamentState.players);
@@ -2040,6 +2085,14 @@
     syncStatus.dataset.state = state || '';
     syncStatus.textContent = state ? t('tournament.sync.' + state) : '';
     retryScoreBtn.hidden = !lastScoreCommand || ['offline', 'denied', 'conflict', 'invalid'].indexOf(state) === -1;
+    // In-view mirror (REQ-UX-43) — a lightweight in-place patch, never a rebuild, so a
+    // structural scoreboard change (conflict block, disabled controls) stays owned by
+    // refreshScoreboardPanel() at its own well-defined call sites (see commitScore()).
+    var scoringSyncEl = document.getElementById('scoring-sync');
+    if (scoringSyncEl) {
+      scoringSyncEl.dataset.state = state || '';
+      scoringSyncEl.textContent = state ? t('tournament.sync.' + state) : '';
+    }
   }
 
   function renderTournamentOps() {
@@ -2213,14 +2266,10 @@
       tournamentGroupsEl.appendChild(banner);
     }
 
-    // Live scoreboard panel
-    if (!isReadOnly && scoreboardMatchId) {
-      renderScoreboardPanel();
-      scoreboardPanelEl.hidden = false;
-    } else {
-      scoreboardPanelEl.hidden = true;
-      scoreboardPanelEl.innerHTML = '';
-    }
+    // Live scoreboard panel — stays open (in a revoked, controls-disabled state) even
+    // when isReadOnly flips true mid-scoring (REQ-UX-43); renderScoreboardPanel() owns
+    // that branch internally so a revoked view is never just silently hidden.
+    refreshScoreboardPanel();
   }
 
   /** Owner-authored custom-rules note (REQ-FMT-07), visible read-only to every role
@@ -2367,6 +2416,88 @@
     return panel;
   }
 
+  /** Snapshot survival for the scoring view (mirrors captureCommandCenterFocus() /
+   * restoreCommandCenterFocus()): captures enough to re-find the focused control after
+   * refreshScoreboardPanel() rebuilds the panel — including from an unrelated snapshot
+   * re-render (subscribeToSession -> renderTournament() -> refreshScoreboardPanel()).
+   * Null when focus is outside the panel. */
+  function captureScoreboardFocus() {
+    var active = document.activeElement;
+    if (!active || !scoreboardPanelEl.contains(active)) return null;
+    var cls = active.classList;
+    if (cls.contains('finish-confirm__confirm')) return { type: 'finish-confirm__confirm' };
+    if (cls.contains('finish-confirm__keep-scoring')) return { type: 'finish-confirm__keep-scoring' };
+    if (cls.contains('scoreboard__save--finish')) return { type: 'scoreboard__save--finish' };
+    if (cls.contains('scoreboard__save')) return { type: 'scoreboard__save' };
+    if (cls.contains('scoreboard__inc') || cls.contains('scoreboard__dec')) {
+      var type = cls.contains('scoreboard__inc') ? 'scoreboard__inc' : 'scoreboard__dec';
+      var teamPanels = Array.prototype.slice.call(scoreboardPanelEl.querySelectorAll('.scoreboard__team'));
+      var teamIndex = teamPanels.findIndex(function (tp) { return tp.contains(active); });
+      return { type: type, teamIndex: teamIndex };
+    }
+    if (cls.contains('scoring-conflict__retry')) return { type: 'scoring-conflict__retry' };
+    if (cls.contains('scoring-conflict__discard')) return { type: 'scoring-conflict__discard' };
+    if (cls.contains('scoring-offline__retry')) return { type: 'scoring-offline__retry' };
+    if (cls.contains('scoreboard__back')) return { type: 'scoreboard__back' };
+    return null;
+  }
+
+  /** Restores focus captured by captureScoreboardFocus() after the panel has been
+   * rebuilt. A missing target (e.g. the control no longer exists in the new state) is a
+   * silent no-op. */
+  function restoreScoreboardFocus(ref) {
+    if (!ref) return;
+    var target = null;
+    if (ref.type === 'scoreboard__inc' || ref.type === 'scoreboard__dec') {
+      var teamPanel = scoreboardPanelEl.querySelectorAll('.scoreboard__team')[ref.teamIndex];
+      target = teamPanel && teamPanel.querySelector('.' + ref.type);
+    } else {
+      target = scoreboardPanelEl.querySelector('.' + ref.type);
+    }
+    if (target) target.focus();
+  }
+
+  /** Owns scoreboard-panel visibility, the single call site every state-change flow
+   * (commitScore, subscribeToSession's isReadOnly flip, Cancel/Discard/Confirm) uses at
+   * its own well-defined moment — never automatically from setSyncState(), so an
+   * in-flight validation message (see scoreboardErrorMessage) is never torn down
+   * mid-write. Unhides before rendering so a caller's own post-call .focus() (and any
+   * focus set from inside renderScoreboardPanel() itself) lands on a visible node.
+   * Captures/restores focus internally so an UNRELATED re-render (a snapshot arriving
+   * while the user has focus in this panel) never silently drops focus to <body> — a
+   * caller with a more specific target (e.g. requestFinishConfirmation() focusing
+   * Confirm) simply re-focuses after this returns, taking precedence. */
+  function refreshScoreboardPanel() {
+    if (scoreboardMatchId) {
+      var focusRef = captureScoreboardFocus();
+      scoreboardPanelEl.hidden = false;
+      renderScoreboardPanel();
+      restoreScoreboardFocus(focusRef);
+    } else {
+      scoreboardPanelEl.hidden = true;
+      scoreboardPanelEl.innerHTML = '';
+    }
+  }
+
+  /** REQ-UX-41/F.6 focus management once a score commit resolves to 'synced': the
+   * next-match-card action, or the "See results" link once nothing remains — shared by
+   * both the Firebase and the local (non-Firebase, REQ-UX-44) commit paths. */
+  function focusAfterScoreSynced() {
+    var target = nextMatchCardEl && (nextMatchCardEl.querySelector('.next-match-card__action') ||
+      nextMatchCardEl.querySelector('.next-match-card__results-link'));
+    if (target) target.focus();
+  }
+
+  /** Shared entry point for both the manual Finish tap and the auto-finish increment
+   * path (REQ-UX-41/D11) — never commits straight away; sets pendingFinish, re-renders
+   * the in-view confirm row, and focuses Confirm (F.6). */
+  function requestFinishConfirmation(score1, score2) {
+    pendingFinish = { score1: score1, score2: score2 };
+    refreshScoreboardPanel();
+    var confirmBtn = scoreboardPanelEl.querySelector('.finish-confirm__confirm');
+    if (confirmBtn) confirmBtn.focus();
+  }
+
   function renderScoreboardPanel() {
     scoreboardPanelEl.innerHTML = '';
 
@@ -2392,9 +2523,44 @@
     // Stage Set Rules (REQ-FMT-20) — pointsTo:null (classic/unrecognized match) means
     // unrestricted free-entry scoring, so the caption and the +/- cap below are skipped.
     var rules = rulesForMatch(tournamentState.format, match.id);
+    // Sync state is match-scoped (REQ-UX-42 integrity): syncStatus.dataset.state and
+    // lastScoreCommand are single global vars shared across every match, so a conflict/
+    // denied/saving/offline state left over from a DIFFERENT match (e.g. Back -> open a
+    // different match while match A's write is still unresolved) must never leak into
+    // this match's controls, chip, or conflict/denied/offline display. Only trust the
+    // live global state when the in-flight command actually targets THIS match; a bare
+    // local validation failure (scoreboardErrorMessage, already reset per match by
+    // handleScoreboard()) is the one case that legitimately has no lastScoreCommand yet.
+    var commandForThisMatch = lastScoreCommand && lastScoreCommand.matchId === scoreboardMatchId ? lastScoreCommand : null;
+    var syncState = commandForThisMatch ? syncStatus.dataset.state : (scoreboardErrorMessage ? 'invalid' : null);
 
     var panel = document.createElement('div');
     panel.className = 'scoreboard animate__animated animate__fadeInUp';
+
+    // Header: back affordance + in-view sync chip (REQ-UX-40/43) — a distinct exit from
+    // the bottom Cancel button, matching the design wireframe's top-of-view back link.
+    var header = document.createElement('div');
+    header.className = 'scoreboard__header';
+    var backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'scoreboard__back';
+    backBtn.textContent = t('tournament.scoreboard.back');
+    backBtn.addEventListener('click', function () {
+      scoreboardMatchId = null;
+      liveScore = { score1: 0, score2: 0 };
+      renderTournament();
+    });
+    header.appendChild(backBtn);
+
+    var syncChip = document.createElement('span');
+    syncChip.id = 'scoring-sync';
+    syncChip.className = 'sync-status';
+    syncChip.setAttribute('role', 'status');
+    syncChip.setAttribute('aria-live', 'polite');
+    syncChip.dataset.state = syncState || '';
+    syncChip.textContent = syncState ? t('tournament.sync.' + syncState) : '';
+    header.appendChild(syncChip);
+    panel.appendChild(header);
 
     // Heading
     var heading = document.createElement('h3');
@@ -2411,17 +2577,48 @@
       '<span class="scoreboard__team-tag">' + escapeHTML(name2) + '</span>';
     panel.appendChild(matchLabel);
 
-    if (rules.pointsTo != null) {
+    // Stage/group + Set Rules context (REQ-UX-40) — the same convention already used by
+    // renderNextMatchCard()'s metaParts line, so the two views read identically.
+    var metaParts = [];
+    if (match.groupId) metaParts.push(t('tournament.group', { id: match.groupId }));
+    if (rules.pointsTo != null) metaParts.push(formatStageRuleLabel(rules));
+    if (metaParts.length) {
       var ruleCaption = document.createElement('p');
       ruleCaption.className = 'scoreboard__rule';
-      ruleCaption.textContent = formatStageRuleLabel(rules);
+      ruleCaption.textContent = metaParts.join(' · ');
       panel.appendChild(ruleCaption);
+    }
+
+    // Revoked mid-scoring (REQ-UX-43): the view stays open but read-only — no controls,
+    // no Save/Finish; the confirmed result already on the match is never lost/replaced.
+    if (isReadOnly) {
+      var revokedMsg = document.createElement('p');
+      revokedMsg.className = 'scoreboard__revoked';
+      revokedMsg.setAttribute('role', 'alert');
+      revokedMsg.textContent = t('tournament.sync.revoked');
+      panel.appendChild(revokedMsg);
+      var confirmedScore = document.createElement('p');
+      confirmedScore.className = 'scoreboard__match-label';
+      // The last confirmed score, whether the match is finished or still live in progress
+      // (score1/score2 are non-null the moment scoring starts) — never gated on `played`
+      // alone, so a mid-match revoke never mislabels an in-progress score as "no result".
+      confirmedScore.textContent = (match.score1 != null && match.score2 != null)
+        ? (match.score1 + ' – ' + match.score2) : '—';
+      panel.appendChild(confirmedScore);
+      scoreboardPanelEl.appendChild(panel);
+      return;
     }
 
     var errorEl = document.createElement('p');
     errorEl.className = 'scoreboard__error';
     errorEl.setAttribute('role', 'alert');
     errorEl.setAttribute('aria-live', 'polite');
+    errorEl.textContent = (syncState === 'invalid' && scoreboardErrorMessage) ? scoreboardErrorMessage : '';
+
+    // A conflict/denied write or an in-flight save freezes the local attempt so Retry
+    // always resubmits exactly what the server rejected/queued (REQ-UX-42/43); a pending
+    // Finish confirmation freezes it too so the score can't drift under the prompt.
+    var controlsDisabled = !!pendingFinish || syncState === 'saving' || syncState === 'conflict' || syncState === 'denied';
 
     // Teams grid
     var teamsGrid = document.createElement('div');
@@ -2437,6 +2634,7 @@
       var teamName = document.createElement('p');
       teamName.className = 'scoreboard__team-name';
       teamName.textContent = side.name;
+      teamName.title = side.name; // REQ-UX-40/73: full name always available once clamped to 2 lines
       teamPanel.appendChild(teamName);
 
       var scoreDisplay = document.createElement('p');
@@ -2451,6 +2649,7 @@
       decBtn.className = 'scoreboard__dec';
       decBtn.textContent = '−'; // −
       decBtn.setAttribute('aria-label', '− ' + side.name);
+      decBtn.disabled = controlsDisabled;
       decBtn.addEventListener('click', (function (key, display) {
         return function () {
           if (liveScore[key] > 0) {
@@ -2465,6 +2664,7 @@
       incBtn.className = 'scoreboard__inc';
       incBtn.textContent = '+';
       incBtn.setAttribute('aria-label', '+ ' + side.name);
+      incBtn.disabled = controlsDisabled;
       incBtn.addEventListener('click', (function (key, display) {
         return function () {
           // No-op once the set is already decided with no overtime (REQ-FMT-20) —
@@ -2476,11 +2676,11 @@
           liveScore[key]++;
           display.textContent = liveScore[key];
 
-          // Auto-finish through the existing commitScore('finished') transaction —
-          // same expectedRevision/conflict semantics as a manual Finish (REQ-FMT-21).
+          // Auto-finish routes through the same in-view confirmation as a manual
+          // Finish tap — never commits straight from the increment (REQ-UX-41/D11).
           var after = matchOutcome(rules, liveScore.score1, liveScore.score2);
           if (after.finished) {
-            commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, 'finished');
+            requestFinishConfirmation(liveScore.score1, liveScore.score2);
           }
         };
       })(side.scoreKey, scoreDisplay));
@@ -2494,10 +2694,138 @@
 
     panel.appendChild(teamsGrid);
 
-    // Actions: Cancel + Save
+    // Conflict block (REQ-UX-42): the server's confirmed result, the local attempt
+    // labelled as not saved, and Retry/Discard reachable without leaving the view.
+    if (syncState === 'conflict') {
+      var localAttempt = lastScoreCommand || { score1: liveScore.score1, score2: liveScore.score2 };
+      var serverResult = conflictServerResult || { score1: 0, score2: 0 };
+      var conflictBlock = document.createElement('div');
+      conflictBlock.className = 'scoring-conflict';
+      conflictBlock.setAttribute('role', 'alert');
+      conflictBlock.setAttribute('tabindex', '-1');
+      var conflictLocal = document.createElement('p');
+      conflictLocal.className = 'scoring-conflict__local';
+      conflictLocal.textContent = t('tournament.scoreboard.conflictLocal', { score1: localAttempt.score1, score2: localAttempt.score2 });
+      var conflictServer = document.createElement('p');
+      conflictServer.className = 'scoring-conflict__server';
+      conflictServer.textContent = t('tournament.scoreboard.conflictServer', { score1: serverResult.score1, score2: serverResult.score2 });
+      var conflictActions = document.createElement('div');
+      conflictActions.className = 'scoring-conflict__actions';
+      var retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'scoring-conflict__retry';
+      retryBtn.textContent = t('tournament.sync.retry');
+      retryBtn.addEventListener('click', function () {
+        if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, errorEl, lastScoreCommand.status);
+      });
+      var discardBtn = document.createElement('button');
+      discardBtn.type = 'button';
+      discardBtn.className = 'scoring-conflict__discard';
+      discardBtn.textContent = t('tournament.scoreboard.discard');
+      discardBtn.addEventListener('click', function () {
+        lastScoreCommand = null;
+        conflictServerResult = null;
+        liveScore = { score1: serverResult.score1 || 0, score2: serverResult.score2 || 0 };
+        setSyncState(null);
+        refreshScoreboardPanel();
+      });
+      conflictActions.appendChild(retryBtn);
+      conflictActions.appendChild(discardBtn);
+      conflictBlock.appendChild(conflictLocal);
+      conflictBlock.appendChild(conflictServer);
+      conflictBlock.appendChild(conflictActions);
+      panel.appendChild(conflictBlock);
+    }
+
+    // Offline (REQ-UX-43): the state matrix requires a visible in-view Retry for THIS
+    // match — the persistent strip's #retry-score-btn sits far off-screen once the
+    // scoring view is open at a true narrow viewport. Values stay editable (REQ-UX-44's
+    // "kept" invariant); this is icon+text via the existing tournament.sync.offline key.
+    if (syncState === 'offline') {
+      var offlineBlock = document.createElement('div');
+      offlineBlock.className = 'scoring-offline';
+      offlineBlock.setAttribute('role', 'alert');
+      var offlineMsg = document.createElement('p');
+      offlineMsg.className = 'scoring-offline__message';
+      offlineMsg.textContent = t('tournament.sync.offline');
+      offlineBlock.appendChild(offlineMsg);
+      var offlineRetryBtn = document.createElement('button');
+      offlineRetryBtn.type = 'button';
+      offlineRetryBtn.className = 'scoring-offline__retry';
+      offlineRetryBtn.textContent = t('tournament.sync.retry');
+      offlineRetryBtn.addEventListener('click', function () {
+        if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, errorEl, lastScoreCommand.status);
+      });
+      offlineBlock.appendChild(offlineRetryBtn);
+      panel.appendChild(offlineBlock);
+    }
+
+    if (syncState === 'denied') {
+      var deniedMsg = document.createElement('p');
+      deniedMsg.className = 'scoreboard__denied';
+      deniedMsg.setAttribute('role', 'alert');
+      deniedMsg.textContent = t('tournament.scoreboard.denied');
+      panel.appendChild(deniedMsg);
+    }
+
+    // Actions: Cancel + Save progress + Finish, OR the in-view Finish confirmation row
+    // (REQ-UX-41) — never both at once.
+    if (pendingFinish) {
+      var finishConfirm = document.createElement('div');
+      finishConfirm.className = 'finish-confirm';
+      var question = document.createElement('p');
+      question.className = 'finish-confirm__question';
+      question.textContent = t('tournament.scoreboard.finishConfirm', { score1: pendingFinish.score1, score2: pendingFinish.score2 });
+      finishConfirm.appendChild(question);
+      var finishActions = document.createElement('div');
+      finishActions.className = 'finish-confirm__actions';
+      var confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'finish-confirm__confirm';
+      confirmBtn.textContent = t('tournament.scoreboard.confirm');
+      confirmBtn.addEventListener('click', function () {
+        var toCommit = pendingFinish;
+        pendingFinish = null;
+        if (toCommit) commitScore(scoreboardMatchId, toCommit.score1, toCommit.score2, errorEl, 'finished');
+      });
+      var keepScoringBtn = document.createElement('button');
+      keepScoringBtn.type = 'button';
+      keepScoringBtn.className = 'finish-confirm__keep-scoring';
+      keepScoringBtn.textContent = t('tournament.scoreboard.keepScoring');
+      keepScoringBtn.addEventListener('click', function () {
+        pendingFinish = null;
+        refreshScoreboardPanel();
+        var finishBtn = scoreboardPanelEl.querySelector('.scoreboard__save--finish');
+        if (finishBtn) finishBtn.focus();
+      });
+      finishActions.appendChild(confirmBtn);
+      finishActions.appendChild(keepScoringBtn);
+      finishConfirm.appendChild(finishActions);
+      panel.appendChild(finishConfirm);
+      scoreboardPanelEl.appendChild(panel);
+      return;
+    }
+
+    // Save progress + Finish share the primary row (REQ-UX-40 wireframe); Cancel gets its
+    // own row below — three buttons on one flex row cannot stay >=44px tall and fit
+    // 320px without shrinking below their own text's min-content width (REQ-UX-73).
     var actions = document.createElement('div');
     actions.className = 'scoreboard__actions';
+    ['live', 'finished'].forEach(function (status) {
+      var action = document.createElement('button'); action.type = 'button';
+      action.className = 'scoreboard__save' + (status === 'finished' ? ' scoreboard__save--finish' : '');
+      action.textContent = t(status === 'live' ? 'tournament.match.saveProgress' : 'tournament.match.finish');
+      action.disabled = controlsDisabled;
+      action.addEventListener('click', function () {
+        if (status === 'finished') requestFinishConfirmation(liveScore.score1, liveScore.score2);
+        else commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, status);
+      });
+      actions.appendChild(action);
+    });
+    panel.appendChild(actions);
 
+    var secondaryActions = document.createElement('div');
+    secondaryActions.className = 'scoreboard__actions scoreboard__actions--secondary';
     var cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
     cancelBtn.className = 'scoreboard__cancel';
@@ -2507,15 +2835,8 @@
       liveScore = { score1: 0, score2: 0 };
       renderTournament();
     });
-
-    actions.appendChild(cancelBtn);
-    ['live', 'finished'].forEach(function (status) {
-      var action = document.createElement('button'); action.type = 'button'; action.className = 'scoreboard__save';
-      action.textContent = t(status === 'live' ? 'tournament.match.saveProgress' : 'tournament.match.finish');
-      action.addEventListener('click', function () { commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, status); });
-      actions.appendChild(action);
-    });
-    panel.appendChild(actions);
+    secondaryActions.appendChild(cancelBtn);
+    panel.appendChild(secondaryActions);
     panel.appendChild(errorEl);
 
     scoreboardPanelEl.appendChild(panel);
