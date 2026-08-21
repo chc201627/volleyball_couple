@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Workspace Module Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Workspace Module — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/workspace.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    function heading(title) {
+      results.innerHTML += `<h2>${title}</h2>`;
+    }
+
+    /** Owner input with a customizable base state — every field the design's
+     * Input table lists, defaulted to "brand new session, no players". */
+    function baseInput(overrides) {
+      return Object.assign({
+        role: 'owner', isReadOnly: false, sessionState: 'ok',
+        playerCount: 0, teamSize: 2,
+        couplesGenerated: false, teamCount: 0, unmatchedCount: 0,
+        groupCount: 1, formatValidation: null,
+        hasTournament: false, hasKingGame: false,
+        complete: false, hasNextMatch: false, pendingRequestCount: 0,
+        firebaseAvailable: false, currentView: null,
+      }, overrides || {});
+    }
+
+    function navIds(view) { return view.navItems.map(function (i) { return i.id; }); }
+    function navItem(view, id) { return view.navItems.filter(function (i) { return i.id === id; })[0]; }
+
+    heading('Global surface');
+    assert(typeof computeWorkspace === 'function', 'computeWorkspace is exposed as a global function');
+
+    heading('Default view per state (design "Default-view / primary-action" table)');
+    assert(computeWorkspace(baseInput()).view === 'setup', 'No players -> setup');
+    assert(computeWorkspace(baseInput({ playerCount: 2 })).view === 'setup', 'Players, no teams -> setup');
+    assert(computeWorkspace(baseInput({ playerCount: 4, couplesGenerated: true, teamCount: 2 })).view === 'teams',
+      'Teams generated, no tournament/king -> teams');
+    assert(computeWorkspace(baseInput({ couplesGenerated: true, hasTournament: true })).view === 'tournament',
+      'Tournament active -> tournament');
+    assert(computeWorkspace(baseInput({ couplesGenerated: true, hasKingGame: true })).view === 'tournament',
+      'King game active -> tournament');
+    assert(computeWorkspace(baseInput({ couplesGenerated: true, hasTournament: true, complete: true })).view === 'results',
+      'Complete -> results');
+    assert(computeWorkspace(baseInput({ sessionState: 'notFound' })).view === 'tournament',
+      'sessionState notFound -> tournament regardless of other fields');
+    assert(computeWorkspace(baseInput({ role: 'scorer' })).view === 'tournament', 'Scorer default -> tournament');
+    assert(computeWorkspace(baseInput({ role: 'scorer', complete: true })).view === 'results', 'Scorer, complete -> results');
+    assert(computeWorkspace(baseInput({ role: 'spectator' })).view === 'tournament', 'Spectator default -> tournament');
+
+    heading('Role scoping (invariant 2 — non-owner nav is [tournament, results] only)');
+    assert(navIds(computeWorkspace(baseInput())).join(',') === 'setup,teams,tournament,results', 'Owner sees all 4 destinations');
+    assert(navIds(computeWorkspace(baseInput({ role: 'scorer' }))).join(',') === 'tournament,results', 'Scorer nav is tournament+results only');
+    assert(navIds(computeWorkspace(baseInput({ role: 'spectator' }))).join(',') === 'tournament,results', 'Spectator nav is tournament+results only');
+
+    heading('Blocking readiness -> disabled primary action (invariant 3)');
+    var notEnough = computeWorkspace(baseInput({ playerCount: 1 }));
+    assert(notEnough.primaryAction.id === 'addPlayers' && notEnough.primaryAction.enabled === false,
+      'Not enough players -> addPlayers action, disabled');
+    assert(notEnough.primaryAction.blockedReasonKey === 'workspace.readiness.enoughPlayers',
+      'addPlayers action names the unmet readiness item');
+    var readyToGenerate = computeWorkspace(baseInput({ playerCount: 4 }));
+    assert(readyToGenerate.primaryAction.id === 'generateTeams' && readyToGenerate.primaryAction.enabled === true,
+      'Enough players, no teams -> generateTeams action, enabled');
+    var readyToStart = computeWorkspace(baseInput({ playerCount: 4, couplesGenerated: true, teamCount: 2 }));
+    assert(readyToStart.primaryAction.id === 'startTournament' && readyToStart.primaryAction.enabled === true,
+      'Enough players + teams -> startTournament action, enabled');
+    var unfeasibleGroups = computeWorkspace(baseInput({
+      playerCount: 6, couplesGenerated: true, teamCount: 3, groupCount: 3,
+    }));
+    assert(unfeasibleGroups.primaryAction.id === 'startTournament' && unfeasibleGroups.primaryAction.enabled === false,
+      'Infeasible group split (3 teams / 3 groups) -> startTournament disabled');
+    assert(unfeasibleGroups.primaryAction.blockedReasonKey === 'workspace.readiness.groupFeasible',
+      'startTournament blockedReasonKey names groupFeasible');
+    var invalidFormat = computeWorkspace(baseInput({
+      playerCount: 4, couplesGenerated: true, teamCount: 2, formatValidation: { valid: false, errors: ['x'] },
+    }));
+    assert(invalidFormat.primaryAction.enabled === false && invalidFormat.primaryAction.blockedReasonKey === 'workspace.readiness.formatValid',
+      'Invalid format draft -> startTournament disabled, names formatValid');
+
+    heading('formatLocked after start (invariant 4 — formatLocked === hasTournament)');
+    assert(computeWorkspace(baseInput()).formatLocked === false, 'No tournament -> formatLocked false');
+    assert(computeWorkspace(baseInput({ hasTournament: true })).formatLocked === true, 'Tournament started -> formatLocked true');
+    assert(computeWorkspace(baseInput({ hasKingGame: true })).formatLocked === false, 'King game alone does not lock format (REQ-UX-13 is tournament-only)');
+
+    heading('Locked-view fallback (invariant 1)');
+    var lockedTeamsPick = computeWorkspace(baseInput({ currentView: 'teams' })); // no teams generated yet -> teams is locked
+    assert(lockedTeamsPick.view === 'setup', 'Picking a locked destination (teams, no teams generated) falls back to defaultView');
+    var lockedTournamentPick = computeWorkspace(baseInput({ currentView: 'tournament' }));
+    assert(lockedTournamentPick.view === 'setup', 'Picking a locked Tournament falls back to defaultView');
+    var validPick = computeWorkspace(baseInput({ playerCount: 4, couplesGenerated: true, teamCount: 2, currentView: 'setup' }));
+    assert(validPick.view === 'setup', 'Picking an enabled non-default destination (setup, mid-teams-flow) is honored');
+    var offRolePick = computeWorkspace(baseInput({ role: 'scorer', currentView: 'setup' }));
+    assert(offRolePick.view === 'tournament', 'A non-owner cannot land on an owner-only destination even if currentView requests it');
+
+    heading('Every locked nav item carries a non-null lockReasonKey (invariant 7)');
+    var freshOwner = computeWorkspace(baseInput());
+    freshOwner.navItems.filter(function (i) { return !i.enabled; }).forEach(function (item) {
+      assert(typeof item.lockReasonKey === 'string' && item.lockReasonKey.length > 0,
+        'Locked nav item "' + item.id + '" carries a lockReasonKey');
+    });
+    assert(navItem(freshOwner, 'teams').enabled === false && navItem(freshOwner, 'teams').lockReasonKey === 'workspace.nav.locked.generateTeamsFirst',
+      'Teams is locked with "generate teams first" before any teams exist');
+    assert(navItem(freshOwner, 'results').enabled === false && navItem(freshOwner, 'results').lockReasonKey === 'workspace.nav.locked.startFirst',
+      'Results is locked with "start first" before any tournament/king exists');
+
+    heading('sessionState notFound -> 1-item nav, no Results (invariant 6)');
+    var notFound = computeWorkspace(baseInput({ sessionState: 'notFound', hasTournament: true, complete: true }));
+    assert(navIds(notFound).join(',') === 'tournament', 'notFound nav is exactly [tournament]');
+    assert(notFound.primaryAction === null, 'notFound has no primary action');
+    assert(navItem(notFound, 'tournament').enabled === true, 'notFound Tournament item stays enabled (it renders the not-found state itself)');
+
+    heading('Results is enabled as soon as a tournament/king exists, not only on completion (invariant 8)');
+    var midTournament = computeWorkspace(baseInput({ couplesGenerated: true, hasTournament: true, complete: false }));
+    assert(navItem(midTournament, 'results').enabled === true, 'Results enabled mid-tournament, before completion');
+    assert(midTournament.view === 'tournament', 'Active destination stays Tournament while in progress');
+
+    heading('Scorer / spectator primary action');
+    var scorerWithMatch = computeWorkspace(baseInput({ role: 'scorer', hasTournament: true, hasNextMatch: true }));
+    assert(scorerWithMatch.primaryAction.id === 'scoreNext' && scorerWithMatch.primaryAction.enabled === true, 'Scorer with a next match -> scoreNext enabled');
+    var scorerNoMatch = computeWorkspace(baseInput({ role: 'scorer', hasTournament: true, hasNextMatch: false }));
+    assert(scorerNoMatch.primaryAction.enabled === false && scorerNoMatch.primaryAction.blockedReasonKey === 'workspace.action.blocked.noNextMatch',
+      'Scorer with no next match -> scoreNext disabled, names the reason');
+    var spectator = computeWorkspace(baseInput({ role: 'spectator' }));
+    assert(spectator.primaryAction.id === 'requestAccess' && spectator.primaryAction.enabled === true, 'Spectator -> requestAccess, always enabled');
+
+    heading('At most one primaryAction (invariant 5)');
+    assert(Object.keys(computeWorkspace(baseInput())).indexOf('primaryAction') !== -1, 'primaryAction key always present (possibly null)');
+    assert(computeWorkspace(baseInput({ sessionState: 'notFound' })).primaryAction === null, 'null is a legal primaryAction value');
+
+    heading('Readiness checklist shape (REQ-UX-11)');
+    var readiness = computeWorkspace(baseInput({ playerCount: 3, teamSize: 2 })).readiness;
+    var byKey = {}; readiness.forEach(function (r) { byKey[r.key] = r; });
+    assert(byKey.enoughPlayers.ok === false && byKey.enoughPlayers.params.needed === 1, '3 players / 2v2 -> enoughPlayers not-ok, needs 1 more');
+    assert(byKey.noUnmatched.blocking === false && byKey.groupFeasible.blocking === true, 'noUnmatched is a warning; groupFeasible is blocking');
+    var withFirebase = computeWorkspace(baseInput({ firebaseAvailable: true })).readiness;
+    assert(withFirebase.some(function (r) { return r.key === 'firebaseConnected' && r.blocking === false; }),
+      'firebaseConnected readiness item only appears when firebaseAvailable is true');
+    var withoutFirebase = computeWorkspace(baseInput({ firebaseAvailable: false })).readiness;
+    assert(!withoutFirebase.some(function (r) { return r.key === 'firebaseConnected'; }), 'firebaseConnected is omitted when Firebase is not configured');
+
+    // ===== Summary =====
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>
