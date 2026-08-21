@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tournament Day Module Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Tournament Day Module — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/tournament.js"></script>
+  <script src="../js/tournament-format.js"></script>
+  <script src="../js/tournament-day.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    function heading(title) {
+      results.innerHTML += `<h2>${title}</h2>`;
+    }
+
+    function makeGroups(sizesById) {
+      const groups = [];
+      let idx = 0;
+      Object.keys(sizesById).forEach((id) => {
+        const teams = [];
+        for (let i = 0; i < sizesById[id]; i++) {
+          teams.push({ id: 't' + idx, name: 'Team ' + idx });
+          idx++;
+        }
+        groups.push({ id, teams });
+      });
+      return groups;
+    }
+
+    function play(matches, matchId, s1, s2) {
+      return recordMatchScore(matches, matchId, s1, s2);
+    }
+
+    // Plays every match with the lower-global-index team always winning — produces a
+    // strictly transitive, tie-free standings order (mirrors tournament-format.test.html).
+    function playDecisively(matches, groupMatches) {
+      groupMatches.forEach((m) => {
+        const idx1 = parseInt(m.team1Id.slice(1), 10);
+        const idx2 = parseInt(m.team2Id.slice(1), 10);
+        matches = idx1 < idx2 ? play(matches, m.id, 21, 10) : play(matches, m.id, 10, 21);
+      });
+      return matches;
+    }
+
+    // ─── nextMatch precedence (live > scorable pending), nextMatchReason ──────
+
+    heading('nextMatch precedence and nextMatchReason (classic)');
+
+    (function () {
+      const view = tournamentDay({ matches: [], groups: [] });
+      assert(view.nextMatch === null && view.nextMatchReason === 'none', 'no matches at all → nextMatchReason "none"');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      let matches = generateMatches(groups);
+      // Mark one match live (status field only, no format engine involved).
+      matches = matches.map((m, i) => (i === 0 ? Object.assign({}, m, { status: 'live' }) : m));
+      const view = tournamentDay({ matches, groups });
+      assert(view.nextMatch && view.nextMatch.status === 'live', 'a live match always outranks pending matches');
+      assert(view.nextMatchReason === 'ok', 'nextMatchReason is "ok" when a live match exists');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      const matches = generateMatches(groups);
+      const view = tournamentDay({ matches, groups });
+      assert(view.nextMatch !== null && view.nextMatch.status === 'pending', 'classic: first pending match by order is next when nothing is live');
+      assert(view.nextMatch.matchId === matches[0].id, 'classic: next match matches generateMatches order', view.nextMatch.matchId + ' vs ' + matches[0].id);
+      assert(view.nextMatchReason === 'ok', 'nextMatchReason is "ok" for a scorable classic pending match');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      let matches = generateMatches(groups);
+      matches.forEach((m) => { matches = play(matches, m.id, 21, 10); });
+      const view = tournamentDay({ matches, groups });
+      assert(view.nextMatch === null, 'no next match once every classic match is finished');
+      assert(view.nextMatchReason === 'allFinished', 'nextMatchReason is "allFinished" once every match is finished');
+    })();
+
+    heading('nextMatch precedence (formatted sessions — scorable pending only)');
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      const matches = generateStageMatches(format, groups);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const view = tournamentDay({ matches, groups, format, resolution, standings });
+      assert(view.nextMatch !== null && view.nextMatch.stageId === 'group', 'formatted: next match is a scorable round-robin match before the final resolves');
+      assert(view.nextMatchReason === 'ok', 'formatted: nextMatchReason is "ok" while round-robin matches remain');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      let matches = generateStageMatches(format, groups);
+      const groupMatches = matches.filter((m) => m.stageId === 'group');
+      matches = playDecisively(matches, groupMatches);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const view = tournamentDay({ matches, groups, format, resolution, standings });
+      assert(view.nextMatch !== null && view.nextMatch.stageId === 'final', 'formatted: next match becomes the final once it resolves and is scorable');
+      assert(view.nextMatch.scorable === true, 'formatted: the selected next match is scorable');
+    })();
+
+    (function () {
+      // Tamper one final slot so resolveFormat marks the stage invalid — every match in
+      // it must be unscorable, so nextMatch must NOT select it even though group play is done.
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      let matches = generateStageMatches(format, groups);
+      matches = matches.map((m) => (m.id === 'k-final-1' ? Object.assign({}, m, { team1Id: 'slot:A9' }) : m));
+      const groupMatches = matches.filter((m) => m.stageId === 'group');
+      matches = playDecisively(matches, groupMatches);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const view = tournamentDay({ matches, groups, format, resolution, standings });
+      assert(view.nextMatch === null, 'formatted: an invalid stage never produces a scorable next match');
+      assert(view.nextMatchReason === 'awaitingStage', 'formatted: nextMatchReason is "awaitingStage" when pending matches exist but none are scorable');
+    })();
+
+    // ─── classic vs formatted stage progress ───────────────────────────────
+
+    heading('stage progress (classic vs formatted)');
+
+    (function () {
+      const groups = makeGroups({ A: 4, B: 4 });
+      let matches = generateMatches(groups);
+      const groupAMatches = matches.filter((m) => m.groupId === 'A');
+      matches = playDecisively(matches, groupAMatches);
+      const view = tournamentDay({ matches, groups });
+      const stageA = view.stageProgress.find((s) => s.id === 'A');
+      const stageB = view.stageProgress.find((s) => s.id === 'B');
+      assert(stageA.kind === 'group' && stageA.played === stageA.total, 'classic: fully played group reports played === total', JSON.stringify(stageA));
+      assert(stageA.status === 'complete', 'classic: fully played group status is "complete"');
+      assert(stageB.played === 0 && stageB.status === 'pending', 'classic: untouched group status is "pending"');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4, B: 4 });
+      const format = presetFormat('crossover', groups);
+      const matches = generateStageMatches(format, groups);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const view = tournamentDay({ matches, groups, format, resolution, standings });
+      const stageIds = view.stageProgress.map((s) => s.id);
+      assert(JSON.stringify(stageIds) === JSON.stringify(['group', 'qf', 'sf', 'final']),
+        'formatted: stageProgress mirrors resolveFormat stage order', JSON.stringify(stageIds));
+      const groupStage = view.stageProgress.find((s) => s.id === 'group');
+      assert(groupStage.total === 12, 'formatted: group stage total counts all round-robin matches', JSON.stringify(groupStage));
+      const finalStage = view.stageProgress.find((s) => s.id === 'final');
+      assert(finalStage.status === 'pending', 'formatted: unresolved final stage status is "pending"');
+    })();
+
+    // ─── recentlyFinished ordering, incl. updatedAt:null ───────────────────
+
+    heading('recentlyFinished ordering');
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      let matches = generateMatches(groups);
+      matches = play(matches, matches[0].id, 21, 10);
+      matches = play(matches, matches[1].id, 21, 15);
+      matches = matches.map((m, i) => {
+        if (i === 0) return Object.assign({}, m, { updatedAt: 1000 });
+        if (i === 1) return Object.assign({}, m, { updatedAt: 2000 });
+        return m;
+      });
+      const view = tournamentDay({ matches, groups });
+      assert(view.recentlyFinished[0].updatedAt === 2000 && view.recentlyFinished[1].updatedAt === 1000,
+        'recentlyFinished: higher updatedAt sorts first (desc)', JSON.stringify(view.recentlyFinished.map((m) => m.updatedAt)));
+    })();
+
+    (function () {
+      // All local saves leave updatedAt: null — fallback is revision desc, then order desc.
+      const groups = makeGroups({ A: 4 });
+      let matches = generateMatches(groups);
+      matches = play(matches, matches[0].id, 21, 10); // revision 1, order 1
+      matches = play(matches, matches[1].id, 21, 15); // revision 1, order 2
+      matches = play(matches, matches[1].id, 25, 20); // re-scored → revision 2, order 2
+      const view = tournamentDay({ matches, groups });
+      assert(view.recentlyFinished.every((m) => m.updatedAt === null), 'recentlyFinished: local saves keep updatedAt null');
+      assert(view.recentlyFinished[0].matchId === matches[1].id,
+        'recentlyFinished: with null updatedAt, higher revision sorts first', JSON.stringify(view.recentlyFinished.map((m) => [m.matchId, m.revision])));
+      assert(view.recentlyFinished[1].matchId === matches[0].id, 'recentlyFinished: lower-revision match sorts after');
+    })();
+
+    // ─── counts + COLLAPSE_AFTER ────────────────────────────────────────────
+
+    heading('counts and TOURNAMENT_DAY_COLLAPSE_AFTER');
+
+    (function () {
+      assert(TOURNAMENT_DAY_COLLAPSE_AFTER === 5, 'TOURNAMENT_DAY_COLLAPSE_AFTER is exactly 5 (REQ-UX-32)');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4, B: 4 }); // 12 matches
+      let matches = generateMatches(groups);
+      matches.slice(0, 7).forEach((m) => { matches = play(matches, m.id, 21, 10); });
+      const view = tournamentDay({ matches, groups });
+      assert(view.counts.recentlyFinished === 7, 'counts.recentlyFinished reflects the full finished count (no collapsing in the module)', JSON.stringify(view.counts));
+      assert(view.recentlyFinished.length === 7, 'recentlyFinished returns the FULL array, not capped at COLLAPSE_AFTER');
+      assert(view.counts.pending === 5, 'counts.pending reflects remaining matches', JSON.stringify(view.counts));
+    })();
+
+    // ─── all 5 outcome kinds ────────────────────────────────────────────────
+
+    heading('outcome kinds');
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      let matches = generateMatches(groups);
+      const view = tournamentDay({ matches, groups });
+      assert(view.outcome.kind === 'none', 'outcome: "none" while the tournament is in progress');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      let matches = generateMatches(groups);
+      matches = playDecisively(matches, matches);
+      const standings = calculateStandings(groups, matches);
+      const view = tournamentDay({ matches, groups, standings });
+      assert(view.outcome.kind === 'champion', 'outcome: single classic group with a clear leader → "champion"', JSON.stringify(view.outcome));
+      assert(view.outcome.championTeamId === 't0', 'outcome: champion is the standings[0] team', view.outcome.championTeamId);
+    })();
+
+    (function () {
+      // Top two teams finish level on every tiebreak field (points/diff/setsFor) —
+      // tiedLead. 4-team group, all 6 matches played: t0 and t1 both go 2-1 with
+      // identical set differentials; t2 and t3 trail with distinct records.
+      const groups = makeGroups({ A: 4 });
+      function playBetween(currentMatches, idA, idB, scoreA, scoreB) {
+        const m = currentMatches.find((mm) => (mm.team1Id === idA && mm.team2Id === idB) || (mm.team1Id === idB && mm.team2Id === idA));
+        return m.team1Id === idA ? play(currentMatches, m.id, scoreA, scoreB) : play(currentMatches, m.id, scoreB, scoreA);
+      }
+      let matches = generateMatches(groups);
+      matches = playBetween(matches, 't0', 't2', 21, 15);
+      matches = playBetween(matches, 't0', 't3', 21, 15);
+      matches = playBetween(matches, 't1', 't0', 21, 15);
+      matches = playBetween(matches, 't1', 't2', 21, 15);
+      matches = playBetween(matches, 't3', 't1', 21, 15);
+      matches = playBetween(matches, 't2', 't3', 21, 15);
+      const standings = calculateStandings(groups, matches);
+      const rows = standings.get('A');
+      assert(rows[0].points === rows[1].points && (rows[0].setsFor - rows[0].setsAgainst) === (rows[1].setsFor - rows[1].setsAgainst) && rows[0].setsFor === rows[1].setsFor,
+        'outcome fixture: top two rows are tied on points/diff/setsFor', JSON.stringify(rows));
+      const view = tournamentDay({ matches, groups, standings });
+      assert(view.complete === true, 'outcome fixture: all 6 matches played → complete');
+      assert(view.outcome.kind === 'tiedLead', 'outcome: top two tied on the full default chain → "tiedLead"', JSON.stringify(view.outcome));
+      assert(view.outcome.tiedTeamIds.length === 2 && view.outcome.tiedTeamIds.indexOf('t0') !== -1 && view.outcome.tiedTeamIds.indexOf('t1') !== -1,
+        'outcome: tiedLead lists both tied teams (t0, t1)', JSON.stringify(view.outcome.tiedTeamIds));
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4, B: 4 });
+      let matches = generateMatches(groups);
+      matches = playDecisively(matches, matches);
+      const standings = calculateStandings(groups, matches);
+      const view = tournamentDay({ matches, groups, standings });
+      assert(view.outcome.kind === 'groupWinners', 'outcome: multi-group classic, no knockout → "groupWinners"', JSON.stringify(view.outcome));
+      assert(view.outcome.groupWinners.length === 2, 'outcome: one groupWinners entry per group');
+      assert(view.outcome.groupWinners.every((w) => w.tied === false), 'outcome: groupWinners entries carry a per-group tied flag');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      let matches = generateStageMatches(format, groups);
+      const groupMatches = matches.filter((m) => m.stageId === 'group');
+      matches = playDecisively(matches, groupMatches);
+      matches = play(matches, 'k-final-1', 15, 10);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const view = tournamentDay({ matches, groups, format, resolution, standings });
+      assert(view.complete === true, 'outcome fixture: resolution reports complete once the final is played');
+      assert(view.outcome.kind === 'champion', 'outcome: formatted session with a played final → "champion"', JSON.stringify(view.outcome));
+      assert(view.outcome.championTeamId === 't0', 'outcome: champion is the final match winner', view.outcome.championTeamId);
+    })();
+
+    (function () {
+      // tournament-day.js only depends on tournament.js/tournament-format.js (not
+      // king-of-court.js), so this fixture is a plain object shaped like a finished
+      // KingState rather than a real createKingGame()/recordRally() run.
+      const king = { winner: { id: 't1', name: 'Team 1' } };
+      const view = tournamentDay({ king });
+      assert(view.outcome.kind === 'kingChampion', 'outcome: a finished King game → "kingChampion"', JSON.stringify(view.outcome));
+      assert(view.outcome.championTeamId === king.winner.id, 'outcome: kingChampion id matches kingState.winner.id');
+    })();
+
+    (function () {
+      const king = { winner: null };
+      const view = tournamentDay({ king });
+      assert(view.outcome.kind === 'none', 'outcome: an in-progress King game (no winner yet) never produces "kingChampion"');
+    })();
+
+    // ─── formatTournamentSummary with fake labels ──────────────────────────
+
+    heading('formatTournamentSummary (fake labels)');
+
+    (function () {
+      const view = {
+        outcome: { kind: 'champion', championTeamId: 't0', groupWinners: [], tiedTeamIds: [] },
+        stageProgress: [{ id: 'A', kind: 'group', label: 'x', played: 3, total: 3, status: 'complete' }],
+        recentlyFinished: [{ matchId: 'A-t0-t1', team1Id: 't0', team2Id: 't1', score1: 21, score2: 10 }],
+      };
+      const labels = {
+        title: 'FAKE TITLE',
+        championLine: (id) => 'Champion: ' + id,
+        stageLine: (stage) => 'Stage ' + stage.id + ': ' + stage.played + '/' + stage.total,
+        matchLine: (m) => m.team1Id + ' ' + m.score1 + '-' + m.score2 + ' ' + m.team2Id,
+      };
+      const summary = formatTournamentSummary(view, labels);
+      assert(summary.indexOf('FAKE TITLE') === 0, 'formatTournamentSummary: leads with the injected title');
+      assert(summary.indexOf('Champion: t0') !== -1, 'formatTournamentSummary: includes the champion line via the fake label callback');
+      assert(summary.indexOf('Stage A: 3/3') !== -1, 'formatTournamentSummary: includes stage progress via the fake label callback');
+      assert(summary.indexOf('t0 21-10 t1') !== -1, 'formatTournamentSummary: includes finished results via the fake label callback');
+    })();
+
+    (function () {
+      const view = { outcome: { kind: 'groupWinners', groupWinners: [{ groupId: 'A', teamId: 't0', tied: false }, { groupId: 'B', teamId: 't4', tied: true }] }, stageProgress: [], recentlyFinished: [] };
+      const labels = { groupWinnerLine: (groupId, teamId, tied) => 'Group ' + groupId + ': ' + teamId + (tied ? ' (tied)' : '') };
+      const summary = formatTournamentSummary(view, labels);
+      assert(summary === 'Group A: t0\nGroup B: t4 (tied)', 'formatTournamentSummary: one groupWinnerLine call per winner, joined by newline', JSON.stringify(summary));
+    })();
+
+    (function () {
+      const view = { outcome: { kind: 'tiedLead', tiedTeamIds: ['t0', 't1'] }, stageProgress: [], recentlyFinished: [] };
+      const labels = { tiedLeadLine: (ids) => 'Tied: ' + ids.join(' & ') };
+      const summary = formatTournamentSummary(view, labels);
+      assert(summary === 'Tied: t0 & t1', 'formatTournamentSummary: tiedLead uses the fake tiedLeadLine callback', summary);
+    })();
+
+    (function () {
+      const view = { outcome: { kind: 'none' }, stageProgress: [], recentlyFinished: [] };
+      const labels = { noChampionLine: 'In progress' };
+      const summary = formatTournamentSummary(view, labels);
+      assert(summary === 'In progress', 'formatTournamentSummary: "none" outcome falls back to the fake noChampionLine string', summary);
+    })();
+
+    (function () {
+      const summary = formatTournamentSummary(undefined, undefined);
+      assert(summary === '', 'formatTournamentSummary: no view/labels never throws and returns an empty string');
+    })();
+
+    // ─── Summary ─────────────────────────────────────────────────────────────
+
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>
