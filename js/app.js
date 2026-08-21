@@ -947,6 +947,52 @@
 
   // --- Tournament command center (REQ-UX-30..35) ---
 
+  /** Snapshot survival (design "restore focus by element id"): captures enough
+   * to re-find the focused control (Next Match action, a match-day row, a
+   * "Show all" summary, or an access Approve/Deny button) after an async
+   * snapshot rebuilds it. Null when focus is elsewhere. */
+  function captureCommandCenterFocus() {
+    var active = document.activeElement;
+    if (!active || active === document.body) return null;
+    if (active === nextMatchCardEl.querySelector('.next-match-card__action')) {
+      return { type: 'next-match-action' };
+    }
+    if (accessMembers.contains(active) && active.dataset.member) {
+      return { type: 'access-member', member: active.dataset.member, access: active.dataset.access };
+    }
+    var summary = active.closest && active.closest('.match-day-section__more > summary');
+    if (summary) {
+      var section = summary.closest('.match-day-section');
+      if (section) return { type: 'show-all-summary', sectionId: section.id };
+    }
+    var rowBtn = active.closest && active.closest('.match-card[data-match-id] .match-card__btn');
+    if (rowBtn) {
+      var row = rowBtn.closest('.match-card[data-match-id]');
+      if (row) return { type: 'match-row-action', matchId: row.dataset.matchId };
+    }
+    return null;
+  }
+
+  /** Restores focus captured by captureCommandCenterFocus() after the
+   * relevant subtree has been rebuilt. A missing target (e.g. the match
+   * finished and its row/button no longer exists) is a silent no-op. */
+  function restoreCommandCenterFocus(ref) {
+    if (!ref) return;
+    var target = null;
+    if (ref.type === 'next-match-action') {
+      target = nextMatchCardEl.querySelector('.next-match-card__action');
+    } else if (ref.type === 'access-member') {
+      target = accessMembers.querySelector('[data-member="' + ref.member + '"][data-access="' + ref.access + '"]');
+    } else if (ref.type === 'show-all-summary') {
+      var section = document.getElementById(ref.sectionId);
+      target = section && section.querySelector('.match-day-section__more > summary');
+    } else if (ref.type === 'match-row-action') {
+      var row = document.querySelector('.match-card[data-match-id="' + ref.matchId + '"]');
+      target = row && row.querySelector('.match-card__btn');
+    }
+    if (target) target.focus();
+  }
+
   /** Owns everything below the status strip inside the Tournament destination:
    * Next Match card, stage progress and the stacked Live/Pending/Recently
    * finished sections — called from renderChrome() only (D3/R3), never from
@@ -1017,7 +1063,15 @@
       card.appendChild(teamsEl);
 
       var metaParts = [];
-      if (match.groupId) metaParts.push(t('tournament.group', { id: match.groupId }));
+      if (match.groupId) {
+        metaParts.push(t('tournament.group', { id: match.groupId }));
+      } else if (match.stageId) {
+        // Knockout matches carry no groupId — name the knockout stage instead
+        // (e.g. "Quarterfinals"), looked up from the same stageProgress list
+        // rendered just above.
+        var matchStage = (day.stageProgress || []).filter(function (s) { return s.id === match.stageId; })[0];
+        if (matchStage) metaParts.push(t(matchStage.label));
+      }
       // Set Rules are unset (pointsTo: null) for classic sessions — same guard
       // already used by renderStagePanel()/renderScoreboardPanel().
       if (match.rules && match.rules.pointsTo != null) metaParts.push(formatStageRuleLabel(match.rules));
@@ -1080,9 +1134,16 @@
       var li = document.createElement('li');
       li.className = 'stage-progress__item';
       var label = stage.kind === 'group' ? t(stage.label, { group: stage.id }) : t(stage.label);
+      // A classic group has no real stage dependency, so its 'pending' status
+      // (0 played) reads as neutral "Not started" rather than the formatted
+      // engine's "Locked" — 'pending' legitimately means locked-by-a-prior-
+      // stage only for a real (formatted) stage.
+      var statusLabel = (stage.kind === 'group' && stage.status === 'pending')
+        ? t('workspace.tournament.stageProgress.notStarted')
+        : formatStageStatusLabel(stage.status);
       li.textContent = label + ' — ' +
         t('workspace.tournament.stageProgress.count', { played: stage.played, total: stage.total }) +
-        ' · ' + formatStageStatusLabel(stage.status);
+        ' · ' + statusLabel;
       ul.appendChild(li);
     });
     tournamentStageProgressEl.appendChild(ul);
@@ -1093,6 +1154,10 @@
    * "Show all (N)" disclosure — tournamentDay() always returns the full
    * array; the collapse itself is this rendering concern. */
   function renderMatchDaySection(container, kind, matches, count) {
+    // Snapshot survival: a "Show all" disclosure the organizer already opened
+    // must stay open across a re-render triggered by an unrelated snapshot —
+    // captured before innerHTML clears it, restored on the rebuilt <details>.
+    var wasOpen = !!container.querySelector('.match-day-section__more[open]');
     container.hidden = count === 0;
     container.innerHTML = '';
     if (count === 0) return;
@@ -1110,6 +1175,7 @@
     if (count > TOURNAMENT_DAY_COLLAPSE_AFTER) {
       var details = document.createElement('details');
       details.className = 'disclosure match-day-section__more';
+      details.open = wasOpen;
       var summary = document.createElement('summary');
       summary.className = 'disclosure__summary';
       summary.textContent = t('workspace.tournament.showAll', { count: count });
@@ -1124,7 +1190,8 @@
 
   /** One row for a command-center list — reuses the existing .match-card
    * markup/CSS (same as renderMatchList()/renderStagePanel()) so no new
-   * match-row styling is needed. */
+   * match-row styling is needed. data-match-id backs snapshot-survival focus
+   * restoration (captureCommandCenterFocus()/restoreCommandCenterFocus()). */
   function renderMatchDayRow(match) {
     var name1 = match.team1Id ? resolveMatchTeamName(match.team1Id) : formatSlotLabel(match.team1Slot);
     var name2 = match.team2Id ? resolveMatchTeamName(match.team2Id) : formatSlotLabel(match.team2Slot);
@@ -1132,6 +1199,7 @@
 
     var li = document.createElement('li');
     li.dataset.status = match.status;
+    li.dataset.matchId = match.matchId;
     li.className = 'match-card' + (match.played ? ' match-card--played' : '');
 
     var row = document.createElement('div');
@@ -1938,10 +2006,14 @@
     if (!tournamentRepository || !sid) return;
     if (repositoryUnsubscribe) repositoryUnsubscribe();
     repositoryUnsubscribe = tournamentRepository.watchSession(sid, function (snapshot) {
+      // Snapshot survival: this listener fires async/independently of user action —
+      // capture focus before the rebuild so an in-progress tap is never dropped.
+      var focusRef = captureCommandCenterFocus();
       if (!snapshot || !snapshot.tournament) {
         if (snapshot && snapshot.error) console.warn(snapshot.error);
         workspaceSessionState = 'notFound';
         renderChrome();
+        restoreCommandCenterFocus(focusRef);
         return;
       }
       workspaceSessionState = 'ok';
@@ -1959,6 +2031,7 @@
       tournamentSection.hidden = false;
       renderTournament();
       updateUI();
+      restoreCommandCenterFocus(focusRef);
     });
   }
 
