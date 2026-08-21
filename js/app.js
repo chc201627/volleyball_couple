@@ -834,7 +834,9 @@
     btn.className = 'workspace-nav__item' + (item.status === 'attention' ? ' workspace-nav__item--attention' : '');
     if (item.id === activeViewId) btn.setAttribute('aria-current', 'page'); else btn.removeAttribute('aria-current');
     var label = t(item.labelKey);
-    var reason = !item.enabled ? t(item.lockReasonKey) : (item.badge != null ? '(' + item.badge + ')' : '');
+    var statusToken = item.status === 'attention' ? t('workspace.nav.status.attention') : item.status === 'done' ? t('workspace.nav.status.done') : '';
+    var reason = !item.enabled ? t(item.lockReasonKey)
+      : statusToken + (item.badge != null ? ' (' + item.badge + ')' : '');
     if (!item.enabled) { btn.setAttribute('aria-disabled', 'true'); btn.title = reason; }
     else { btn.removeAttribute('aria-disabled'); btn.removeAttribute('title'); }
     btn.setAttribute('aria-label', reason ? label + ' — ' + reason : label);

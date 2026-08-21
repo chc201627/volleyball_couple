@@ -253,6 +253,8 @@ var t, setLanguage, getLanguage;
       'workspace.readiness.teamsGenerated': 'Generate teams first',
       'workspace.readiness.groupFeasible': 'Adjust the group count',
       'workspace.readiness.formatValid': 'Fix the tournament format',
+      'workspace.nav.status.done': 'Completed',
+      'workspace.nav.status.attention': 'Needs attention',
       // Footer
 
       'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.8.1'
@@ -495,6 +497,8 @@ var t, setLanguage, getLanguage;
       'workspace.readiness.teamsGenerated': 'Genera los equipos primero',
       'workspace.readiness.groupFeasible': 'Ajusta el n\u00famero de grupos',
       'workspace.readiness.formatValid': 'Corrige el formato del torneo',
+      'workspace.nav.status.done': 'Completado',
+      'workspace.nav.status.attention': 'Requiere atenci\u00f3n',
       // Pie de p\u00e1gina
 
       'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.8.1'
