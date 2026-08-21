@@ -255,6 +255,22 @@ var t, setLanguage, getLanguage;
       'workspace.readiness.formatValid': 'Fix the tournament format',
       'workspace.nav.status.done': 'Completed',
       'workspace.nav.status.attention': 'Needs attention',
+      // Guided setup (REQ-UX-10..13)
+      'workspace.summary.players': '{count} players',
+      'workspace.summary.teams': '{count} teams',
+      'workspace.checklist.heading': 'Ready to start',
+      'workspace.checklist.enoughPlayers.ok': 'Enough players',
+      'workspace.checklist.enoughPlayers.blocked': '{needed} more players needed',
+      'workspace.checklist.teamsGenerated.ok': 'Teams generated',
+      'workspace.checklist.teamsGenerated.blocked': 'Teams not generated yet',
+      'workspace.checklist.noUnmatched.ok': 'No unmatched players',
+      'workspace.checklist.noUnmatched.warn': '{count} players unmatched',
+      'workspace.checklist.groupFeasible.ok': 'Group configuration is feasible',
+      'workspace.checklist.groupFeasible.blocked': 'Adjust the group count',
+      'workspace.checklist.formatValid.ok': 'Tournament format is valid',
+      'workspace.checklist.formatValid.blocked': 'Fix the tournament format',
+      'workspace.checklist.firebaseConnected.ok': 'Connection available',
+      'workspace.setup.formatLocked.note': 'Locked — reset tournament to change',
       // Footer
 
       'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.8.1'
@@ -499,6 +515,22 @@ var t, setLanguage, getLanguage;
       'workspace.readiness.formatValid': 'Corrige el formato del torneo',
       'workspace.nav.status.done': 'Completado',
       'workspace.nav.status.attention': 'Requiere atenci\u00f3n',
+      // Configuraci\u00f3n guiada (REQ-UX-10..13)
+      'workspace.summary.players': '{count} jugadores',
+      'workspace.summary.teams': '{count} equipos',
+      'workspace.checklist.heading': 'Listo para empezar',
+      'workspace.checklist.enoughPlayers.ok': 'Suficientes jugadores',
+      'workspace.checklist.enoughPlayers.blocked': 'Faltan {needed} jugadores',
+      'workspace.checklist.teamsGenerated.ok': 'Equipos generados',
+      'workspace.checklist.teamsGenerated.blocked': 'A\u00fan no se generan los equipos',
+      'workspace.checklist.noUnmatched.ok': 'Sin jugadores sin equipo',
+      'workspace.checklist.noUnmatched.warn': '{count} jugadores sin equipo',
+      'workspace.checklist.groupFeasible.ok': 'La configuraci\u00f3n de grupos es viable',
+      'workspace.checklist.groupFeasible.blocked': 'Ajusta el n\u00famero de grupos',
+      'workspace.checklist.formatValid.ok': 'El formato del torneo es v\u00e1lido',
+      'workspace.checklist.formatValid.blocked': 'Corrige el formato del torneo',
+      'workspace.checklist.firebaseConnected.ok': 'Conexi\u00f3n disponible',
+      'workspace.setup.formatLocked.note': 'Bloqueado \u2014 reinicia el torneo para cambiarlo',
       // Pie de p\u00e1gina
 
       'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.8.1'
