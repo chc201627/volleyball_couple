@@ -36,6 +36,9 @@
   let importAnalysis = null;
   let importLocale = 'es';
   let lastImportIds = [];
+  var currentView = null;            // last nav pick this session; null = follow computeWorkspace() default
+  var workspaceSessionState = 'ok';  // 'ok' | 'loading' | 'notFound' — REQ-UX-62
+  var workspaceToastTimer = null;
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -106,6 +109,10 @@
   const matchFilters = document.getElementById('match-filters');
   const syncStatus = document.getElementById('sync-status');
   const retryScoreBtn = document.getElementById('retry-score-btn');
+  const workspaceEl = document.getElementById('workspace');
+  const workspaceNavItemsEl = document.getElementById('workspace-nav-items');
+  const workspaceNavCta = document.getElementById('workspace-nav-cta');
+  const workspaceToastEl = document.getElementById('workspace-toast');
   const tournamentSection = document.getElementById('tournament-section');
   const tournamentGroupsEl = document.getElementById('tournament-groups');
   const tournamentStagesEl = document.getElementById('tournament-stages');
@@ -253,6 +260,8 @@
         updateActionButtons();
       }
     }
+
+    renderChrome();
   }
 
   // Expose re-render hook for i18n language changes
@@ -268,6 +277,7 @@
       renderKing();
     }
     if (importAnalysis) renderImportPreview();
+    renderChrome();
   };
 
   // --- Bulk import preview (commit is wired in Phase 3) ---
@@ -633,6 +643,7 @@
     if (!couplesGenerated) {
       resultsSection.hidden = true;
     }
+    renderChrome();
   }
 
   function renderPlayerList() {
@@ -727,6 +738,165 @@
       updateGroupOptions(teamCount);
       updateFormatPresetVisibility();
     }
+  }
+
+  // --- Workspace Chrome (Setup/Teams/Tournament/Results nav) — REQ-UX-01..07 ---
+
+  /** Assembles computeWorkspace()'s pure input from the module's live state
+   * (design "Module Design > js/workspace.js > Input"). */
+  function buildWorkspaceInput() {
+    var groups = formatDraft ? getSetupGroupsShape() : [];
+    var teams = lastResult ? (lastResult.teams || lastResult.couples || []) : [];
+    var unmatched = lastResult ? lastResult.unmatched : null;
+    var unmatchedCount = unmatched ? (Array.isArray(unmatched) ? unmatched.length : 1) : 0;
+    var complete = tournamentState
+      ? (currentResolution ? currentResolution.complete : isTournamentComplete(tournamentState.matches))
+      : (kingState ? isKingGameOver(kingState) : false);
+    var hasNextMatch = false;
+    if (tournamentState) {
+      var resolution = tournamentState.format ? currentResolution : null;
+      hasNextMatch = tournamentDay({ matches: tournamentState.matches, format: tournamentState.format || null, resolution: resolution }).nextMatch !== null;
+    } else if (kingState) {
+      hasNextMatch = !isKingGameOver(kingState);
+    }
+    var pendingRequestCount = 0;
+    if (sessionSnapshot && sessionSnapshot.requests) {
+      Object.keys(sessionSnapshot.requests).forEach(function (id) {
+        if (sessionSnapshot.requests[id].status === 'pending') pendingRequestCount++;
+      });
+    }
+    return {
+      role: (sessionSnapshot && sessionSnapshot.role) || 'owner',
+      isReadOnly: isReadOnly,
+      sessionState: workspaceSessionState,
+      playerCount: players.length,
+      teamSize: teamSize,
+      couplesGenerated: couplesGenerated,
+      teamCount: teams.length,
+      unmatchedCount: unmatchedCount,
+      groupCount: getSelectedGroupCount(),
+      formatValidation: formatDraft ? validateFormat(formatDraft, groups) : null,
+      hasTournament: tournamentState !== null,
+      hasKingGame: kingState !== null,
+      complete: complete,
+      hasNextMatch: hasNextMatch,
+      pendingRequestCount: pendingRequestCount,
+      firebaseAvailable: tournamentRepository !== null,
+      currentView: currentView,
+    };
+  }
+
+  /** Resolves the active WorkspaceView and applies it to the DOM (D1) —
+   * the CSS slot filter does the actual show/hide. */
+  function applyWorkspace() {
+    var view = computeWorkspace(buildWorkspaceInput());
+    workspaceEl.dataset.view = view.view;
+    return view;
+  }
+
+  /** Owns #workspace-nav — never called from inside renderTournament()/
+   * renderKing() (D3/R3); patches existing nodes in place (never rebuilds
+   * an unchanged button set), so focus/identity survive a snapshot re-render. */
+  function renderChrome() {
+    var view = applyWorkspace();
+    patchWorkspaceNavItems(view);
+    patchWorkspaceCta(view);
+  }
+
+  /** Rebuilds buttons only when the nav-id list itself changes (role/session
+   * flip); otherwise every button node is reused and patched in place. */
+  function patchWorkspaceNavItems(view) {
+    var existing = Array.prototype.slice.call(workspaceNavItemsEl.children);
+    var nextIds = view.navItems.map(function (item) { return item.id; });
+    var idsChanged = existing.length !== nextIds.length ||
+      existing.some(function (el, i) { return el.dataset.viewId !== nextIds[i]; });
+    if (idsChanged) {
+      workspaceNavItemsEl.innerHTML = '';
+      view.navItems.forEach(function (item) {
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.dataset.viewId = item.id;
+        var label = document.createElement('span');
+        label.className = 'workspace-nav__item__label';
+        btn.appendChild(label);
+        btn.addEventListener('click', function () { handleNavClick(item.id); });
+        workspaceNavItemsEl.appendChild(btn);
+      });
+      existing = Array.prototype.slice.call(workspaceNavItemsEl.children);
+    }
+    existing.forEach(function (btn, i) { patchWorkspaceNavButton(btn, view.navItems[i], view.view); });
+  }
+
+  /** Patches one existing button's classes/attrs/text — never recreates it,
+   * so a locked tap (`aria-disabled`, never native `disabled`) still reaches
+   * handleNavClick()'s toast, and locked/attention status is announced via
+   * aria-label rather than class-only (REQ-UX-03). */
+  function patchWorkspaceNavButton(btn, item, activeViewId) {
+    btn.className = 'workspace-nav__item' + (item.status === 'attention' ? ' workspace-nav__item--attention' : '');
+    if (item.id === activeViewId) btn.setAttribute('aria-current', 'page'); else btn.removeAttribute('aria-current');
+    var label = t(item.labelKey);
+    var reason = !item.enabled ? t(item.lockReasonKey) : (item.badge != null ? '(' + item.badge + ')' : '');
+    if (!item.enabled) { btn.setAttribute('aria-disabled', 'true'); btn.title = reason; }
+    else { btn.removeAttribute('aria-disabled'); btn.removeAttribute('title'); }
+    btn.setAttribute('aria-label', reason ? label + ' — ' + reason : label);
+    btn.querySelector('.workspace-nav__item__label').textContent = label;
+    var badgeEl = btn.querySelector('.workspace-nav__badge');
+    if (item.badge != null) {
+      if (!badgeEl) { badgeEl = document.createElement('span'); badgeEl.className = 'workspace-nav__badge'; btn.appendChild(badgeEl); }
+      badgeEl.textContent = String(item.badge);
+    } else if (badgeEl) { badgeEl.remove(); }
+  }
+
+  /** `#workspace-nav-cta` is a single static node from index.html — only
+   * its properties are patched, never recreated. */
+  function patchWorkspaceCta(view) {
+    var primaryAction = view.primaryAction;
+    if (!primaryAction) {
+      workspaceNavCta.hidden = true; workspaceNavCta.onclick = null;
+      workspaceNavCta.removeAttribute('title'); workspaceNavCta.removeAttribute('aria-label');
+      return;
+    }
+    workspaceNavCta.hidden = false;
+    workspaceNavCta.disabled = !primaryAction.enabled;
+    workspaceNavCta.textContent = t(primaryAction.labelKey);
+    workspaceNavCta.onclick = function () { handleCenterActionClick(primaryAction); };
+    // REQ-UX-04: a disabled CTA still carries its blocked reason (title + aria-label).
+    if (!primaryAction.enabled && primaryAction.blockedReasonKey) {
+      var reason = t(primaryAction.blockedReasonKey);
+      workspaceNavCta.title = reason;
+      workspaceNavCta.setAttribute('aria-label', t(primaryAction.labelKey) + ' — ' + reason);
+    } else {
+      workspaceNavCta.removeAttribute('title'); workspaceNavCta.removeAttribute('aria-label');
+    }
+  }
+
+  /** A locked destination never changes `view` — it announces its reason as
+   * a toast instead (REQ-UX-03). */
+  function handleNavClick(viewId) {
+    var view = computeWorkspace(buildWorkspaceInput());
+    var item = view.navItems.filter(function (i) { return i.id === viewId; })[0];
+    if (!item) return;
+    if (!item.enabled) {
+      showWorkspaceToast(t(item.lockReasonKey));
+      return;
+    }
+    currentView = viewId;
+    renderChrome();
+  }
+
+  function handleCenterActionClick(primaryAction) {
+    if (!primaryAction.enabled) {
+      if (primaryAction.blockedReasonKey) showWorkspaceToast(t(primaryAction.blockedReasonKey));
+      return;
+    }
+    currentView = primaryAction.targetView;
+    renderChrome();
+  }
+
+  function showWorkspaceToast(message) {
+    workspaceToastEl.textContent = message;
+    workspaceToastEl.hidden = false;
+    if (workspaceToastTimer) clearTimeout(workspaceToastTimer);
+    workspaceToastTimer = setTimeout(function () { workspaceToastEl.hidden = true; }, 4000);
   }
 
   function renderResults(result) {
@@ -1036,6 +1206,7 @@
     tournamentSection.hidden = false;
     renderTournament();
     updateActionButtons();
+    renderChrome(); // D3: chrome is driven by the caller, never by renderTournament() itself
     tournamentSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -1065,6 +1236,7 @@
     groupCountOptions.querySelector('[data-groups="1"]').classList.add('tournament-setup__opt--active');
     selectFormatPreset('classic');
     updateActionButtons();
+    renderChrome();
   }
 
   // ─── King of the Court Handlers ──────────────────────────────────────────────
@@ -1096,6 +1268,7 @@
     kingSection.hidden = false;
     renderKing();
     updateActionButtons();
+    renderChrome(); // D3: chrome is driven by the caller, never by renderKing() itself
     kingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -1107,6 +1280,7 @@
     kingQueueList.innerHTML = '';
     kingLogList.innerHTML = '';
     updateActionButtons();
+    renderChrome();
   }
 
   function handleRally(winnerSide) {
@@ -1114,6 +1288,7 @@
     kingState = recordRally(kingState, winnerSide);
     saveKingState();
     renderKing();
+    renderChrome(); // hasNextMatch/complete may flip when the game ends on this rally
   }
 
   // ─── King of the Court Render ─────────────────────────────────────────────────
@@ -1237,6 +1412,7 @@
       saveTournamentState();
       pushShareURL();
       renderTournament();
+      renderChrome(); // local (non-Firebase) score commit — hasNextMatch may change
     } catch (e) {
       setSyncState('invalid');
       if (errorEl) errorEl.textContent = t(e.message) || e.message;
@@ -1334,8 +1510,11 @@
     repositoryUnsubscribe = tournamentRepository.watchSession(sid, function (snapshot) {
       if (!snapshot || !snapshot.tournament) {
         if (snapshot && snapshot.error) console.warn(snapshot.error);
+        workspaceSessionState = 'notFound';
+        renderChrome();
         return;
       }
+      workspaceSessionState = 'ok';
       sessionSnapshot = snapshot;
       tournamentState = snapshot.tournament;
       isReadOnly = snapshot.legacy || (snapshot.role !== 'owner' && snapshot.role !== 'scorer');

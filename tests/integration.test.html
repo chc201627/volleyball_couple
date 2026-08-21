@@ -30,9 +30,14 @@
       <h1 class="header__title" data-i18n="page.title">Beach Volleyball Couple Matching</h1>
       <p class="header__subtitle" data-i18n="page.subtitle">Register players and generate random couples for your game</p>
     </header>
+    <div class="workspace-status" id="workspace-status" role="status" aria-live="polite">
+      <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
+      <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
+    </div>
     <main class="main">
+    <div class="workspace" id="workspace" data-view="setup">
       <!-- Input Section -->
-      <section class="section section--input" aria-labelledby="input-heading">
+      <section class="section section--input" aria-labelledby="input-heading" data-view-slot="setup">
         <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
         <div class="entry-tabs" role="tablist" aria-label="Player entry mode" data-i18n-aria-label="import.modeLabel">
           <button class="entry-tab entry-tab--active" id="single-mode-tab" role="tab" aria-selected="true" aria-controls="player-form" data-i18n="import.singleMode">One player</button>
@@ -86,7 +91,7 @@
       </section>
 
       <!-- Player List Section -->
-      <section class="section section--players" aria-labelledby="players-heading">
+      <section class="section section--players" aria-labelledby="players-heading" data-view-slot="setup">
         <h2 id="players-heading" class="section__heading">
           Registered Players (<span id="player-count">0</span>)
         </h2>
@@ -97,8 +102,8 @@
         <p class="player-list__empty" id="empty-message" data-i18n="players.empty">No players added yet</p>
       </section>
 
-      <!-- Action Section -->
-      <section class="section section--actions" aria-labelledby="actions-heading">
+      <!-- Setup Actions -->
+      <section class="section section--actions" id="setup-actions" aria-labelledby="actions-heading" data-view-slot="setup">
         <h2 id="actions-heading" class="sr-only">Actions</h2>
         <div class="actions">
           <!-- Match Type Selector (hidden for read-only viewers via JS) -->
@@ -159,12 +164,6 @@
             Generate Couples
           </button>
           <p class="actions__hint" id="generate-hint" data-i18n="actions.hint">Add at least 2 players to generate couples</p>
-          <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
-            Regenerate Couples
-          </button>
-          <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
-            Clear All Players
-          </button>
           <div class="tournament-setup" id="tournament-setup" hidden>
             <label class="tournament-setup__label" for="group-count" data-i18n="tournament.groupsLabel">Groups:</label>
             <div class="tournament-setup__options" id="group-count-options">
@@ -201,6 +200,19 @@
               Start Tournament
             </button>
           </div>
+        </div>
+      </section>
+
+      <!-- Teams Actions -->
+      <section class="section section--actions" id="teams-actions" aria-labelledby="teams-actions-heading" data-view-slot="teams">
+        <h2 id="teams-actions-heading" class="sr-only">Team options</h2>
+        <div class="actions">
+          <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
+            Regenerate Couples
+          </button>
+          <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
+            Clear All Players
+          </button>
           <!-- King of the Court Setup (shown after couples generated, no active tournament or king game) -->
           <div class="king-setup" id="king-setup" hidden>
             <div class="king-setup__options">
@@ -227,7 +239,7 @@
       </section>
 
       <!-- Results Section -->
-      <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden>
+      <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden data-view-slot="teams">
         <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
         <div class="couples-grid" id="couples-grid">
           <!-- Couple cards rendered by JS -->
@@ -238,7 +250,7 @@
       </section>
 
       <!-- King of the Court Section -->
-      <section class="section section--king" id="king-section" aria-labelledby="king-heading" hidden>
+      <section class="section section--king" id="king-section" aria-labelledby="king-heading" hidden data-view-slot="tournament">
         <div class="king-header">
           <h2 id="king-heading" class="section__heading" data-i18n="king.heading">King of the Court</h2>
           <button class="btn btn--warning btn--small" id="reset-king-btn"
@@ -281,7 +293,7 @@
       </section>
 
       <!-- Tournament Section -->
-      <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden>
+      <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden data-view-slot="tournament">
         <div class="tournament-header">
           <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
           <div class="tournament-header__actions">
@@ -308,8 +320,6 @@
             <button class="match-filters__btn" type="button" data-filter="live" data-i18n="tournament.filter.live">Live</button>
             <button class="match-filters__btn" type="button" data-filter="finished" data-i18n="tournament.filter.finished">Finished</button>
           </div>
-          <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
-          <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
         </div>
         <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
           <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
@@ -323,6 +333,14 @@
         </div>
         <div class="scoreboard-panel" id="scoreboard-panel" hidden></div>
       </section>
+
+      <!-- Workspace bottom nav + toast -->
+      <nav class="workspace-nav" id="workspace-nav" aria-label="Workspace">
+        <div class="workspace-nav__items" id="workspace-nav-items"></div>
+        <button class="workspace-nav__cta" id="workspace-nav-cta" type="button" hidden></button>
+      </nav>
+      <div class="toast" id="workspace-toast" role="status" aria-live="polite" hidden></div>
+    </div>
     </main>
   </div>
 
@@ -348,6 +366,7 @@
     var firebase = { apps: [], initializeApp: function () { this.apps.push({}); }, app: function () { return {}; } };
     var createFirebaseTournamentRepository = function () { return testRepository; };
   </script>
+  <script src="../js/workspace.js"></script>
   <script src="../js/app.js"></script>
   <script>
     const out = document.getElementById('test-results');
@@ -386,9 +405,22 @@
     // Wait for DOMContentLoaded handlers (app.js, i18n.js) to finish
     setTimeout(async function runTests() {
 
-      // ===== TEST 0: script order — tournament-day.js is loaded and exposed =====
+      // ===== TEST 0: script order — tournament-day.js / workspace.js are loaded and exposed =====
       assert(typeof tournamentDay === 'function', 'Script order: tournamentDay is a global function (js/tournament-day.js loaded)');
       assert(typeof formatTournamentSummary === 'function', 'Script order: formatTournamentSummary is a global function (js/tournament-day.js loaded)');
+      assert(typeof computeWorkspace === 'function', 'Script order: computeWorkspace is a global function (js/workspace.js loaded)');
+
+      // ===== WORKSPACE SHELL: #workspace exists before every other test runs =====
+      assert(!!document.getElementById('workspace'), 'Workspace shell: #workspace container exists');
+      assert(document.getElementById('workspace').dataset.view === 'setup', 'Workspace shell: default view is setup with no players');
+      assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 4, 'Workspace shell: owner nav has 4 destinations');
+      var teamsNavBtn = document.querySelector('#workspace-nav-items [data-view-id="teams"]');
+      assert(teamsNavBtn.getAttribute('aria-disabled') === 'true', 'Workspace shell: Teams nav item is locked before teams are generated');
+      var viewBeforeLockedTap = document.getElementById('workspace').dataset.view;
+      teamsNavBtn.click();
+      assert(document.getElementById('workspace').dataset.view === viewBeforeLockedTap, 'Workspace shell: tapping a locked nav item does not change the active view');
+      assert(!document.getElementById('workspace-toast').hidden && document.getElementById('workspace-toast').textContent.length > 0,
+        'Workspace shell: tapping a locked nav item shows a toast naming the reason');
 
       // ===== TEST 1: Initial empty state =====
       assert(getPlayerItems().length === 0, 'Initial: player list is empty');
@@ -784,8 +816,36 @@
       document.querySelector('[data-member="phone2"][data-access="revoked"]')?.click();
       assert(testRepository.accessCommand && testRepository.accessCommand.status === 'revoked', 'Scoring access: owner can revoke a scorer');
 
+      // ===== WORKSPACE SHELL: mid-tournament — snapshot survival, badge, 320px, 44px =====
+      assert(document.getElementById('workspace').dataset.view === 'tournament', 'Workspace shell: active tournament defaults the view to Tournament');
+      assert(document.querySelector('#workspace-nav-items [data-view-id="tournament"] .workspace-nav__badge').textContent === '1',
+        'Workspace shell: 1 pending access request badges the Tournament nav item');
+      // #app-frame must be rendered (not display:none) for .focus() to take effect.
+      appFrame.style.cssText = 'display:block;width:320px';
+      var before = document.querySelector('[data-view-id="tournament"]');
+      before.focus();
+      testRepository.emit({ role: 'owner', requests: { phone1: { label: 'Court 1', status: 'pending' }, phone2: { label: 'Court 2', status: 'approved' } } });
+      assert(document.querySelector('[data-view-id="tournament"]') === before && document.activeElement === before,
+        'Workspace shell: nav button identity and focus survive a snapshot re-render (renderChrome() patches in place)');
+      assert(document.getElementById('workspace').dataset.view === 'tournament', 'Workspace shell: a snapshot re-render does not reset the active destination');
+      assert(appFrame.scrollWidth <= appFrame.clientWidth, 'Workspace shell: 320px has no horizontal overflow with the sticky nav rendered');
+      var navItemHeights = Array.from(document.querySelectorAll('.workspace-nav__item')).map(function (el) { return el.getBoundingClientRect().height; });
+      assert(navItemHeights.length === 4 && navItemHeights.every(function (h) { return h >= 44; }), 'Workspace shell: every nav item is at least 44px tall');
+      var labelHeightsEn = Array.from(document.querySelectorAll('.workspace-nav__item__label')).map(function (el) { return el.getBoundingClientRect().height; });
+      var ctaHeightEn = document.getElementById('workspace-nav-cta').getBoundingClientRect().height;
+      assert(labelHeightsEn.every(function (h) { return h > 0 && h <= 16; }), 'Workspace shell (EN): every nav label renders on one line at 320px', labelHeightsEn.join(','));
+      assert(ctaHeightEn <= 44, 'Workspace shell (EN): center CTA does not grow past its 44px row at 320px', String(ctaHeightEn));
+      setLanguage('es');
+      var labelHeightsEs = Array.from(document.querySelectorAll('.workspace-nav__item__label')).map(function (el) { return el.getBoundingClientRect().height; });
+      var ctaHeightEs = document.getElementById('workspace-nav-cta').getBoundingClientRect().height;
+      assert(labelHeightsEs.every(function (h) { return h > 0 && h <= 16; }), 'Workspace shell (ES): every nav label renders on one line at 320px', labelHeightsEs.join(','));
+      assert(ctaHeightEs <= 44, 'Workspace shell (ES): center CTA does not grow past its 44px row at 320px', String(ctaHeightEs));
+      setLanguage('en');
+      appFrame.style.cssText = '';
+
       testRepository.emit({ role: 'spectator', authState: 'pending', accessStatus: null });
       assert(document.getElementById('request-access-btn').disabled && !document.querySelector('.match-card__btn'), 'Scoring access: auth pending remains readable and disables editing');
+      assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 2, 'Workspace shell: spectator nav is tournament+results only (2 items)');
       testRepository.emit({ role: 'spectator', accessStatus: null });
       document.getElementById('access-label').value = 'Beach phone'; document.getElementById('request-access-btn').click(); await Promise.resolve();
       assert(testRepository.requestedLabel === 'Beach phone', 'Scoring access: spectator can request device-scoped access');
@@ -797,6 +857,7 @@
       Object.assign(mixed.matches[1], { status: 'live', revision: 1, played: false, score1: 10, score2: 10 });
       Object.assign(mixed.matches[2], { status: 'finished', revision: 1, played: true, score1: 21, score2: 18 });
       testRepository.emit({ role: 'scorer', accessStatus: 'approved', tournament: mixed });
+      assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 2, 'Workspace shell: scorer nav is tournament+results only (2 items)');
       assert(document.querySelectorAll('.match-card').length === 1 && document.querySelector('.match-card')?.dataset.status === 'pending', 'Match filters: defaults to Pending');
       document.querySelector('[data-filter="live"]').click();
       assert(document.querySelector('.match-card')?.dataset.status === 'live', 'Match filters: Live shows synchronized progress');
