@@ -27,6 +27,11 @@
 
   <main class="main">
   <div class="workspace" id="workspace" data-view="setup">
+    <!-- Compact event summary (REQ-UX-10) -->
+    <section class="section section--summary" id="event-summary" data-view-slot="setup">
+      <p class="event-summary__line" id="event-summary-line"></p>
+    </section>
+
     <!-- Input Section -->
     <section class="section section--input" aria-labelledby="input-heading" data-view-slot="setup">
       <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
@@ -196,11 +201,21 @@
             </div>
             <p class="form__error" id="format-error" role="alert" aria-live="polite"></p>
           </div>
+          <div class="format-locked-note" id="format-locked-note" hidden>
+            <p class="format-locked-note__text" data-i18n="workspace.setup.formatLocked.note">Locked — reset tournament to change</p>
+            <button class="btn btn--warning btn--small" id="format-locked-reset-btn" type="button" data-i18n="tournament.reset">Reset Tournament</button>
+          </div>
           <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
             Start Tournament
           </button>
         </div>
       </div>
+    </section>
+
+    <!-- Readiness checklist (REQ-UX-11/12) -->
+    <section class="section section--readiness" id="readiness-checklist" aria-labelledby="readiness-heading" data-view-slot="setup">
+      <h2 id="readiness-heading" class="section__heading" data-i18n="workspace.checklist.heading">Ready to start</h2>
+      <ul class="readiness" id="readiness-list"></ul>
     </section>
 
     <!-- Teams Actions: progressive-disclosure regenerate/clear + King fork (REQ-UX-21/22) -->
