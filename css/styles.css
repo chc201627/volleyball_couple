@@ -2269,3 +2269,102 @@ textarea {
 .session-missing { display: flex; flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
 .session-missing__icon { font-size: 2rem; }
 .session-missing__text { margin: 0; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+
+/* --- Results / completion (REQ-UX-50..53) --- */
+.results-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: #fff3e0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+.results-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+.champion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 16px;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-white);
+  text-align: center;
+  margin-bottom: 16px;
+}
+.champion-card__icon { font-size: 2rem; margin: 0; }
+.champion-card__heading {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+}
+.champion-card__name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.champion-card__winners {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.champion-card__winner {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  text-align: left;
+}
+.champion-card__winner-group {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+}
+.champion-card__winner-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.completion-summary { margin: 0 0 16px; font-size: 0.875rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.completion-standings { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
+.completion-bracket { margin-bottom: 16px; }
+.completion-bracket__content { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; }
+
+.completion-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+@media (min-width: 600px) {
+  .champion-card__winners { flex-direction: row; flex-wrap: wrap; }
+  .champion-card__winner { flex: 1 1 200px; }
+  .completion-actions { flex-direction: row; flex-wrap: wrap; }
+  .completion-actions .btn { flex: 1 1 auto; }
+}

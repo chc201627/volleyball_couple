@@ -394,6 +394,40 @@
       <button class="btn btn--primary" id="session-not-found-reset-btn" type="button" data-i18n="workspace.tournament.notFound.startLocalSetup">Start a local setup</button>
     </div>
 
+    <!-- Results / completion (REQ-UX-50..53) -->
+    <section class="section section--completion" id="completion-section" aria-labelledby="completion-heading" data-view-slot="results">
+      <h2 id="completion-heading" class="section__heading" data-i18n="workspace.results.heading">Results</h2>
+
+      <div class="results-banner" id="completion-banner" hidden>
+        <span aria-hidden="true">⏳</span>
+        <span data-i18n="workspace.results.inProgress">Tournament in progress — live standings, no champion yet</span>
+      </div>
+
+      <div class="results-empty" id="completion-empty" hidden>
+        <p data-i18n="workspace.results.empty">No results yet</p>
+        <button class="btn btn--primary" id="completion-empty-setup-btn" type="button" data-i18n="workspace.results.emptyLink">Go to Setup</button>
+      </div>
+
+      <div class="champion-card" id="completion-champion" hidden></div>
+
+      <p class="completion-summary" id="completion-summary"></p>
+
+      <div class="completion-standings" id="completion-standings" hidden>
+        <!-- Standings tables rendered by JS (renderStandingsTable(), read-only) -->
+      </div>
+
+      <details class="disclosure completion-bracket" id="completion-bracket" hidden>
+        <summary class="disclosure__summary" data-i18n="workspace.results.bracket">Bracket</summary>
+        <div class="completion-bracket__content" id="completion-bracket-content"></div>
+      </details>
+
+      <div class="completion-actions" id="completion-actions" hidden>
+        <button class="btn btn--share" id="completion-share-btn" type="button" data-i18n="tournament.share">Share</button>
+        <button class="btn" id="completion-export-btn" type="button" data-i18n="workspace.results.export">Copy / share summary</button>
+        <button class="btn btn--warning" id="completion-start-another-btn" type="button" data-i18n="workspace.results.startAnother">Start another tournament</button>
+      </div>
+    </section>
+
     <!-- Workspace bottom nav: 4 destinations (owner) / 2 (scorer, spectator) / 1
          (session-not-found), plus the single contextual center action (REQ-UX-01/04). -->
     <nav class="workspace-nav" id="workspace-nav" aria-label="Workspace">
