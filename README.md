@@ -93,6 +93,52 @@ Abra `http://127.0.0.1:4173/?firebaseEmulator=1`. El parámetro solamente se
 activa en `localhost` o `127.0.0.1`. Consulte `firebase-plan.md` para despliegue,
 migración y rollback.
 
+### Ejecutar los harnesses en modo headless
+
+```bash
+python3 -m http.server 4173 --bind 127.0.0.1
+# En otra terminal, con Chrome/Chromium instalado:
+google-chrome --headless --disable-gpu --dump-dom \
+  http://127.0.0.1:4173/tests/integration.test.html
+```
+
+Cualquier navegador headless que ejecute JavaScript sirve — inspeccione el
+recuento final de aserciones (`PASSED`/`FAILED`) en la salida o en el DOM
+volcado. `tests/integration.test.html` es una copia (mirror) del marcado de
+`index.html`: cualquier cambio estructural en `index.html` debe reflejarse
+byte a byte en el harness en el mismo cambio, o el harness prueba un DOM
+obsoleto.
+
+### Verificar 320px con una ventana real
+
+`#app-frame` en `tests/integration.test.html` simula 320px fijando su ancho
+en línea, lo cual restringe el layout pero **no** activa `@media
+(min-width/max-width)` — las media queries siguen la ventana real del
+navegador. En Chrome 151+, `--window-size=320,568` en modo headless se
+recorta a un mínimo de ~500px sin importar los flags, por lo que una
+ejecución headless simple omite silenciosamente el CSS real de 320px. Para
+verificar breakpoints en una ventana genuina de 320px, use Playwright
+contra el Chrome del sistema:
+
+```bash
+npm install playwright --no-save   # en un directorio de scratch, no en el repo
+node -e "
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('http://127.0.0.1:4173/tests/integration.test.html');
+  console.log(await page.evaluate(() => window.innerWidth)); // debe ser 320
+  await browser.close();
+})();
+"
+```
+
+Las aserciones protegidas por ventana registran `SKIPPED` en la consola en
+vez de pasar silenciosamente cuando la ventana real no coincide con el
+tamaño que necesitan.
+
 ## Flujo de marcadores colaborativos
 
 1. El organizador inicia el torneo y comparte el enlace `#s=`.

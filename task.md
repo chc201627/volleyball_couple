@@ -550,3 +550,23 @@
 
 ### TASK-13.4 — Bracket rendering and release
 - [x] Per-stage knockout panels driven by `resolveFormat`, localized slot placeholders, reference-format end-to-end integration test, and v1.8.0 release documentation/version bumps.
+
+## Phase 14: Guided Organizer Workspace (v1.9.0)
+
+Delivered as SDD change `organizer-workspace` (see `sdd/organizer-workspace/{proposal,spec,design,tasks}`), Feature Branch Chain, nine slices A–I, each its own PR against the previous slice's branch off tracker `feat/organizer-workspace`.
+
+| Slice | Content | Requirements | PR | Status |
+|---|---|---|---|---|
+| A | `js/tournament-day.js` pure selectors + harness | REQ-UX-31/32/33/50/52 | [#50](https://github.com/chc201627/volleyball_couple/pull/50) | [x] Done, validated PASS |
+| B | `js/workspace.js` + view shell (`data-view`, nav, status strip) | REQ-UX-01–07, 10–13, 60–62 | [#51](https://github.com/chc201627/volleyball_couple/pull/51) | [x] Done, validated PASS |
+| C | Setup workspace (readiness checklist, single CTA, format lock) | REQ-UX-10–13, 72, 73, 80 | [#52](https://github.com/chc201627/volleyball_couple/pull/52) | [x] Done, validated PASS |
+| D | Teams workspace (summary bar, cards, mode fork) | REQ-UX-20–23 | [#53](https://github.com/chc201627/volleyball_couple/pull/53) | [x] Done, validated PASS |
+| E | Tournament command center (Next Match, stacked lists, access requests) | REQ-UX-30–35, 62 | [#54](https://github.com/chc201627/volleyball_couple/pull/54) | [x] Done, validated PASS |
+| F | Scoring view (Finish confirmation, conflict Retry/Discard, state matrix) | REQ-UX-40–44 | [#55](https://github.com/chc201627/volleyball_couple/pull/55) | [x] Done, validated PASS |
+| G | Results/completion (champion resolution, summary, export) | REQ-UX-50–53 | [#56](https://github.com/chc201627/volleyball_couple/pull/56) | [x] Done, validated PASS |
+| H | Visual tokens (dark + neon-lime theme, contrast audit) | REQ-UX-70–73 | [#57](https://github.com/chc201627/volleyball_couple/pull/57) | [x] Done, validated PASS |
+| I | Release v1.9.0 (asset/version bumps, docs) | REQ-UX-90/91 | #58 | [x] Done |
+
+**Acceptance criteria (spec §Acceptance):** four nav labels visible at 320×568 on first paint; Start impossible with an unmet readiness item; Next Match is the first content block above the fold at 320×568; owner approves a scorer without leaving Tournament; every scoring action ends in a visible state with in-view conflict Retry/Discard; champion/group-winners/tied-lead + standings visible on Results with no navigation; integration harness and `npm run test:rules` green; no untranslated key at 320px in EN or ES.
+
+**Deferred/known items** (tracked, not release blockers): `.workspace-status` sticky per wireframe (currently `position: static`); share/export confirmation label restore from `data-i18n`; gender/level chip accent colors approximated from the mockup (contrast-verified, not organizer-pixel-confirmed); Results summary date (no reliable timestamp on local-only saves); Setup empty-state auto-focus; Approve/Deny label distinction in `renderTournamentOps()`; a pre-existing CSS-specificity quirk where `:hover` outranks a selected `--active` chip on desktop pointers only (touch/production mobile unaffected).
