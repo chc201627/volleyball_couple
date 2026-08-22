@@ -2145,6 +2145,139 @@
           'Results: after reset, Results is either empty or no longer the active destination (no stale champion state)');
       })();
 
+      // ===== Slice H: visual token system (REQ-UX-70/71/72) =====
+      await (async function () {
+        const rootStyle = getComputedStyle(document.documentElement);
+        function token(name) { return rootStyle.getPropertyValue(name).trim(); }
+
+        assert(token('--surface-0').toLowerCase() === '#080808', 'Tokens: --surface-0 equals the mockup page background #080808');
+        assert(token('--surface-1').toLowerCase() === '#111111', 'Tokens: --surface-1 equals the mockup card surface #111111');
+        assert(token('--accent').toLowerCase() === '#c8ff00', 'Tokens: --accent equals the mockup lime #c8ff00');
+        assert(token('--text-on-accent').toLowerCase() === '#080808', 'Tokens: --text-on-accent equals #080808 for CTA labels on lime');
+
+        // Note: this harness nests the whole app inside #app-frame (a <div>, not a real
+        // <body>) so the `body { background: var(--surface-0) }` tag-selector rule cannot
+        // be exercised here — it is verified against the real index.html separately.
+        const sectionEl = document.querySelector('.section');
+        assert(!!sectionEl, 'Computed style: at least one .section card exists to check');
+        if (sectionEl) {
+          const cardBg = getComputedStyle(sectionEl).backgroundColor;
+          assert(cardBg === 'rgb(17, 17, 17)', 'Computed style: .section card background-color resolves to --surface-1 (rgb(17, 17, 17))', cardBg);
+        }
+
+        // Synthetic, detached elements decouple this check from whatever state the CTA
+        // happens to be in after the preceding scenarios (enabled/disabled/hidden).
+        const ctaProbe = document.createElement('button');
+        ctaProbe.className = 'workspace-nav__cta';
+        document.body.appendChild(ctaProbe);
+        const ctaBg = getComputedStyle(ctaProbe).backgroundColor;
+        const ctaColor = getComputedStyle(ctaProbe).color;
+        ctaProbe.remove();
+        assert(ctaBg === 'rgb(200, 255, 0)', 'Computed style: primary CTA background-color resolves to --accent lime (rgb(200, 255, 0))', ctaBg);
+        assert(ctaColor === 'rgb(8, 8, 8)', 'Computed style: primary CTA label color resolves to --text-on-accent (rgb(8, 8, 8))', ctaColor);
+
+        // No raw hex/rgba literal remains outside :root (REQ-UX-70) — read the source stylesheet text directly.
+        const cssResponse = await fetch('../css/styles.css');
+        const cssText = await cssResponse.text();
+        const rootEnd = cssText.indexOf('\n}', cssText.indexOf(':root'));
+        const bodyText = cssText.slice(rootEnd + 2);
+        const literalMatches = bodyText.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [];
+        assert(literalMatches.length === 0,
+          'Tokens: zero raw hex/rgba literals remain in css/styles.css outside :root (REQ-UX-70)',
+          literalMatches.join(', '));
+
+        // Focus ring visibility (REQ-UX-71 >=3:1): a focusable control must define a
+        // non-"none" outline or box-shadow declaration referencing the accent/focus tokens.
+        const hasFocusRingRule = /:focus(-visible)?[^{]*\{[^}]*(outline|box-shadow)\s*:\s*[^;]*var\(--(accent|overlay-accent|focus-ring)/i.test(cssText);
+        assert(hasFocusRingRule, 'Tokens: at least one :focus/:focus-visible rule sets a visible lime-accent outline/box-shadow (REQ-UX-71)');
+
+        // Measured ratio (not just "references the token"): the ring color is --accent,
+        // solid (not alpha-blended since the corrective pass), so it must clear >=3:1
+        // against every surface it can appear over.
+        const ringColorHex = token('--accent');
+        const ringSurfaces = ['--surface-0', '--surface-1', '--surface-2', '--surface-3'];
+        ringSurfaces.forEach(function (surfaceVar) {
+          const surfaceHex = token(surfaceVar);
+          const ratio = contrastRatio('rgb(' + hexToRgbTriplet(ringColorHex) + ')', 'rgb(' + hexToRgbTriplet(surfaceHex) + ')');
+          assert(ratio >= 3,
+            'Contrast: focus ring (--accent) vs ' + surfaceVar + ' is >=3:1 (measured ' + ratio.toFixed(2) + ':1)',
+            ringColorHex + ' vs ' + surfaceHex);
+        });
+
+        // Reduced-motion: the blanket rule already zeroes animation/transition durations app-wide (REQ-UX-73).
+        const reducedMotionRuleExists = Array.from(document.styleSheets).some(function (sheet) {
+          try {
+            return Array.from(sheet.cssRules).some(function (rule) {
+              return rule.media && rule.media.mediaText && rule.media.mediaText.indexOf('prefers-reduced-motion') !== -1;
+            });
+          } catch (e) { return false; }
+        });
+        assert(reducedMotionRuleExists, 'Tokens: a prefers-reduced-motion media rule exists (REQ-UX-73)');
+
+        // ---- WCAG 2.1 contrast helper (mirrors the scratchpad Python verification script) ----
+        function hexToRgbTriplet(hex) {
+          hex = hex.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16), g = parseInt(hex.substring(2, 4), 16), b = parseInt(hex.substring(4, 6), 16);
+          return r + ', ' + g + ', ' + b;
+        }
+        function srgbToLin(c) { c = c / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+        function relLum(rgbString) {
+          const m = rgbString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (!m) return null;
+          const r = srgbToLin(+m[1]), g = srgbToLin(+m[2]), b = srgbToLin(+m[3]);
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+        function contrastRatio(fg, bg) {
+          const l1 = relLum(fg), l2 = relLum(bg);
+          const lighter = Math.max(l1, l2), darker = Math.min(l1, l2);
+          return (lighter + 0.05) / (darker + 0.05);
+        }
+        function effectiveBg(el) {
+          // Walk up until a non-transparent background-color is found (matches how a
+          // "background: none" item visually composites over its container in the browser).
+          let node = el;
+          while (node) {
+            const bg = getComputedStyle(node).backgroundColor;
+            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+            node = node.parentElement;
+          }
+          return 'rgb(8, 8, 8)';
+        }
+
+        // Synthetic nav probe: real nesting (nav container > items/cta), decoupled from app state.
+        const navProbe = document.createElement('div');
+        navProbe.className = 'workspace-nav';
+        navProbe.innerHTML =
+          '<button class="workspace-nav__item" aria-current="page">Active</button>' +
+          '<button class="workspace-nav__item">Inactive</button>' +
+          '<button class="workspace-nav__cta" disabled>CTA</button>';
+        document.body.appendChild(navProbe);
+        const [activeItem, inactiveItem, disabledCta] = navProbe.children;
+
+        const activeFg = getComputedStyle(activeItem).color;
+        const activeBg = effectiveBg(activeItem);
+        const activeRatio = contrastRatio(activeFg, activeBg);
+        assert(activeRatio >= 7,
+          'Contrast: active nav tab (aria-current) label vs its own pill background is >=7:1 (measured ' + activeRatio.toFixed(2) + ':1)',
+          'fg=' + activeFg + ' bg=' + activeBg);
+
+        const inactiveFg = getComputedStyle(inactiveItem).color;
+        const inactiveBg = effectiveBg(inactiveItem);
+        const inactiveRatio = contrastRatio(inactiveFg, inactiveBg);
+        assert(inactiveRatio >= 4.5,
+          'Contrast: inactive nav label vs the nav surface is >=4.5:1 (measured ' + inactiveRatio.toFixed(2) + ':1)',
+          'fg=' + inactiveFg + ' bg=' + inactiveBg);
+
+        const disabledCtaFg = getComputedStyle(disabledCta).color;
+        const disabledCtaBg = effectiveBg(disabledCta);
+        const disabledCtaRatio = contrastRatio(disabledCtaFg, disabledCtaBg);
+        assert(disabledCtaRatio >= 4.5,
+          'Contrast: disabled CTA label vs its own background is >=4.5:1, never grey-on-grey (measured ' + disabledCtaRatio.toFixed(2) + ':1)',
+          'fg=' + disabledCtaFg + ' bg=' + disabledCtaBg);
+
+        navProbe.remove();
+      })();
+
       // ===== Summary =====
       const total = passed + failed;
       const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
