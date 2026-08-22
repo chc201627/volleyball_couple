@@ -84,7 +84,7 @@ The application will include player registration, gender-aware random pairing al
 
 ### 3.3 Results Display
 
-**REQ-FR-14:** The system shall display generated couples in a clear, readable format.
+**REQ-FR-14 (MODIFIED by REQ-UX-20, v1.9.0):** Generated teams SHALL be displayed as phone-optimized team cards (team number, member names with gender badges, optional level) preceded by a summary bar "{teamSize}v{teamSize} · {random|manual} · {N} players · {M} teams". Unmatched players remain clearly indicated (REQ-FR-18). (Previously: "display generated couples in a clear, readable format".)
 
 **REQ-FR-15:** The system shall identify each couple with a number (Couple 1, Couple 2, etc.).
 
@@ -303,7 +303,7 @@ Function GenerateCouples(playerList):
 
 **REQ-ERR-02:** Error messages shall use clear, non-technical language.
 
-**REQ-ERR-03:** Error messages shall use red or warning color scheme (#DC3545 or similar).
+**REQ-ERR-03 (MODIFIED by REQ-UX-72, v1.9.0):** Errors and every status (sync, access, readiness, step, match state, champion) SHALL be communicated with icon + text; color is supplementary, never the only channel. (Previously: "red or warning color scheme (#DC3545 or similar)".)
 
 **REQ-ERR-04:** Error messages shall auto-dismiss after 5 seconds or include a close button.
 
@@ -509,9 +509,9 @@ The application will be considered complete when:
 - **REQ-FR-25:** A device may request scoring access and remains read-only until owner approval.
 - **REQ-FR-26:** The owner may approve or revoke a device; revocation applies before its next write.
 - **REQ-FR-27:** Owners and approved scorers may update only an existing match result.
-- **REQ-FR-28:** Result writes use exact monotonic revisions and preserve newer confirmed data on conflict.
-- **REQ-FR-29:** Spectators receive live results and standings without editing controls.
-- **REQ-NFR-14:** Mobile tournament operations support 320px width, 44px targets, and non-color status feedback.
+- **REQ-FR-28 (MODIFIED by REQ-UX-42, v1.9.0):** Result writes use exact monotonic revisions (`expectedRevision` from the latest snapshot) and preserve newer confirmed data on conflict. A conflict MUST be surfaced in the scoring view itself: the server's confirmed result is shown, the local attempt is labelled as not saved, and Retry (re-reads the new revision) and Discard are reachable without leaving the view. The app MUST NEVER silently replace a confirmed result. (Previously: conflict preserved server data; state shown only in `#sync-status` inside tournament ops.)
+- **REQ-FR-29 (MODIFIED by REQ-UX-60, v1.9.0):** Spectators receive live results and standings without editing controls, through the Tournament and Results destinations only; Setup and Teams are not rendered for them. The nav shows a "Request scoring access" center action until approved. (Previously: "read-only results only".)
+- **REQ-NFR-14 (MODIFIED by REQ-UX-75, v1.9.0):** All destinations — not only tournament operations — support 320px width, ≥44px targets and non-color status feedback. (Previously: scoped to mobile tournament operations.)
 - **REQ-TECH-06:** New sessions use schema v2; schema v1 remains readable and unknown versions fail closed.
 
 ## Configurable Tournament Formats (v1.8.0)
@@ -521,7 +521,7 @@ The application will be considered complete when:
 - **REQ-FMT-03:** Validation rejects an empty stage list, non-positive/non-integer `pointsTo`, a knockout Slot referencing a nonexistent group rank or match, and cycles/forward references. Invalid formats do not create a session.
 - **REQ-FMT-04:** Knockout matches are pre-created at session creation with slot-descriptor team IDs (`slot:` group-rank, `winner:` match). No byes, no third-place match, no losers bracket.
 - **REQ-FMT-05:** Slot resolution is a pure, deterministic client-side projection: identical format + results yield identical bracket pairings on every device. Unresolved slots render a localized placeholder and the match is not scorable.
-- **REQ-FMT-06:** The Format is frozen after session creation; no edit path exists in any role's UI.
+- **REQ-FMT-06 (MODIFIED by REQ-UX-13, v1.9.0):** The Format is editable in Setup until the tournament starts. Once started (session created or local tournament created) no edit path exists in any role's UI; the only way back is the existing reset-tournament action, which discards results after the existing confirmation. (Previously: "frozen after session creation; no edit path" — unchanged intent, now explicit about the pre-start window and the reset path.)
 - **REQ-FMT-07:** The owner may attach one plain-text custom-rules note, max 500 characters, in one language; it is visible to owner, scorers, and spectators.
 - **REQ-FMT-08:** Stage names, set-rule labels, overtime labels, placeholders, and all new UI strings have EN and ES entries in `js/i18n.js`.
 - **REQ-FMT-09:** New format/bracket UI shows no horizontal overflow at 320px and gives interactive controls ≥44×44px targets.
@@ -534,6 +534,82 @@ The application will be considered complete when:
 - **REQ-FMT-31:** Classic sessions keep schema v2 read/write; v1 stays read-only; unknown schemas fail closed with the existing unsupported-schema state.
 - **REQ-FMT-32:** Firebase Rules accept schema `2 or 3`; `structure` (including `format`) remains owner-only writable; scorers can write only `results/{matchId}` for pre-existing match IDs; access policy remains owner-only.
 - **REQ-FMT-33:** Point-target enforcement stays client-side (documented trust boundary); rules keep structural invariants only (no draws, no negatives). No rules-language target enforcement.
+
+## Guided Organizer Workspace (v1.9.0)
+
+Four guided destinations (Setup → Teams → Tournament → Results) behind a persistent, role-scoped bottom nav with a raised contextual center action; a Next Match command center; an outdoor-readable scoring view; a champion/results screen; and a dark + neon-lime token system. No feature removal, no Firebase schema/rules change, no hash/URL routing. Full scenario-level detail lives in `sdd/organizer-workspace/spec` (SDD change `organizer-workspace`); this table is the condensed, ID-traceable summary.
+
+### workspace-navigation
+
+- **REQ-UX-01:** Exactly four destinations (Setup, Teams, Tournament, Results) through one bottom-nav component, `position: sticky` inside the view container; only the active destination's content is in the accessibility tree.
+- **REQ-UX-02:** View state is local (memory/localStorage only); the URL hash/query string never encodes the view; the share URL is unchanged.
+- **REQ-UX-03:** Each nav item shows a step status (`done`/`current`/`locked`/`attention`) as icon + text/aria-label plus an optional badge; locked items are disabled (not hidden), with the blocking reason exposed via `aria-describedby`/title and a toast on tap.
+- **REQ-UX-04:** The nav center slot renders the single contextual primary action for the current state/role; it is never a fifth destination and is disabled (with reason) when unavailable.
+- **REQ-UX-05:** Default destination on load is derived from player/team/tournament state and role/session context (see spec for the full derivation table).
+- **REQ-UX-06:** A per-snapshot re-render must not change the active destination, reset scroll, or close an open scoring view.
+- **REQ-UX-07:** Nav labels exist in EN and ES and fit four items at 320px without wrapping or truncation.
+
+### guided-setup
+
+- **REQ-UX-10:** Setup shows, top to bottom: event summary, player entry, team-size/pairing-mode selection, tournament/King configuration, readiness checklist, and exactly one enabled primary action.
+- **REQ-UX-11:** The readiness checklist lists ok/not-ok items with text: enough players, teams generated, unmatched players (warning), group configuration feasible, format valid, and Firebase connectivity (warning only).
+- **REQ-UX-12:** Start tournament / Start King is impossible while any blocking readiness item is not-ok; the CTA is disabled and the first unmet item is named.
+- **REQ-UX-13 (MODIFIES REQ-FMT-06):** see the updated REQ-FMT-06 entry above.
+
+### teams-workspace
+
+- **REQ-UX-20 (MODIFIES REQ-FR-14):** see the updated REQ-FR-14 entry above.
+- **REQ-UX-21:** Teams offers Regenerate/Edit pairs as secondary actions under progressive disclosure, and an explicit "Ready to start" state.
+- **REQ-UX-22:** The end of Teams presents the mode fork: Start tournament (primary) | King of the Court (secondary); King starts inside the Tournament destination.
+- **REQ-UX-23:** Once a tournament or King game has started, team cards are read-only and Regenerate/Edit are not rendered.
+
+### tournament-command-center
+
+- **REQ-UX-30:** Tournament renders, in order: status strip, Next Match card, scorer-access request card (organizer only), stage/progress indicator, stacked Live/Pending/Recently finished, quick links to Standings/Bracket, Share, Reset.
+- **REQ-UX-31:** Next Match is the first `live` match, else the first scorable `pending` match by order; the card states why when none exists.
+- **REQ-UX-32:** Live/Pending/Recently finished partition by status; lists longer than 5 collapse behind "Show all (N)".
+- **REQ-UX-33:** Stage progress shows played/total per group or per stage as text, not color-only.
+- **REQ-UX-34:** Pending scorer-access requests surface as a nav badge and an inline card with Approve/Deny; no modal.
+- **REQ-UX-35:** King of the Court renders inside Tournament with the same status strip; its queue replaces Next Match and lists.
+
+### scoring-experience
+
+- **REQ-UX-40:** The scoring view opens inside Tournament for one match with both team names, stage/group context, rules, large controls (≥56×56px) and score digits (≥40px), Save progress, Finish match, Cancel/back.
+- **REQ-UX-41:** Finish match requires a non-modal in-view confirmation step; `window.confirm` MUST NOT be used for scoring.
+- **REQ-UX-42 (MODIFIES REQ-FR-28):** see the updated REQ-FR-28 entry above.
+- **REQ-UX-43:** Every scoring action ends in exactly one visible in-view state from {saving, synced, offline, conflict, denied, revoked, invalid}, mirrored in the persistent status strip.
+- **REQ-UX-44:** Local/no-Firebase mode reuses the same view and states.
+
+### completion-results
+
+- **REQ-UX-50:** Champion resolution: knockout final winner; single-group `standings[0]`; tied-lead state on a full tiebreak tie; classic multi-group without knockout → group-winner cards; King → `kingState.winner`.
+- **REQ-UX-51:** Results shows champion (or group winners/tied lead), summary, final standings, bracket, Share, Export, and "Start another tournament" — no further navigation required.
+- **REQ-UX-52:** Export produces a plain-text summary copied to clipboard or handed to Web Share, with a visible confirmation.
+- **REQ-UX-53:** Results is reachable for all roles once the tournament completes; before completion it shows live standings with a "Tournament in progress" banner.
+
+### role-visibility
+
+- **REQ-UX-60 (MODIFIES REQ-FR-29):** see the updated REQ-FR-29 entry above.
+- **REQ-UX-61:** Role changes arriving via snapshot re-render the nav and controls within the same destination without a page reload.
+- **REQ-UX-62:** Session-not-found renders a dedicated state inside Tournament with a "Start a local setup" link; nav shows Tournament only.
+
+### visual-system
+
+- **REQ-UX-70:** All colors are CSS custom properties on `:root` (no hard-coded hex outside the token block); dark + neon-lime is the default and only shipped theme, themeable by construction.
+- **REQ-UX-71:** Minimum contrast ratios (outdoor-glare, hard requirement): primary text ≥7:1, secondary/muted text ≥4.5:1, icons/borders/focus rings ≥3:1, primary CTA label on accent ≥7:1, score digits/team names in the scoring view ≥7:1.
+- **REQ-UX-72 (MODIFIES REQ-ERR-03):** see the updated REQ-ERR-03 entry above.
+- **REQ-UX-73:** All interactive controls ≥44×44px; `prefers-reduced-motion` disables entrance/transition animations; long names wrap with at most 2 clamped lines; no horizontal overflow at 320px.
+- **REQ-UX-74:** Every new string exists in EN and ES; no raw keys render at 320px.
+- **REQ-UX-75 (MODIFIES REQ-NFR-14):** see the updated REQ-NFR-14 entry above.
+
+### state-matrix
+
+- **REQ-UX-80:** Every applicable cell of the state × destination matrix (empty, ready, loading, syncing, offline, conflict, denied, revoked, completed, session-not-found) renders its required visible outcome; each cell is a test case (full matrix in `sdd/organizer-workspace/spec`).
+
+### release-and-verification
+
+- **REQ-UX-90:** `tests/integration.test.html` mirrors the new markup and asserts nav role-scoping, default-view derivation, Next Match above the fold, 320px no-overflow, ≥44×44 targets, and in-view conflict surfacing; two new pure-module harnesses cover `workspace.js` and `tournament-day.js`; `npm run test:rules` stays green.
+- **REQ-UX-91:** Release bump to v1.9.0 per the CLAUDE.md checklist (all `?v=`, footer, both `footer.copyright` strings, CLAUDE.md stale version corrected, RELEASE_NOTES, requeriment/task).
 
 ## Tech Stack
 
