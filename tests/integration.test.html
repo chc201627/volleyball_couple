@@ -1014,8 +1014,15 @@
         assert(labels.every(function (l) { return l.scrollWidth <= Math.ceil(l.getBoundingClientRect().width); }),
           'Workspace shell (' + langLabel + '): no nav label is truncated at 600px');
         assert(cta.scrollWidth <= cta.clientWidth, 'Workspace shell (' + langLabel + '): center CTA text ("' + cta.textContent + '") is not clipped at 600px');
-        assert(Math.abs(cta.getBoundingClientRect().top - items[0].getBoundingClientRect().top) < 1,
-          'Workspace shell (' + langLabel + '): CTA and tabs share one row at 600px (top aligned)');
+        // @media resolves against the real window, not #app-frame's simulated width;
+        // at a true narrow real window (e.g. 320x568) the <600px stacked layout is
+        // genuinely active, so tabs/CTA are not on one row and this check does not apply.
+        if (!window.matchMedia('(min-width:600px)').matches) {
+          console.log('SKIPPED (real window < 600px): Workspace shell (' + langLabel + '): CTA and tabs share one row at 600px');
+        } else {
+          assert(Math.abs(cta.getBoundingClientRect().top - items[0].getBoundingClientRect().top) < 1,
+            'Workspace shell (' + langLabel + '): CTA and tabs share one row at 600px (top aligned)');
+        }
       }
       assertSingleRowNoTruncation('EN');
       setLanguage('es');
