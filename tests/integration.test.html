@@ -2191,6 +2191,19 @@
         const hasFocusRingRule = /:focus(-visible)?[^{]*\{[^}]*(outline|box-shadow)\s*:\s*[^;]*var\(--(accent|overlay-accent|focus-ring)/i.test(cssText);
         assert(hasFocusRingRule, 'Tokens: at least one :focus/:focus-visible rule sets a visible lime-accent outline/box-shadow (REQ-UX-71)');
 
+        // Measured ratio (not just "references the token"): the ring color is --accent,
+        // solid (not alpha-blended since the corrective pass), so it must clear >=3:1
+        // against every surface it can appear over.
+        const ringColorHex = token('--accent');
+        const ringSurfaces = ['--surface-0', '--surface-1', '--surface-2', '--surface-3'];
+        ringSurfaces.forEach(function (surfaceVar) {
+          const surfaceHex = token(surfaceVar);
+          const ratio = contrastRatio('rgb(' + hexToRgbTriplet(ringColorHex) + ')', 'rgb(' + hexToRgbTriplet(surfaceHex) + ')');
+          assert(ratio >= 3,
+            'Contrast: focus ring (--accent) vs ' + surfaceVar + ' is >=3:1 (measured ' + ratio.toFixed(2) + ':1)',
+            ringColorHex + ' vs ' + surfaceHex);
+        });
+
         // Reduced-motion: the blanket rule already zeroes animation/transition durations app-wide (REQ-UX-73).
         const reducedMotionRuleExists = Array.from(document.styleSheets).some(function (sheet) {
           try {
@@ -2202,6 +2215,11 @@
         assert(reducedMotionRuleExists, 'Tokens: a prefers-reduced-motion media rule exists (REQ-UX-73)');
 
         // ---- WCAG 2.1 contrast helper (mirrors the scratchpad Python verification script) ----
+        function hexToRgbTriplet(hex) {
+          hex = hex.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16), g = parseInt(hex.substring(2, 4), 16), b = parseInt(hex.substring(4, 6), 16);
+          return r + ', ' + g + ', ' + b;
+        }
         function srgbToLin(c) { c = c / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
         function relLum(rgbString) {
           const m = rgbString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
