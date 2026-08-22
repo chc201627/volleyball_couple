@@ -41,6 +41,7 @@
   var currentView = null;            // last nav pick this session; null = follow computeWorkspace() default
   var workspaceSessionState = 'ok';  // 'ok' | 'loading' | 'notFound' — REQ-UX-62
   var workspaceToastTimer = null;
+  var emptySetupFocused = false;     // REQ-UX-80: guards the empty-Setup auto-focus to once per entry
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -865,6 +866,13 @@
   function applyWorkspace() {
     var view = computeWorkspace(buildWorkspaceInput());
     workspaceEl.dataset.view = view.view;
+    // REQ-UX-80: entering an empty Setup focuses the name input — the guard
+    // resets as soon as the empty-Setup condition no longer holds (a player
+    // is added, or the view changes), so re-render while it still holds
+    // (typing, chip taps) never steals focus again.
+    var isEmptySetup = view.view === 'setup' && players.length === 0;
+    if (isEmptySetup && !emptySetupFocused) { nameInput.focus(); emptySetupFocused = true; }
+    else if (!isEmptySetup) { emptySetupFocused = false; }
     return view;
   }
 
@@ -1615,13 +1623,45 @@
     renderChrome();
   }
 
+  /** REQ-UX-04: the center CTA performs its contextual ACTION through the
+   * SAME gate/handler an in-page trigger already uses — it never merely
+   * flips `currentView` (that was the fifth-destination bug). `primaryAction.id`
+   * doubles as the action id (already the discriminator the workspace tests
+   * assert on); unknown/none falls back to the plain view switch. */
   function handleCenterActionClick(primaryAction) {
     if (!primaryAction.enabled) {
       if (primaryAction.blockedReasonKey) showWorkspaceToast(t(primaryAction.blockedReasonKey));
       return;
     }
-    currentView = primaryAction.targetView;
+    switch (primaryAction.id) {
+      case 'generateTeams':
+        handleGenerate();
+        currentView = 'teams';
+        break;
+      case 'startTournament':
+        handleStartTournament();
+        if (tournamentState) currentView = 'tournament';
+        break;
+      case 'scoreNext':
+        if (tournamentState) {
+          var resolution = tournamentState.format ? currentResolution : null;
+          var day = tournamentDay({ matches: tournamentState.matches, groups: tournamentState.groups, format: tournamentState.format || null, resolution: resolution });
+          if (day.nextMatch) handleScoreboard(day.nextMatch.matchId);
+        }
+        currentView = 'tournament';
+        break;
+      case 'shareResults':
+        handleShareTournament({ currentTarget: completionShareBtn });
+        currentView = 'results';
+        break;
+      case 'requestAccess':
+        currentView = 'tournament';
+        break;
+      default:
+        currentView = primaryAction.targetView;
+    }
     renderChrome();
+    if (primaryAction.id === 'requestAccess' && accessLabel && !accessLabel.disabled) accessLabel.focus();
   }
 
   function showWorkspaceToast(message) {
@@ -2400,7 +2440,9 @@
         if ((status === 'approved' && member.status !== 'pending') || (status === 'revoked' && member.status === 'revoked')) return;
         var button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--small';
         button.dataset.member = memberId; button.dataset.access = status;
-        button.textContent = t('tournament.access.' + (status === 'approved' ? 'approve' : 'revoke')); li.appendChild(button);
+        // REQ-UX-34: a still-pending request denies (not "revokes" — nothing was ever approved).
+        var labelKey = status === 'approved' ? 'approve' : (member.status === 'pending' ? 'deny' : 'revoke');
+        button.textContent = t('tournament.access.' + labelKey); li.appendChild(button);
       });
       accessMembers.appendChild(li);
     });

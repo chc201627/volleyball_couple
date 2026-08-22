@@ -970,6 +970,42 @@
         'Format lock: the feasible group option is re-enabled after reset');
       window.confirm = origConfirmSetup;
 
+      // ===== REQ-UX-04 / REQ-UX-80: center CTA performs its contextual ACTION
+      // (not a fifth destination); empty Setup auto-focuses the name input =====
+      window.confirm = function () { return true; };
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.getElementById('clear-btn').click();
+      assert(document.activeElement === document.getElementById('player-name'),
+        'REQ-UX-80: clearing all players re-enters empty Setup and focuses the name input');
+      document.getElementById('type-2v2-btn').focus();
+      document.getElementById('mode-random-btn').click();
+      assert(document.activeElement !== document.getElementById('player-name'),
+        'REQ-UX-80: a later re-render while still empty does not repeatedly steal focus back');
+
+      ['C1', 'C2', 'C3', 'C4'].forEach(function (name, i) { addPlayer(name, i % 2 ? 'female' : 'male'); });
+      document.getElementById('workspace-nav-cta').click();
+      assert(document.getElementById('couples-grid').children.length > 0,
+        'CTA (REQ-UX-04): "Generate teams" actually generates teams, not a fifth destination');
+      assert(document.getElementById('workspace').dataset.view === 'teams', 'CTA (REQ-UX-04): view follows the generated teams');
+
+      document.getElementById('workspace-nav-cta').click();
+      await Promise.resolve(); await Promise.resolve();
+      assert(!document.getElementById('format-locked-note').hidden,
+        'CTA (REQ-UX-04): "Start tournament" actually starts one — format locks for real');
+      assert(document.getElementById('workspace').dataset.view === 'tournament', 'CTA (REQ-UX-04): view follows the started tournament');
+
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: {
+        players: ['C1', 'C2', 'C3', 'C4'].map(function (n) { return { id: n, name: n, gender: 'male' }; }),
+        teams: [{ id: 'ct0', name: 'CTA A' }, { id: 'ct1', name: 'CTA B' }],
+        groups: [{ id: 'A', teams: [{ id: 'ct0' }, { id: 'ct1' }] }],
+        matches: [{ id: 'A-ct0-ct1', groupId: 'A', order: 0, status: 'pending', played: false, score1: 0, score2: 0, revision: 0, team1Id: 'ct0', team2Id: 'ct1' }],
+      } });
+      document.getElementById('workspace-nav-cta').click();
+      assert(!document.getElementById('scoreboard-panel').hidden,
+        'CTA (REQ-UX-04): "Score next match" opens the scoring view for that match at a true 320px viewport, not a bare view switch');
+      appFrame.style.cssText = '';
+      window.confirm = origConfirmSetup;
+
       // ===== COLLABORATIVE MOBILE TOURNAMENT =====
       window.confirm = function () { return true; }; document.getElementById('clear-btn').click();
       document.getElementById('type-2v2-btn').click(); document.getElementById('mode-random-btn').click();
@@ -977,6 +1013,10 @@
       document.getElementById('generate-btn').click(); document.getElementById('start-tournament-btn').click(); await Promise.resolve(); await Promise.resolve();
       testRepository.emit({ role: 'owner', requests: { phone1: { label: 'Court 1', status: 'pending' }, phone2: { label: 'Court 2', status: 'approved' } } });
       assert(document.querySelectorAll('#access-members li').length === 2, 'Scoring access: owner sees private device requests');
+      assert(document.querySelector('[data-member="phone1"][data-access="revoked"]').textContent === 'Deny',
+        'REQ-UX-34: a still-pending request\'s second action reads "Deny", not "Revoke"');
+      assert(document.querySelector('[data-member="phone2"][data-access="revoked"]').textContent === 'Revoke',
+        'REQ-UX-34: an already-approved device\'s second action still reads "Revoke"');
       document.querySelector('[data-member="phone1"][data-access="approved"]')?.click();
       assert(testRepository.accessCommand && testRepository.accessCommand.status === 'approved', 'Scoring access: owner can approve a pending device');
       document.querySelector('[data-member="phone2"][data-access="revoked"]')?.click();
@@ -1043,6 +1083,12 @@
       assert(document.getElementById('request-access-btn').disabled && !document.querySelector('.match-card__btn'), 'Scoring access: auth pending remains readable and disables editing');
       assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 2, 'Workspace shell: spectator nav is tournament+results only (2 items)');
       testRepository.emit({ role: 'spectator', accessStatus: null });
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.getElementById('workspace-nav-cta').click();
+      assert(document.getElementById('workspace').dataset.view === 'tournament', 'CTA (REQ-UX-04): "Request scoring access" switches to Tournament');
+      assert(document.activeElement === document.getElementById('access-label'),
+        'CTA (REQ-UX-04): "Request scoring access" focuses the request form, not a bare view switch');
+      appFrame.style.cssText = '';
       document.getElementById('access-label').value = 'Beach phone'; document.getElementById('request-access-btn').click(); await Promise.resolve();
       assert(testRepository.requestedLabel === 'Beach phone', 'Scoring access: spectator can request device-scoped access');
       testRepository.emit({ role: 'spectator', accessStatus: 'pending' });
@@ -2001,7 +2047,7 @@
 
         // ---- Group winners (REQ-UX-50): 2-group classic, all played, no knockout ----
         var groupWinnersFixture = {
-          players: [],
+          players: ['gw1', 'gw2', 'gw3', 'gw4', 'gw5', 'gw6', 'gw7', 'gw8'].map(function (n) { return { id: n, name: n, gender: 'male' }; }),
           teams: [
             { id: 'ga0', name: 'Alpha One' }, { id: 'ga1', name: 'Alpha Two' },
             { id: 'gb0', name: 'Bravo One' }, { id: 'gb1', name: 'Bravo Two' },
@@ -2028,6 +2074,19 @@
           'Results: renderStandingsTable() is reused read-only for every group (REQ-UX-51)');
         assert(!document.getElementById('completion-actions').hidden && !document.getElementById('completion-start-another-btn').hidden,
           'Results: Share/Export/Start another are visible to the owner once complete (REQ-UX-51)');
+
+        // ---- REQ-UX-04: center CTA "Share results" reuses the exact handleShareTournament() gate ----
+        var ctaClipboardCalls = [];
+        var ctaOriginalClipboard = navigator.clipboard, ctaOriginalShare = navigator.share;
+        Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (u) { ctaClipboardCalls.push(u); return Promise.resolve(); } } });
+        document.getElementById('workspace-nav-cta').click();
+        await Promise.resolve(); await Promise.resolve();
+        assert(ctaClipboardCalls.length === 1, 'CTA (REQ-UX-04): "Share results" reuses handleShareTournament(), not a bare view switch');
+        assert(document.getElementById('completion-share-btn').textContent.indexOf('Copied') !== -1,
+          'CTA (REQ-UX-04): the confirmation lands on the Results Share button (event.currentTarget), not the hidden Tournament one');
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: ctaOriginalClipboard });
+        Object.defineProperty(navigator, 'share', { configurable: true, value: ctaOriginalShare });
 
         // ---- 320px: no horizontal overflow with champion card, standings and actions rendered ----
         appFrame.style.cssText = 'display:block;width:320px';
