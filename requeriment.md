@@ -583,7 +583,7 @@ Four guided destinations (Setup → Teams → Tournament → Results) behind a p
 ### completion-results
 
 - **REQ-UX-50:** Champion resolution: knockout final winner; single-group `standings[0]`; tied-lead state on a full tiebreak tie; classic multi-group without knockout → group-winner cards; King → `kingState.winner`.
-- **REQ-UX-51:** Results shows champion (or group winners/tied lead), summary, final standings, bracket, Share, Export, and "Start another tournament" — no further navigation required.
+- **REQ-UX-51:** Results shows champion (or group winners/tied lead), summary (format, teams, matches played — no date), final standings, bracket, Share, Export, and "Start another tournament" — no further navigation required. (Amended 2026-08-24: date removed — local saves have no trustworthy timestamp; decision `sdd/organizer-workspace/decision-req-ux-51-no-date`)
 - **REQ-UX-52:** Export produces a plain-text summary copied to clipboard or handed to Web Share, with a visible confirmation.
 - **REQ-UX-53:** Results is reachable for all roles once the tournament completes; before completion it shows live standings with a "Tournament in progress" banner.
 
