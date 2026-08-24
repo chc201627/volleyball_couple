@@ -970,6 +970,42 @@
         'Format lock: the feasible group option is re-enabled after reset');
       window.confirm = origConfirmSetup;
 
+      // ===== REQ-UX-04 / REQ-UX-80: center CTA performs its contextual ACTION
+      // (not a fifth destination); empty Setup auto-focuses the name input =====
+      window.confirm = function () { return true; };
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.getElementById('clear-btn').click();
+      assert(document.activeElement === document.getElementById('player-name'),
+        'REQ-UX-80: clearing all players re-enters empty Setup and focuses the name input');
+      document.getElementById('type-2v2-btn').focus();
+      document.getElementById('mode-random-btn').click();
+      assert(document.activeElement !== document.getElementById('player-name'),
+        'REQ-UX-80: a later re-render while still empty does not repeatedly steal focus back');
+
+      ['C1', 'C2', 'C3', 'C4'].forEach(function (name, i) { addPlayer(name, i % 2 ? 'female' : 'male'); });
+      document.getElementById('workspace-nav-cta').click();
+      assert(document.getElementById('couples-grid').children.length > 0,
+        'CTA (REQ-UX-04): "Generate teams" actually generates teams, not a fifth destination');
+      assert(document.getElementById('workspace').dataset.view === 'teams', 'CTA (REQ-UX-04): view follows the generated teams');
+
+      document.getElementById('workspace-nav-cta').click();
+      await Promise.resolve(); await Promise.resolve();
+      assert(!document.getElementById('format-locked-note').hidden,
+        'CTA (REQ-UX-04): "Start tournament" actually starts one — format locks for real');
+      assert(document.getElementById('workspace').dataset.view === 'tournament', 'CTA (REQ-UX-04): view follows the started tournament');
+
+      testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: {
+        players: ['C1', 'C2', 'C3', 'C4'].map(function (n) { return { id: n, name: n, gender: 'male' }; }),
+        teams: [{ id: 'ct0', name: 'CTA A' }, { id: 'ct1', name: 'CTA B' }],
+        groups: [{ id: 'A', teams: [{ id: 'ct0' }, { id: 'ct1' }] }],
+        matches: [{ id: 'A-ct0-ct1', groupId: 'A', order: 0, status: 'pending', played: false, score1: 0, score2: 0, revision: 0, team1Id: 'ct0', team2Id: 'ct1' }],
+      } });
+      document.getElementById('workspace-nav-cta').click();
+      assert(!document.getElementById('scoreboard-panel').hidden,
+        'CTA (REQ-UX-04): "Score next match" opens the scoring view for that match at a true 320px viewport, not a bare view switch');
+      appFrame.style.cssText = '';
+      window.confirm = origConfirmSetup;
+
       // ===== COLLABORATIVE MOBILE TOURNAMENT =====
       window.confirm = function () { return true; }; document.getElementById('clear-btn').click();
       document.getElementById('type-2v2-btn').click(); document.getElementById('mode-random-btn').click();
@@ -977,6 +1013,10 @@
       document.getElementById('generate-btn').click(); document.getElementById('start-tournament-btn').click(); await Promise.resolve(); await Promise.resolve();
       testRepository.emit({ role: 'owner', requests: { phone1: { label: 'Court 1', status: 'pending' }, phone2: { label: 'Court 2', status: 'approved' } } });
       assert(document.querySelectorAll('#access-members li').length === 2, 'Scoring access: owner sees private device requests');
+      assert(document.querySelector('[data-member="phone1"][data-access="revoked"]').textContent === 'Deny',
+        'REQ-UX-34: a still-pending request\'s second action reads "Deny", not "Revoke"');
+      assert(document.querySelector('[data-member="phone2"][data-access="revoked"]').textContent === 'Revoke',
+        'REQ-UX-34: an already-approved device\'s second action still reads "Revoke"');
       document.querySelector('[data-member="phone1"][data-access="approved"]')?.click();
       assert(testRepository.accessCommand && testRepository.accessCommand.status === 'approved', 'Scoring access: owner can approve a pending device');
       document.querySelector('[data-member="phone2"][data-access="revoked"]')?.click();
@@ -1014,8 +1054,15 @@
         assert(labels.every(function (l) { return l.scrollWidth <= Math.ceil(l.getBoundingClientRect().width); }),
           'Workspace shell (' + langLabel + '): no nav label is truncated at 600px');
         assert(cta.scrollWidth <= cta.clientWidth, 'Workspace shell (' + langLabel + '): center CTA text ("' + cta.textContent + '") is not clipped at 600px');
-        assert(Math.abs(cta.getBoundingClientRect().top - items[0].getBoundingClientRect().top) < 1,
-          'Workspace shell (' + langLabel + '): CTA and tabs share one row at 600px (top aligned)');
+        // @media resolves against the real window, not #app-frame's simulated width;
+        // at a true narrow real window (e.g. 320x568) the <600px stacked layout is
+        // genuinely active, so tabs/CTA are not on one row and this check does not apply.
+        if (!window.matchMedia('(min-width:600px)').matches) {
+          console.log('SKIPPED (real window < 600px): Workspace shell (' + langLabel + '): CTA and tabs share one row at 600px');
+        } else {
+          assert(Math.abs(cta.getBoundingClientRect().top - items[0].getBoundingClientRect().top) < 1,
+            'Workspace shell (' + langLabel + '): CTA and tabs share one row at 600px (top aligned)');
+        }
       }
       assertSingleRowNoTruncation('EN');
       setLanguage('es');
@@ -1036,6 +1083,12 @@
       assert(document.getElementById('request-access-btn').disabled && !document.querySelector('.match-card__btn'), 'Scoring access: auth pending remains readable and disables editing');
       assert(document.querySelectorAll('#workspace-nav-items .workspace-nav__item').length === 2, 'Workspace shell: spectator nav is tournament+results only (2 items)');
       testRepository.emit({ role: 'spectator', accessStatus: null });
+      appFrame.style.cssText = 'display:block;width:320px';
+      document.getElementById('workspace-nav-cta').click();
+      assert(document.getElementById('workspace').dataset.view === 'tournament', 'CTA (REQ-UX-04): "Request scoring access" switches to Tournament');
+      assert(document.activeElement === document.getElementById('access-label'),
+        'CTA (REQ-UX-04): "Request scoring access" focuses the request form, not a bare view switch');
+      appFrame.style.cssText = '';
       document.getElementById('access-label').value = 'Beach phone'; document.getElementById('request-access-btn').click(); await Promise.resolve();
       assert(testRepository.requestedLabel === 'Beach phone', 'Scoring access: spectator can request device-scoped access');
       testRepository.emit({ role: 'spectator', accessStatus: 'pending' });
@@ -1994,7 +2047,7 @@
 
         // ---- Group winners (REQ-UX-50): 2-group classic, all played, no knockout ----
         var groupWinnersFixture = {
-          players: [],
+          players: ['gw1', 'gw2', 'gw3', 'gw4', 'gw5', 'gw6', 'gw7', 'gw8'].map(function (n) { return { id: n, name: n, gender: 'male' }; }),
           teams: [
             { id: 'ga0', name: 'Alpha One' }, { id: 'ga1', name: 'Alpha Two' },
             { id: 'gb0', name: 'Bravo One' }, { id: 'gb1', name: 'Bravo Two' },
@@ -2021,6 +2074,19 @@
           'Results: renderStandingsTable() is reused read-only for every group (REQ-UX-51)');
         assert(!document.getElementById('completion-actions').hidden && !document.getElementById('completion-start-another-btn').hidden,
           'Results: Share/Export/Start another are visible to the owner once complete (REQ-UX-51)');
+
+        // ---- REQ-UX-04: center CTA "Share results" reuses the exact handleShareTournament() gate ----
+        var ctaClipboardCalls = [];
+        var ctaOriginalClipboard = navigator.clipboard, ctaOriginalShare = navigator.share;
+        Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (u) { ctaClipboardCalls.push(u); return Promise.resolve(); } } });
+        document.getElementById('workspace-nav-cta').click();
+        await Promise.resolve(); await Promise.resolve();
+        assert(ctaClipboardCalls.length === 1, 'CTA (REQ-UX-04): "Share results" reuses handleShareTournament(), not a bare view switch');
+        assert(document.getElementById('completion-share-btn').textContent.indexOf('Copied') !== -1,
+          'CTA (REQ-UX-04): the confirmation lands on the Results Share button (event.currentTarget), not the hidden Tournament one');
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: ctaOriginalClipboard });
+        Object.defineProperty(navigator, 'share', { configurable: true, value: ctaOriginalShare });
 
         // ---- 320px: no horizontal overflow with champion card, standings and actions rendered ----
         appFrame.style.cssText = 'display:block;width:320px';
@@ -2143,6 +2209,139 @@
           'Results: "Start another tournament" runs the existing reset confirmation flow (REQ-UX-51)');
         assert(document.getElementById('completion-empty').hidden === false || document.getElementById('workspace').dataset.view !== 'results',
           'Results: after reset, Results is either empty or no longer the active destination (no stale champion state)');
+      })();
+
+      // ===== Slice H: visual token system (REQ-UX-70/71/72) =====
+      await (async function () {
+        const rootStyle = getComputedStyle(document.documentElement);
+        function token(name) { return rootStyle.getPropertyValue(name).trim(); }
+
+        assert(token('--surface-0').toLowerCase() === '#080808', 'Tokens: --surface-0 equals the mockup page background #080808');
+        assert(token('--surface-1').toLowerCase() === '#111111', 'Tokens: --surface-1 equals the mockup card surface #111111');
+        assert(token('--accent').toLowerCase() === '#c8ff00', 'Tokens: --accent equals the mockup lime #c8ff00');
+        assert(token('--text-on-accent').toLowerCase() === '#080808', 'Tokens: --text-on-accent equals #080808 for CTA labels on lime');
+
+        // Note: this harness nests the whole app inside #app-frame (a <div>, not a real
+        // <body>) so the `body { background: var(--surface-0) }` tag-selector rule cannot
+        // be exercised here — it is verified against the real index.html separately.
+        const sectionEl = document.querySelector('.section');
+        assert(!!sectionEl, 'Computed style: at least one .section card exists to check');
+        if (sectionEl) {
+          const cardBg = getComputedStyle(sectionEl).backgroundColor;
+          assert(cardBg === 'rgb(17, 17, 17)', 'Computed style: .section card background-color resolves to --surface-1 (rgb(17, 17, 17))', cardBg);
+        }
+
+        // Synthetic, detached elements decouple this check from whatever state the CTA
+        // happens to be in after the preceding scenarios (enabled/disabled/hidden).
+        const ctaProbe = document.createElement('button');
+        ctaProbe.className = 'workspace-nav__cta';
+        document.body.appendChild(ctaProbe);
+        const ctaBg = getComputedStyle(ctaProbe).backgroundColor;
+        const ctaColor = getComputedStyle(ctaProbe).color;
+        ctaProbe.remove();
+        assert(ctaBg === 'rgb(200, 255, 0)', 'Computed style: primary CTA background-color resolves to --accent lime (rgb(200, 255, 0))', ctaBg);
+        assert(ctaColor === 'rgb(8, 8, 8)', 'Computed style: primary CTA label color resolves to --text-on-accent (rgb(8, 8, 8))', ctaColor);
+
+        // No raw hex/rgba literal remains outside :root (REQ-UX-70) — read the source stylesheet text directly.
+        const cssResponse = await fetch('../css/styles.css');
+        const cssText = await cssResponse.text();
+        const rootEnd = cssText.indexOf('\n}', cssText.indexOf(':root'));
+        const bodyText = cssText.slice(rootEnd + 2);
+        const literalMatches = bodyText.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [];
+        assert(literalMatches.length === 0,
+          'Tokens: zero raw hex/rgba literals remain in css/styles.css outside :root (REQ-UX-70)',
+          literalMatches.join(', '));
+
+        // Focus ring visibility (REQ-UX-71 >=3:1): a focusable control must define a
+        // non-"none" outline or box-shadow declaration referencing the accent/focus tokens.
+        const hasFocusRingRule = /:focus(-visible)?[^{]*\{[^}]*(outline|box-shadow)\s*:\s*[^;]*var\(--(accent|overlay-accent|focus-ring)/i.test(cssText);
+        assert(hasFocusRingRule, 'Tokens: at least one :focus/:focus-visible rule sets a visible lime-accent outline/box-shadow (REQ-UX-71)');
+
+        // Measured ratio (not just "references the token"): the ring color is --accent,
+        // solid (not alpha-blended since the corrective pass), so it must clear >=3:1
+        // against every surface it can appear over.
+        const ringColorHex = token('--accent');
+        const ringSurfaces = ['--surface-0', '--surface-1', '--surface-2', '--surface-3'];
+        ringSurfaces.forEach(function (surfaceVar) {
+          const surfaceHex = token(surfaceVar);
+          const ratio = contrastRatio('rgb(' + hexToRgbTriplet(ringColorHex) + ')', 'rgb(' + hexToRgbTriplet(surfaceHex) + ')');
+          assert(ratio >= 3,
+            'Contrast: focus ring (--accent) vs ' + surfaceVar + ' is >=3:1 (measured ' + ratio.toFixed(2) + ':1)',
+            ringColorHex + ' vs ' + surfaceHex);
+        });
+
+        // Reduced-motion: the blanket rule already zeroes animation/transition durations app-wide (REQ-UX-73).
+        const reducedMotionRuleExists = Array.from(document.styleSheets).some(function (sheet) {
+          try {
+            return Array.from(sheet.cssRules).some(function (rule) {
+              return rule.media && rule.media.mediaText && rule.media.mediaText.indexOf('prefers-reduced-motion') !== -1;
+            });
+          } catch (e) { return false; }
+        });
+        assert(reducedMotionRuleExists, 'Tokens: a prefers-reduced-motion media rule exists (REQ-UX-73)');
+
+        // ---- WCAG 2.1 contrast helper (mirrors the scratchpad Python verification script) ----
+        function hexToRgbTriplet(hex) {
+          hex = hex.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16), g = parseInt(hex.substring(2, 4), 16), b = parseInt(hex.substring(4, 6), 16);
+          return r + ', ' + g + ', ' + b;
+        }
+        function srgbToLin(c) { c = c / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+        function relLum(rgbString) {
+          const m = rgbString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (!m) return null;
+          const r = srgbToLin(+m[1]), g = srgbToLin(+m[2]), b = srgbToLin(+m[3]);
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+        function contrastRatio(fg, bg) {
+          const l1 = relLum(fg), l2 = relLum(bg);
+          const lighter = Math.max(l1, l2), darker = Math.min(l1, l2);
+          return (lighter + 0.05) / (darker + 0.05);
+        }
+        function effectiveBg(el) {
+          // Walk up until a non-transparent background-color is found (matches how a
+          // "background: none" item visually composites over its container in the browser).
+          let node = el;
+          while (node) {
+            const bg = getComputedStyle(node).backgroundColor;
+            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+            node = node.parentElement;
+          }
+          return 'rgb(8, 8, 8)';
+        }
+
+        // Synthetic nav probe: real nesting (nav container > items/cta), decoupled from app state.
+        const navProbe = document.createElement('div');
+        navProbe.className = 'workspace-nav';
+        navProbe.innerHTML =
+          '<button class="workspace-nav__item" aria-current="page">Active</button>' +
+          '<button class="workspace-nav__item">Inactive</button>' +
+          '<button class="workspace-nav__cta" disabled>CTA</button>';
+        document.body.appendChild(navProbe);
+        const [activeItem, inactiveItem, disabledCta] = navProbe.children;
+
+        const activeFg = getComputedStyle(activeItem).color;
+        const activeBg = effectiveBg(activeItem);
+        const activeRatio = contrastRatio(activeFg, activeBg);
+        assert(activeRatio >= 7,
+          'Contrast: active nav tab (aria-current) label vs its own pill background is >=7:1 (measured ' + activeRatio.toFixed(2) + ':1)',
+          'fg=' + activeFg + ' bg=' + activeBg);
+
+        const inactiveFg = getComputedStyle(inactiveItem).color;
+        const inactiveBg = effectiveBg(inactiveItem);
+        const inactiveRatio = contrastRatio(inactiveFg, inactiveBg);
+        assert(inactiveRatio >= 4.5,
+          'Contrast: inactive nav label vs the nav surface is >=4.5:1 (measured ' + inactiveRatio.toFixed(2) + ':1)',
+          'fg=' + inactiveFg + ' bg=' + inactiveBg);
+
+        const disabledCtaFg = getComputedStyle(disabledCta).color;
+        const disabledCtaBg = effectiveBg(disabledCta);
+        const disabledCtaRatio = contrastRatio(disabledCtaFg, disabledCtaBg);
+        assert(disabledCtaRatio >= 4.5,
+          'Contrast: disabled CTA label vs its own background is >=4.5:1, never grey-on-grey (measured ' + disabledCtaRatio.toFixed(2) + ':1)',
+          'fg=' + disabledCtaFg + ' bg=' + disabledCtaBg);
+
+        navProbe.remove();
       })();
 
       // ===== Summary =====

@@ -111,6 +111,7 @@ var t, setLanguage, getLanguage;
       'tournament.access.label': 'Device label (for example, Court 1)',
       'tournament.access.request': 'Request scoring access',
       'tournament.access.approve': 'Approve',
+      'tournament.access.deny': 'Deny',
       'tournament.access.revoke': 'Revoke',
       'tournament.access.state.pending': 'pending',
       'tournament.access.state.approved': 'approved',
@@ -330,7 +331,7 @@ var t, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Start another tournament',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.8.1'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.9.0'
 
     },
     es: {
@@ -428,6 +429,7 @@ var t, setLanguage, getLanguage;
       'tournament.access.label': 'Nombre del dispositivo (por ejemplo, Cancha 1)',
       'tournament.access.request': 'Solicitar acceso para anotar',
       'tournament.access.approve': 'Aprobar',
+      'tournament.access.deny': 'Denegar',
       'tournament.access.revoke': 'Revocar',
       'tournament.access.state.pending': 'pendiente',
       'tournament.access.state.approved': 'aprobado',
@@ -647,7 +649,7 @@ var t, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Iniciar otro torneo',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.8.1'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.9.0'
 
     }
   };
