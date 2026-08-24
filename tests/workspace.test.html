@@ -76,6 +76,23 @@
     assert(computeWorkspace(baseInput({ role: 'scorer', complete: true })).view === 'results', 'Scorer, complete -> results');
     assert(computeWorkspace(baseInput({ role: 'spectator' })).view === 'tournament', 'Spectator default -> tournament');
 
+    heading('Reload with a running LOCAL tournament (REQ-UX-05 fix — couplesGenerated desync)');
+    // After a page reload, app.js restores tournamentState/kingState from
+    // localStorage but the separate `couplesGenerated` module flag is NOT
+    // persisted and stays false — hasTournament/hasKingGame must still win.
+    var reloadedTournament = computeWorkspace(baseInput({ couplesGenerated: false, hasTournament: true }));
+    assert(reloadedTournament.view === 'tournament',
+      'couplesGenerated:false + hasTournament:true (post-reload) -> tournament, not setup');
+    assert(navItem(reloadedTournament, 'tournament').enabled === true,
+      'couplesGenerated:false + hasTournament:true -> Tournament nav item is NOT locked');
+    assert(navItem(reloadedTournament, 'teams').enabled === true,
+      'couplesGenerated:false + hasTournament:true -> Teams nav item is also reachable (teams must already exist)');
+    var reloadedKing = computeWorkspace(baseInput({ couplesGenerated: false, hasKingGame: true }));
+    assert(reloadedKing.view === 'tournament' && navItem(reloadedKing, 'tournament').enabled === true,
+      'couplesGenerated:false + hasKingGame:true (post-reload) -> tournament, Tournament nav item not locked');
+    var reloadedComplete = computeWorkspace(baseInput({ couplesGenerated: false, hasTournament: true, complete: true }));
+    assert(reloadedComplete.view === 'results', 'couplesGenerated:false + hasTournament:true + complete -> results');
+
     heading('Role scoping (invariant 2 — non-owner nav is [tournament, results] only)');
     assert(navIds(computeWorkspace(baseInput())).join(',') === 'setup,teams,tournament,results', 'Owner sees all 4 destinations');
     assert(navIds(computeWorkspace(baseInput({ role: 'scorer' }))).join(',') === 'tournament,results', 'Scorer nav is tournament+results only');

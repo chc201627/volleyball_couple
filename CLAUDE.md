@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Repository guidance for coding agents. The production application is currently **v1.7.0**.
+Repository guidance for coding agents. The production application is currently **v1.9.0**.
 
 ## Project
 
@@ -30,6 +30,10 @@ npm run test:rules
 ```
 
 Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a browser or headless Chrome and inspect their pass/fail output. To exercise the app against local emulators, run the emulator command documented in `README.md` and open `http://127.0.0.1:4173/?firebaseEmulator=1`.
+
+### Testing at 320px
+
+`tests/integration.test.html` simulates 320px by setting `#app-frame`'s inline width, which constrains layout but does **not** drive `@media (min-width/max-width)` evaluation — media queries follow the real browser window. On Chrome 151+, headless `--window-size=320,568` (and similar small values) clamps to a ~500px minimum window regardless of flags, so a plain headless run silently skips true-320px CSS. To verify breakpoint-gated CSS at a genuine 320px viewport, drive system Chrome with Playwright and `page.setViewportSize({ width: 320, height: 568 })` (CDP device-metrics override), asserting `window.innerWidth === 320` before measuring. Guarded assertions in the harness log `SKIPPED` rather than silently passing when the real window does not match the size they need.
 
 ## Architecture
 

@@ -24,8 +24,10 @@
   var repositoryUnsubscribe = null;
   var sessionId = null;         // Active session ID written to / read from Firebase
   var sessionSnapshot = null;
-  var matchFilter = 'pending';
   var lastScoreCommand = null;
+  var pendingFinish = null;        // { score1, score2 } awaiting in-view Finish confirmation (REQ-UX-41)
+  var conflictServerResult = null; // { score1, score2, revision } from the last saveResult() conflict (REQ-UX-42)
+  var scoreboardErrorMessage = null; // survives a refreshScoreboardPanel() rebuild while state stays 'invalid'
   let pairingMode = 'random';  // 'random' | 'manual'
   let manualPairs = [];        // [{player1, player2}] — confirmed manual pairs
   let kingState = null;        // KingState object or null when no game active
@@ -39,6 +41,7 @@
   var currentView = null;            // last nav pick this session; null = follow computeWorkspace() default
   var workspaceSessionState = 'ok';  // 'ok' | 'loading' | 'notFound' — REQ-UX-62
   var workspaceToastTimer = null;
+  var emptySetupFocused = false;     // REQ-UX-80: guards the empty-Setup auto-focus to once per entry
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -116,7 +119,6 @@
   const accessLabel = document.getElementById('access-label');
   const requestAccessBtn = document.getElementById('request-access-btn');
   const accessMembers = document.getElementById('access-members');
-  const matchFilters = document.getElementById('match-filters');
   const syncStatus = document.getElementById('sync-status');
   const retryScoreBtn = document.getElementById('retry-score-btn');
   const workspaceEl = document.getElementById('workspace');
@@ -130,6 +132,29 @@
   const tournamentCustomRules = document.getElementById('tournament-custom-rules');
   const tournamentCustomRulesSummary = document.getElementById('tournament-custom-rules-summary');
   const tournamentCustomRulesText = document.getElementById('tournament-custom-rules-text');
+
+  // --- Command center (REQ-UX-30..35) DOM references ---
+  const nextMatchCardEl = document.getElementById('next-match-card');
+  const tournamentStageProgressEl = document.getElementById('tournament-stage-progress');
+  const tournamentLiveSectionEl = document.getElementById('tournament-live-section');
+  const tournamentPendingSectionEl = document.getElementById('tournament-pending-section');
+  const tournamentRecentlyFinishedSectionEl = document.getElementById('tournament-recently-finished-section');
+  const sessionNotFoundEl = document.getElementById('session-not-found');
+  const sessionNotFoundResetBtn = document.getElementById('session-not-found-reset-btn');
+
+  // --- Results / completion (REQ-UX-50..53) DOM references ---
+  const completionBannerEl = document.getElementById('completion-banner');
+  const completionEmptyEl = document.getElementById('completion-empty');
+  const completionEmptySetupBtn = document.getElementById('completion-empty-setup-btn');
+  const completionChampionEl = document.getElementById('completion-champion');
+  const completionSummaryEl = document.getElementById('completion-summary');
+  const completionStandingsEl = document.getElementById('completion-standings');
+  const completionBracketEl = document.getElementById('completion-bracket');
+  const completionBracketContentEl = document.getElementById('completion-bracket-content');
+  const completionActionsEl = document.getElementById('completion-actions');
+  const completionShareBtn = document.getElementById('completion-share-btn');
+  const completionExportBtn = document.getElementById('completion-export-btn');
+  const completionStartAnotherBtn = document.getElementById('completion-start-another-btn');
 
   const kingSetup              = document.getElementById('king-setup');
   const startKingBtn           = document.getElementById('start-king-btn');
@@ -180,7 +205,14 @@
     shareTournamentBtn.addEventListener('click', handleShareTournament);
     requestAccessBtn.addEventListener('click', handleRequestAccess);
     accessMembers.addEventListener('click', handleAccessDecision);
-    matchFilters.addEventListener('click', handleMatchFilter);
+    sessionNotFoundResetBtn.addEventListener('click', handleStartLocalSetup);
+    completionEmptySetupBtn.addEventListener('click', function () { handleNavClick('setup'); });
+    completionShareBtn.addEventListener('click', handleShareTournament);
+    completionExportBtn.addEventListener('click', handleCompletionExport);
+    completionStartAnotherBtn.addEventListener('click', function () {
+      if (tournamentState) handleResetTournament();
+      else if (kingState) handleResetKing();
+    });
     retryScoreBtn.addEventListener('click', function () {
       if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, null, lastScoreCommand.status);
     });
@@ -834,6 +866,13 @@
   function applyWorkspace() {
     var view = computeWorkspace(buildWorkspaceInput());
     workspaceEl.dataset.view = view.view;
+    // REQ-UX-80: entering an empty Setup focuses the name input — the guard
+    // resets as soon as the empty-Setup condition no longer holds (a player
+    // is added, or the view changes), so re-render while it still holds
+    // (typing, chip taps) never steals focus again.
+    var isEmptySetup = view.view === 'setup' && players.length === 0;
+    if (isEmptySetup && !emptySetupFocused) { nameInput.focus(); emptySetupFocused = true; }
+    else if (!isEmptySetup) { emptySetupFocused = false; }
     return view;
   }
 
@@ -848,6 +887,8 @@
     renderReadiness(view);
     renderTournamentSetupState(view);
     renderTeamsForkState(view);
+    renderCommandCenter();
+    renderCompletion();
   }
 
   /** REQ-UX-10: compact "{players} · {genderCounts} · {teamSize}vs{teamSize}
@@ -937,6 +978,569 @@
     });
   }
 
+  // --- Tournament command center (REQ-UX-30..35) ---
+
+  /** Snapshot survival (design "restore focus by element id"): captures enough
+   * to re-find the focused control (Next Match action, a match-day row, a
+   * "Show all" summary, or an access Approve/Deny button) after an async
+   * snapshot rebuilds it. Null when focus is elsewhere. */
+  function captureCommandCenterFocus() {
+    var active = document.activeElement;
+    if (!active || active === document.body) return null;
+    if (active === nextMatchCardEl.querySelector('.next-match-card__action')) {
+      return { type: 'next-match-action' };
+    }
+    if (accessMembers.contains(active) && active.dataset.member) {
+      return { type: 'access-member', member: active.dataset.member, access: active.dataset.access };
+    }
+    var summary = active.closest && active.closest('.match-day-section__more > summary');
+    if (summary) {
+      var section = summary.closest('.match-day-section');
+      if (section) return { type: 'show-all-summary', sectionId: section.id };
+    }
+    var rowBtn = active.closest && active.closest('.match-card[data-match-id] .match-card__btn');
+    if (rowBtn) {
+      var row = rowBtn.closest('.match-card[data-match-id]');
+      if (row) return { type: 'match-row-action', matchId: row.dataset.matchId };
+    }
+    return null;
+  }
+
+  /** Restores focus captured by captureCommandCenterFocus() after the
+   * relevant subtree has been rebuilt. A missing target (e.g. the match
+   * finished and its row/button no longer exists) is a silent no-op. */
+  function restoreCommandCenterFocus(ref) {
+    if (!ref) return;
+    var target = null;
+    if (ref.type === 'next-match-action') {
+      target = nextMatchCardEl.querySelector('.next-match-card__action');
+    } else if (ref.type === 'access-member') {
+      target = accessMembers.querySelector('[data-member="' + ref.member + '"][data-access="' + ref.access + '"]') ||
+        accessMembers.querySelector('[data-member="' + ref.member + '"]');
+    } else if (ref.type === 'show-all-summary') {
+      var section = document.getElementById(ref.sectionId);
+      target = section && section.querySelector('.match-day-section__more > summary');
+    } else if (ref.type === 'match-row-action') {
+      var row = document.querySelector('.match-card[data-match-id="' + ref.matchId + '"]');
+      target = row && row.querySelector('.match-card__btn');
+    }
+    if (target) target.focus();
+  }
+
+  /** Owns everything below the status strip inside the Tournament destination:
+   * Next Match card, stage progress and the stacked Live/Pending/Recently
+   * finished sections — called from renderChrome() only (D3/R3), never from
+   * renderTournament()/renderKing(), so it always sees a fresh
+   * currentResolution/tournamentState and tolerates a full re-render on every
+   * snapshot without resetting focus or scroll elsewhere in the page. The
+   * inline access-request card's content is still owned by
+   * renderTournamentOps() (called from renderTournament()) — only its DOM
+   * position moved; this function does not touch it.
+   * King of the Court mode (REQ-UX-35) replaces this whole block with its own
+   * throne/queue UI, so everything here stays hidden while a King game is
+   * active. */
+  function renderCommandCenter() {
+    sessionNotFoundEl.hidden = workspaceSessionState !== 'notFound';
+    if (workspaceSessionState === 'notFound') {
+      tournamentSection.hidden = true;
+      kingSection.hidden = true;
+      return;
+    }
+    if (!tournamentState) {
+      nextMatchCardEl.hidden = true;
+      tournamentStageProgressEl.hidden = true;
+      tournamentLiveSectionEl.hidden = true;
+      tournamentPendingSectionEl.hidden = true;
+      tournamentRecentlyFinishedSectionEl.hidden = true;
+      return;
+    }
+    var resolution = tournamentState.format ? currentResolution : null;
+    var day = tournamentDay({
+      matches: tournamentState.matches,
+      groups: tournamentState.groups,
+      format: tournamentState.format || null,
+      resolution: resolution,
+    });
+    renderNextMatchCard(day);
+    renderStageProgress(day);
+    renderMatchDaySection(tournamentLiveSectionEl, 'live', day.live, day.counts.live);
+    renderMatchDaySection(tournamentPendingSectionEl, 'pending', day.pending, day.counts.pending);
+    renderMatchDaySection(tournamentRecentlyFinishedSectionEl, 'recentlyFinished', day.recentlyFinished, day.counts.recentlyFinished);
+  }
+
+  /** REQ-UX-31: the Next Match card and its 4 reason states. The action
+   * button reuses the existing handleScoreboard() flow (same live-scoreboard
+   * panel, expectedRevision/conflict semantics as every other entry point). */
+  function renderNextMatchCard(day) {
+    nextMatchCardEl.hidden = false;
+    nextMatchCardEl.innerHTML = '';
+    var complete = currentResolution ? currentResolution.complete : isTournamentComplete(tournamentState.matches);
+
+    var card = document.createElement('div');
+    card.className = 'next-match-card__inner';
+
+    var heading = document.createElement('h3');
+    heading.className = 'next-match-card__label';
+    heading.textContent = t('workspace.tournament.nextMatch.heading');
+    card.appendChild(heading);
+
+    if (day.nextMatch) {
+      var match = day.nextMatch;
+      var name1 = match.team1Id ? resolveMatchTeamName(match.team1Id) : formatSlotLabel(match.team1Slot);
+      var name2 = match.team2Id ? resolveMatchTeamName(match.team2Id) : formatSlotLabel(match.team2Slot);
+
+      var teamsEl = document.createElement('p');
+      teamsEl.className = 'next-match-card__teams';
+      teamsEl.innerHTML = escapeHTML(name1) +
+        ' <span class="next-match-card__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+        escapeHTML(name2);
+      card.appendChild(teamsEl);
+
+      var metaParts = [];
+      if (match.groupId) {
+        metaParts.push(t('tournament.group', { id: match.groupId }));
+      } else if (match.stageId) {
+        // Knockout matches carry no groupId — name the knockout stage instead
+        // (e.g. "Quarterfinals"), looked up from the same stageProgress list
+        // rendered just above.
+        var matchStage = (day.stageProgress || []).filter(function (s) { return s.id === match.stageId; })[0];
+        if (matchStage) metaParts.push(t(matchStage.label));
+      }
+      // Set Rules are unset (pointsTo: null) for classic sessions — same guard
+      // already used by renderStagePanel()/renderScoreboardPanel().
+      if (match.rules && match.rules.pointsTo != null) metaParts.push(formatStageRuleLabel(match.rules));
+      if (metaParts.length) {
+        var meta = document.createElement('p');
+        meta.className = 'next-match-card__meta';
+        meta.textContent = metaParts.join(' · ');
+        card.appendChild(meta);
+      }
+
+      if (!isReadOnly) {
+        var actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
+        actionBtn.className = 'btn btn--success btn--large next-match-card__action';
+        actionBtn.textContent = match.status === 'live'
+          ? t('workspace.tournament.nextMatch.resumeBtn') : t('workspace.tournament.nextMatch.scoreBtn');
+        actionBtn.addEventListener('click', (function (mid) { return function () { handleScoreboard(mid); }; })(match.matchId));
+        card.appendChild(actionBtn);
+      }
+    } else {
+      var reasonEl = document.createElement('p');
+      reasonEl.className = 'next-match-card__reason';
+      reasonEl.textContent = t(complete
+        ? 'workspace.tournament.nextMatch.reason.complete'
+        : 'workspace.tournament.nextMatch.reason.' + day.nextMatchReason);
+      card.appendChild(reasonEl);
+
+      if (complete) {
+        var resultsLink = document.createElement('button');
+        resultsLink.type = 'button';
+        resultsLink.className = 'btn btn--large next-match-card__results-link';
+        resultsLink.textContent = t('workspace.tournament.nextMatch.seeResults');
+        resultsLink.addEventListener('click', function () { handleNavClick('results'); });
+        card.appendChild(resultsLink);
+      }
+    }
+
+    nextMatchCardEl.appendChild(card);
+  }
+
+  /** REQ-UX-33: played/total per group (classic) or per stage (formatted
+   * sessions), rendered as text — never color-only (REQ-UX-72). Classic
+   * group labels use the forward-registered 'tournament.day.stageProgress.group'
+   * key (js/tournament-day.js); formatted stage labels reuse the same
+   * t(stage.label) pattern already used by renderStagePanel(). */
+  function renderStageProgress(day) {
+    var stages = day.stageProgress || [];
+    tournamentStageProgressEl.hidden = stages.length === 0;
+    tournamentStageProgressEl.innerHTML = '';
+    if (stages.length === 0) return;
+
+    var heading = document.createElement('h3');
+    heading.className = 'stage-progress__heading';
+    heading.textContent = t('workspace.tournament.stageProgress.heading');
+    tournamentStageProgressEl.appendChild(heading);
+
+    var ul = document.createElement('ul');
+    ul.className = 'stage-progress__list';
+    stages.forEach(function (stage) {
+      var li = document.createElement('li');
+      li.className = 'stage-progress__item';
+      var label = stage.kind === 'group' ? t(stage.label, { group: stage.id }) : t(stage.label);
+      // A classic group has no real stage dependency, so its 'pending' status
+      // (0 played) reads as neutral "Not started" rather than the formatted
+      // engine's "Locked" — 'pending' legitimately means locked-by-a-prior-
+      // stage only for a real (formatted) stage.
+      var statusLabel = (stage.kind === 'group' && stage.status === 'pending')
+        ? t('workspace.tournament.stageProgress.notStarted')
+        : formatStageStatusLabel(stage.status);
+      li.textContent = label + ' — ' +
+        t('workspace.tournament.stageProgress.count', { played: stage.played, total: stage.total }) +
+        ' · ' + statusLabel;
+      ul.appendChild(li);
+    });
+    tournamentStageProgressEl.appendChild(ul);
+  }
+
+  /** REQ-UX-32: Live / Pending / Recently finished, each showing its count and
+   * collapsing anything past TOURNAMENT_DAY_COLLAPSE_AFTER (5) behind a
+   * "Show all (N)" disclosure — tournamentDay() always returns the full
+   * array; the collapse itself is this rendering concern. */
+  function renderMatchDaySection(container, kind, matches, count) {
+    // Snapshot survival: a "Show all" disclosure the organizer already opened
+    // must stay open across a re-render triggered by an unrelated snapshot —
+    // captured before innerHTML clears it, restored on the rebuilt <details>.
+    var wasOpen = !!container.querySelector('.match-day-section__more[open]');
+    container.hidden = count === 0;
+    container.innerHTML = '';
+    if (count === 0) return;
+
+    var heading = document.createElement('h3');
+    heading.className = 'match-day-section__heading';
+    heading.textContent = t('workspace.tournament.section.' + kind, { count: count });
+    container.appendChild(heading);
+
+    var ul = document.createElement('ul');
+    ul.className = 'match-list';
+    matches.slice(0, TOURNAMENT_DAY_COLLAPSE_AFTER).forEach(function (m) { ul.appendChild(renderMatchDayRow(m)); });
+    container.appendChild(ul);
+
+    if (count > TOURNAMENT_DAY_COLLAPSE_AFTER) {
+      var details = document.createElement('details');
+      details.className = 'disclosure match-day-section__more';
+      details.open = wasOpen;
+      var summary = document.createElement('summary');
+      summary.className = 'disclosure__summary';
+      summary.textContent = t('workspace.tournament.showAll', { count: count });
+      details.appendChild(summary);
+      var moreUl = document.createElement('ul');
+      moreUl.className = 'match-list disclosure__content';
+      matches.slice(TOURNAMENT_DAY_COLLAPSE_AFTER).forEach(function (m) { moreUl.appendChild(renderMatchDayRow(m)); });
+      details.appendChild(moreUl);
+      container.appendChild(details);
+    }
+  }
+
+  /** One row for a command-center list — reuses the existing .match-card
+   * markup/CSS (same as renderMatchList()/renderStagePanel()) so no new
+   * match-row styling is needed. data-match-id backs snapshot-survival focus
+   * restoration (captureCommandCenterFocus()/restoreCommandCenterFocus()). */
+  function renderMatchDayRow(match) {
+    var name1 = match.team1Id ? resolveMatchTeamName(match.team1Id) : formatSlotLabel(match.team1Slot);
+    var name2 = match.team2Id ? resolveMatchTeamName(match.team2Id) : formatSlotLabel(match.team2Slot);
+    var hasScore = match.score1 != null && match.score2 != null;
+
+    var li = document.createElement('li');
+    li.dataset.status = match.status;
+    li.dataset.matchId = match.matchId;
+    li.className = 'match-card' + (match.played ? ' match-card--played' : '');
+
+    var row = document.createElement('div');
+    row.className = 'match-card__row';
+
+    var teamsEl = document.createElement('span');
+    teamsEl.className = 'match-card__teams';
+    teamsEl.innerHTML = escapeHTML(name1) +
+      ' <span class="match-card__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+      escapeHTML(name2);
+    row.appendChild(teamsEl);
+
+    var scoreEl = document.createElement('span');
+    scoreEl.className = 'match-card__score' + (hasScore ? ' match-card__score--played' : '');
+    scoreEl.textContent = hasScore ? (match.score1 + ' – ' + match.score2) : '–';
+    row.appendChild(scoreEl);
+
+    if (!isReadOnly && match.scorable) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'match-card__btn';
+      btn.textContent = match.status === 'live'
+        ? t('workspace.tournament.matchRow.resume') : t('workspace.tournament.matchRow.score');
+      btn.addEventListener('click', (function (mid) { return function () { handleScoreboard(mid); }; })(match.matchId));
+      row.appendChild(btn);
+    }
+
+    li.appendChild(row);
+    return li;
+  }
+
+  // --- Results / completion (REQ-UX-50..53) ---
+
+  /** Recomputes the pure day/standings/resolution/complete projection Results
+   * needs from scratch every call — mirrors renderCommandCenter()'s pattern
+   * but, unlike it, MUST pass full standings/king/groups (the command center
+   * never needed outcome, so it omits them). Deliberately independent of
+   * currentResolution (only fresh once renderTournament() has run) so Results
+   * stays correct even when Tournament never rendered this session. Returns
+   * null when neither a tournament nor a King game exists. */
+  function buildCompletionDay() {
+    if (!tournamentState && !kingState) return null;
+    var standings = tournamentState
+      ? calculateStandings(tournamentState.groups, tournamentState.matches, tournamentState.format ? { extendedTiebreak: true } : undefined)
+      : null;
+    var resolution = (tournamentState && tournamentState.format)
+      ? resolveFormat(tournamentState.format, { groups: tournamentState.groups, matches: tournamentState.matches, standings: standings })
+      : null;
+    var complete = tournamentState
+      ? (resolution ? resolution.complete : isTournamentComplete(tournamentState.matches))
+      : isKingGameOver(kingState);
+    var day = tournamentDay({
+      matches: tournamentState ? tournamentState.matches : [],
+      teams: tournamentState ? tournamentState.teams : [],
+      groups: tournamentState ? tournamentState.groups : [],
+      format: tournamentState ? (tournamentState.format || null) : null,
+      resolution: resolution,
+      standings: standings,
+      king: kingState,
+    });
+    return { day: day, standings: standings, resolution: resolution, complete: complete };
+  }
+
+  /** Team display name for the champion card / export — resolveMatchTeamName()
+   * only knows tournamentState.teams, so a King champion (no tournamentState)
+   * falls back to the winning team object tournamentDay() already resolved. */
+  function resolveCompletionTeamName(teamId) {
+    if (tournamentState) return resolveMatchTeamName(teamId);
+    if (kingState && kingState.winner && kingState.winner.id === teamId) return kingState.winner.name;
+    return teamId;
+  }
+
+  /** REQ-UX-50: the 4 champion-card variants (champion/groupWinners/tiedLead/
+   * kingChampion) plus the "none" no-op — hidden entirely before completion
+   * (the in-progress banner owns that state) or when there is nothing to
+   * declare. Every branch uses .textContent, never innerHTML (no escapeHTML()
+   * needed) and clamps long names to 2 lines with a title fallback (REQ-UX-73,
+   * matching the scoreboard team-name pattern from slice F). */
+  function renderCompletionChampion(outcome, complete) {
+    completionChampionEl.innerHTML = '';
+    completionChampionEl.hidden = !complete || outcome.kind === 'none';
+    if (completionChampionEl.hidden) return;
+
+    var icon = document.createElement('p');
+    icon.className = 'champion-card__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '🏆';
+    completionChampionEl.appendChild(icon);
+
+    if (outcome.kind === 'champion' || outcome.kind === 'kingChampion') {
+      var heading = document.createElement('p');
+      heading.className = 'champion-card__heading';
+      heading.textContent = t('workspace.results.champion.heading');
+      completionChampionEl.appendChild(heading);
+
+      var name = document.createElement('p');
+      name.className = 'champion-card__name';
+      var championName = resolveCompletionTeamName(outcome.championTeamId);
+      name.textContent = championName;
+      name.title = championName;
+      completionChampionEl.appendChild(name);
+    } else if (outcome.kind === 'groupWinners') {
+      var gHeading = document.createElement('p');
+      gHeading.className = 'champion-card__heading';
+      gHeading.textContent = t('workspace.results.groupWinners.heading');
+      completionChampionEl.appendChild(gHeading);
+
+      var winnersEl = document.createElement('div');
+      winnersEl.className = 'champion-card__winners';
+      outcome.groupWinners.forEach(function (winner) {
+        var card = document.createElement('div');
+        card.className = 'champion-card__winner';
+
+        var groupLabel = document.createElement('p');
+        groupLabel.className = 'champion-card__winner-group';
+        groupLabel.textContent = t('tournament.group', { id: winner.groupId });
+        card.appendChild(groupLabel);
+
+        var winnerName = document.createElement('p');
+        winnerName.className = 'champion-card__winner-name';
+        var teamText = resolveCompletionTeamName(winner.teamId) + (winner.tied ? ' ' + t('workspace.results.groupWinners.tied') : '');
+        winnerName.textContent = teamText;
+        winnerName.title = teamText;
+        card.appendChild(winnerName);
+
+        winnersEl.appendChild(card);
+      });
+      completionChampionEl.appendChild(winnersEl);
+    } else if (outcome.kind === 'tiedLead') {
+      var tHeading = document.createElement('p');
+      tHeading.className = 'champion-card__heading';
+      tHeading.textContent = t('workspace.results.tiedLead.heading');
+      completionChampionEl.appendChild(tHeading);
+
+      var tiedNames = document.createElement('p');
+      tiedNames.className = 'champion-card__name';
+      var tiedText = outcome.tiedTeamIds.map(resolveCompletionTeamName).join(' · ');
+      tiedNames.textContent = tiedText;
+      tiedNames.title = tiedText;
+      completionChampionEl.appendChild(tiedNames);
+    }
+  }
+
+  /** REQ-UX-51 summary line: "{format|King} · {N} teams · {played}/{total}
+   * matches played" (tournament) or "{King of the Court} · {N} rallies
+   * played" (King). Elapsed date/time is intentionally omitted — the design
+   * left it an open question (updatedAt is null on local saves). */
+  function renderCompletionSummary(day) {
+    var parts = [];
+    if (tournamentState) {
+      // Reads the SESSION's own format (REQ-UX-51), not the Setup draft's
+      // selectedFormatPreset — that module var reflects whatever is currently
+      // selected in Setup and goes stale/wrong for an already-running session
+      // restored from a reload or a scorer/spectator's #s= link, which never
+      // populates it at all (corrective pass).
+      var formatPresetId = tournamentState.format ? tournamentState.format.preset : 'classic';
+      parts.push(t('tournament.format.preset.' + formatPresetId));
+      parts.push(t('workspace.summary.teams', { count: tournamentState.teams.length }));
+      parts.push(t('workspace.results.summary.matches', { played: day.progress.played, total: day.progress.total }));
+    } else if (kingState) {
+      parts.push(t('king.heading'));
+      parts.push(t('workspace.results.summary.rallies', { count: kingState.rallyLog.length }));
+    }
+    completionSummaryEl.textContent = parts.join(' · ');
+  }
+
+  /** REQ-UX-52 label callbacks for formatTournamentSummary() (js/tournament-day.js,
+   * pure/i18n-free by design — D6) — this is the one place that supplies the
+   * already-translated strings the pure module asks for. */
+  function buildCompletionSummaryLabels() {
+    return {
+      title: t('workspace.results.export.title'),
+      championLine: function (teamId) {
+        return t('workspace.results.export.championLine', { team: resolveCompletionTeamName(teamId) });
+      },
+      groupWinnerLine: function (groupId, teamId, tied) {
+        return t('workspace.results.export.groupWinnerLine', { group: t('tournament.group', { id: groupId }), team: resolveCompletionTeamName(teamId) }) +
+          (tied ? ' ' + t('workspace.results.groupWinners.tied') : '');
+      },
+      tiedLeadLine: function (teamIds) {
+        return t('workspace.results.export.tiedLeadLine', { teams: teamIds.map(resolveCompletionTeamName).join(' / ') });
+      },
+      noChampionLine: t('workspace.results.export.noChampion'),
+      stageLine: function (stage) {
+        var label = stage.kind === 'group' ? t(stage.label, { group: stage.id }) : t(stage.label);
+        return label + ': ' + t('workspace.tournament.stageProgress.count', { played: stage.played, total: stage.total });
+      },
+      matchLine: function (match) {
+        var name1 = match.team1Id ? resolveCompletionTeamName(match.team1Id) : formatSlotLabel(match.team1Slot);
+        var name2 = match.team2Id ? resolveCompletionTeamName(match.team2Id) : formatSlotLabel(match.team2Slot);
+        return name1 + ' ' + match.score1 + ' – ' + match.score2 + ' ' + name2;
+      },
+    };
+  }
+
+  /** REQ-UX-52: builds the plain-text summary via the pure formatTournamentSummary()
+   * contract, then appends per-team final standings (outside that contract — it has
+   * no per-row standings label, only stage/match lines) before handing the text to
+   * Web Share, else the clipboard, else the existing fallback textarea. */
+  function handleCompletionExport() {
+    var built = buildCompletionDay();
+    if (!built) return;
+    var text = formatTournamentSummary(built.day, buildCompletionSummaryLabels());
+    if (tournamentState && built.standings) {
+      var standingsLines = [];
+      tournamentState.groups.forEach(function (group) {
+        var rows = built.standings.get(group.id) || [];
+        standingsLines.push(t('tournament.group', { id: group.id }) + ':');
+        rows.forEach(function (row, idx) {
+          standingsLines.push((idx + 1) + '. ' + resolveMatchTeamName(row.teamId) + ' — ' + row.points + ' ' + t('tournament.col.points'));
+        });
+      });
+      if (standingsLines.length) text += '\n' + standingsLines.join('\n');
+    }
+    if (navigator.share) {
+      navigator.share({ text: text }).then(function () {
+        showCompletionExportConfirmation('workspace.results.export.shared');
+      }).catch(function () { /* user cancelled the share sheet — no confirmation, no fallback */ });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        showCompletionExportConfirmation('workspace.results.export.copied');
+      }).catch(function () { fallbackCopyText(text, function () { showCompletionExportConfirmation('workspace.results.export.copied'); }); });
+    } else {
+      fallbackCopyText(text, function () { showCompletionExportConfirmation('workspace.results.export.copied'); });
+    }
+  }
+
+  /** Same temporary-label pattern as showShareCopied() (REQ-UX-52), reusing its
+   * confirmed-state class but scoped to the export button and its own distinct
+   * "Copied"/"Shared" text depending on which delivery path actually ran. */
+  function showCompletionExportConfirmation(labelKey) {
+    var originalText = completionExportBtn.textContent;
+    completionExportBtn.textContent = t(labelKey);
+    completionExportBtn.classList.add('btn--share--copied');
+    setTimeout(function () {
+      completionExportBtn.textContent = originalText;
+      completionExportBtn.classList.remove('btn--share--copied');
+    }, 2500);
+  }
+
+  /** Owns #completion-section — called from renderChrome() only (D3), never
+   * from renderTournament()/renderKing(), so it tolerates a snapshot re-render
+   * without depending on either having run first this cycle. Every rebuilt
+   * subtree (champion card, standings, bracket) holds no focusable controls —
+   * the Share/Export/Start-another buttons are static index.html nodes only
+   * toggled via .hidden, never recreated — so no explicit focus capture/
+   * restore is needed here (REQ-UX-06). */
+  function renderCompletion() {
+    var built = buildCompletionDay();
+    completionEmptyEl.hidden = !!built;
+    if (!built) {
+      completionBannerEl.hidden = true;
+      completionChampionEl.hidden = true;
+      completionSummaryEl.textContent = '';
+      completionStandingsEl.innerHTML = '';
+      completionStandingsEl.hidden = true;
+      completionBracketEl.hidden = true;
+      completionActionsEl.hidden = true;
+      return;
+    }
+
+    completionBannerEl.hidden = built.complete;
+    renderCompletionChampion(built.day.outcome, built.complete);
+    renderCompletionSummary(built.day);
+
+    completionStandingsEl.innerHTML = '';
+    completionStandingsEl.hidden = !tournamentState;
+    if (tournamentState) {
+      tournamentState.groups.forEach(function (group) {
+        completionStandingsEl.appendChild(renderStandingsTable(group, built.standings.get(group.id) || []));
+      });
+    }
+
+    var knockoutStages = built.resolution
+      ? built.resolution.stages.filter(function (stage) { return stage.kind === 'knockout'; })
+      : [];
+    completionBracketEl.hidden = knockoutStages.length === 0;
+    completionBracketContentEl.innerHTML = '';
+    knockoutStages.forEach(function (stage) { completionBracketContentEl.appendChild(renderStagePanel(stage, { readOnly: true })); });
+
+    completionActionsEl.hidden = false;
+    completionShareBtn.hidden = !tournamentState;
+    // REQ-UX-60: reset is organizer-only (cf. resetTournamentBtn.hidden = snapshot.role
+    // !== 'owner' at subscribeToSession()) — isReadOnly alone is false for an approved
+    // scorer, which previously let a scorer see this button too (corrective pass).
+    completionStartAnotherBtn.hidden = tournamentState
+      ? !(sessionSnapshot ? sessionSnapshot.role === 'owner' : !isReadOnly)
+      : isReadOnly;
+  }
+
+  /** REQ-UX-62: leaves the not-found state and returns to a fresh local
+   * organizer flow — clears the session/hash rather than reloading. */
+  function handleStartLocalSetup() {
+    if (repositoryUnsubscribe) { repositoryUnsubscribe(); repositoryUnsubscribe = null; }
+    sessionId = null;
+    sessionSnapshot = null;
+    workspaceSessionState = 'ok';
+    isReadOnly = false;
+    tournamentState = null;
+    kingState = null;
+    currentView = null;
+    tournamentSection.hidden = true;
+    kingSection.hidden = true;
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    updateUI();
+  }
+
   /** Rebuilds buttons only when the nav-id list itself changes (role/session
    * flip); otherwise every button node is reused and patched in place. */
   function patchWorkspaceNavItems(view) {
@@ -1019,13 +1623,45 @@
     renderChrome();
   }
 
+  /** REQ-UX-04: the center CTA performs its contextual ACTION through the
+   * SAME gate/handler an in-page trigger already uses — it never merely
+   * flips `currentView` (that was the fifth-destination bug). `primaryAction.id`
+   * doubles as the action id (already the discriminator the workspace tests
+   * assert on); unknown/none falls back to the plain view switch. */
   function handleCenterActionClick(primaryAction) {
     if (!primaryAction.enabled) {
       if (primaryAction.blockedReasonKey) showWorkspaceToast(t(primaryAction.blockedReasonKey));
       return;
     }
-    currentView = primaryAction.targetView;
+    switch (primaryAction.id) {
+      case 'generateTeams':
+        handleGenerate();
+        currentView = 'teams';
+        break;
+      case 'startTournament':
+        handleStartTournament();
+        if (tournamentState) currentView = 'tournament';
+        break;
+      case 'scoreNext':
+        if (tournamentState) {
+          var resolution = tournamentState.format ? currentResolution : null;
+          var day = tournamentDay({ matches: tournamentState.matches, groups: tournamentState.groups, format: tournamentState.format || null, resolution: resolution });
+          if (day.nextMatch) handleScoreboard(day.nextMatch.matchId);
+        }
+        currentView = 'tournament';
+        break;
+      case 'shareResults':
+        handleShareTournament({ currentTarget: completionShareBtn });
+        currentView = 'results';
+        break;
+      case 'requestAccess':
+        currentView = 'tournament';
+        break;
+      default:
+        currentView = primaryAction.targetView;
+    }
     renderChrome();
+    if (primaryAction.id === 'requestAccess' && accessLabel && !accessLabel.disabled) accessLabel.focus();
   }
 
   function showWorkspaceToast(message) {
@@ -1374,6 +2010,16 @@
     activeMatchId = null;
     scoreboardMatchId = null;
     liveScore = { score1: 0, score2: 0 };
+    // Match ids are deterministic (groupId-team1Id-team2Id from index-based team ids,
+    // e.g. "A-t1-t2") — a brand-new, same-shaped tournament can legitimately reuse an
+    // OLD tournament's match id. Any lingering conflict/offline/denied scratch state
+    // MUST be dropped on reset, or a stale command from the discarded tournament could
+    // wrongly "restore" onto an unrelated match in the new one (REQ-UX-42 integrity).
+    pendingFinish = null;
+    conflictServerResult = null;
+    scoreboardErrorMessage = null;
+    lastScoreCommand = null;
+    setSyncState(null);
     localStorage.removeItem('bv-tournament');
     history.replaceState(null, '', window.location.pathname + window.location.search);
     tournamentSection.hidden = true;
@@ -1573,16 +2219,26 @@
       var confirmedMatch = tournamentState.matches.find(function (match) { return match.id === matchId; });
       var command = { matchId: matchId, score1: score1, score2: score2, status: status, expectedRevision: confirmedMatch.revision || 0 };
       if (tournamentRepository && sessionId) {
-        lastScoreCommand = command; setSyncState('saving');
+        lastScoreCommand = command; setSyncState('saving'); refreshScoreboardPanel();
         tournamentRepository.saveResult(sessionId, command).then(function (result) {
           if (result.status !== 'synced') {
+            conflictServerResult = result.status === 'conflict' ? (result.current || null) : null;
             setSyncState(result.status); if (errorEl) errorEl.textContent = t('tournament.sync.' + result.status);
+            refreshScoreboardPanel();
+            if (result.status === 'conflict') {
+              var conflictAlert = scoreboardPanelEl.querySelector('.scoring-conflict');
+              if (conflictAlert) conflictAlert.focus();
+            }
             return;
           }
-          lastScoreCommand = null; setSyncState('synced');
+          lastScoreCommand = null;
+          conflictServerResult = null;
           activeMatchId = null;
           scoreboardMatchId = null;
           liveScore = { score1: 0, score2: 0 };
+          setSyncState('synced');
+          refreshScoreboardPanel();
+          focusAfterScoreSynced();
         });
         return;
       }
@@ -1596,13 +2252,19 @@
       activeMatchId = null;
       scoreboardMatchId = null;
       liveScore = { score1: 0, score2: 0 };
+      conflictServerResult = null;
       saveTournamentState();
       pushShareURL();
       renderTournament();
       renderChrome(); // local (non-Firebase) score commit — hasNextMatch may change
+      focusAfterScoreSynced(); // REQ-UX-44: local mode reuses the synced-state focus target too
     } catch (e) {
       setSyncState('invalid');
-      if (errorEl) errorEl.textContent = t(e.message) || e.message;
+      scoreboardErrorMessage = t(e.message) || e.message;
+      if (errorEl) errorEl.textContent = scoreboardErrorMessage;
+      // A manual Finish confirmed against a since-invalid score (e.g. Set Rules reject
+      // it) must drop back out of the confirm row instead of leaving it stuck on screen.
+      if (pendingFinish) { pendingFinish = null; refreshScoreboardPanel(); }
     }
   }
 
@@ -1619,11 +2281,24 @@
     }
     activeMatchId = null;
     scoreboardMatchId = matchId;
+    pendingFinish = null;
+    scoreboardErrorMessage = null;
     var match = tournamentState.matches.find(function (m) { return m.id === matchId; });
-    liveScore = {
-      score1: (match && match.played) ? match.score1 : 0,
-      score2: (match && match.played) ? match.score2 : 0,
-    };
+    // Reopening a match with an unresolved write (conflict/offline/denied) restores the
+    // exact local not-saved attempt instead of wiping it — REQ-UX-42's "labelled as not
+    // saved" only means something if the attempt is still visible when the view reopens.
+    // conflictServerResult is intentionally NOT cleared here: its lifecycle is owned by
+    // commitScore() (set fresh on every conflict) and Discard, so it survives a Back ->
+    // reopen of the SAME match and stays simply unread — via the commandForThisMatch
+    // gate in renderScoreboardPanel() — whenever a DIFFERENT match is open.
+    if (lastScoreCommand && lastScoreCommand.matchId === matchId) {
+      liveScore = { score1: lastScoreCommand.score1, score2: lastScoreCommand.score2 };
+    } else {
+      liveScore = {
+        score1: (match && match.played) ? match.score1 : 0,
+        score2: (match && match.played) ? match.score2 : 0,
+      };
+    }
     renderTournament();
     scoreboardPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -1695,10 +2370,14 @@
     if (!tournamentRepository || !sid) return;
     if (repositoryUnsubscribe) repositoryUnsubscribe();
     repositoryUnsubscribe = tournamentRepository.watchSession(sid, function (snapshot) {
+      // Snapshot survival: this listener fires async/independently of user action —
+      // capture focus before the rebuild so an in-progress tap is never dropped.
+      var focusRef = captureCommandCenterFocus();
       if (!snapshot || !snapshot.tournament) {
         if (snapshot && snapshot.error) console.warn(snapshot.error);
         workspaceSessionState = 'notFound';
         renderChrome();
+        restoreCommandCenterFocus(focusRef);
         return;
       }
       workspaceSessionState = 'ok';
@@ -1707,6 +2386,9 @@
       isReadOnly = snapshot.legacy || (snapshot.role !== 'owner' && snapshot.role !== 'scorer');
       readonlyBanner.hidden = !isReadOnly;
       resetTournamentBtn.hidden = snapshot.role !== 'owner';
+      // Revoked mid-scoring (REQ-UX-43): mirror the 7th sync state in the persistent
+      // strip only for a genuine revocation, never for an ordinary first-time spectator.
+      if (snapshot.accessStatus === 'revoked') setSyncState('revoked');
       if (tournamentState.players) {
         players.length = 0;
         players.push.apply(players, tournamentState.players);
@@ -1716,6 +2398,7 @@
       tournamentSection.hidden = false;
       renderTournament();
       updateUI();
+      restoreCommandCenterFocus(focusRef);
     });
   }
 
@@ -1723,6 +2406,14 @@
     syncStatus.dataset.state = state || '';
     syncStatus.textContent = state ? t('tournament.sync.' + state) : '';
     retryScoreBtn.hidden = !lastScoreCommand || ['offline', 'denied', 'conflict', 'invalid'].indexOf(state) === -1;
+    // In-view mirror (REQ-UX-43) — a lightweight in-place patch, never a rebuild, so a
+    // structural scoreboard change (conflict block, disabled controls) stays owned by
+    // refreshScoreboardPanel() at its own well-defined call sites (see commitScore()).
+    var scoringSyncEl = document.getElementById('scoring-sync');
+    if (scoringSyncEl) {
+      scoringSyncEl.dataset.state = state || '';
+      scoringSyncEl.textContent = state ? t('tournament.sync.' + state) : '';
+    }
   }
 
   function renderTournamentOps() {
@@ -1749,7 +2440,9 @@
         if ((status === 'approved' && member.status !== 'pending') || (status === 'revoked' && member.status === 'revoked')) return;
         var button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--small';
         button.dataset.member = memberId; button.dataset.access = status;
-        button.textContent = t('tournament.access.' + (status === 'approved' ? 'approve' : 'revoke')); li.appendChild(button);
+        // REQ-UX-34: a still-pending request denies (not "revokes" — nothing was ever approved).
+        var labelKey = status === 'approved' ? 'approve' : (member.status === 'pending' ? 'deny' : 'revoke');
+        button.textContent = t('tournament.access.' + labelKey); li.appendChild(button);
       });
       accessMembers.appendChild(li);
     });
@@ -1765,16 +2458,6 @@
     var button = event.target.closest('[data-access]');
     if (!button || !tournamentRepository) return;
     tournamentRepository.setAccess(sessionId, button.dataset.member, button.dataset.access).then(function (result) { setSyncState(result.status); });
-  }
-
-  function handleMatchFilter(event) {
-    var button = event.target.closest('[data-filter]'); if (!button) return;
-    matchFilter = button.dataset.filter;
-    matchFilters.querySelectorAll('[data-filter]').forEach(function (item) {
-      item.classList.toggle('match-filters__btn--active', item === button);
-      item.setAttribute('aria-pressed', String(item === button));
-    });
-    activeMatchId = null; scoreboardMatchId = null; renderTournament();
   }
 
   // --- URL Sharing ---
@@ -1816,38 +2499,49 @@
     history.replaceState(null, '', '#t=' + encoded);
   }
 
-  function handleShareTournament() {
+  /** Shared by both the Tournament destination's #share-tournament-btn and the
+   * Results destination's #completion-share-btn — event.currentTarget decides
+   * which button shows the confirmation, so clicking Share on Results never
+   * silently animates the hidden Tournament button instead (corrective pass). */
+  function handleShareTournament(event) {
+    var btn = (event && event.currentTarget) || shareTournamentBtn;
     var url = tournamentRepository && sessionId ? window.location.href : getShareURL();
     if (!url) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {
-        showShareCopied();
+        showShareCopied(btn);
       }).catch(function () {
-        fallbackCopyText(url);
+        fallbackCopyText(url, function () { showShareCopied(btn); });
       });
     } else {
-      fallbackCopyText(url);
+      fallbackCopyText(url, function () { showShareCopied(btn); });
     }
   }
 
-  function fallbackCopyText(text) {
+  /** `onSuccess` defaults to showShareCopied() for the existing tournament
+   * Share flow; the Results export flow (REQ-UX-52) passes its own confirmation
+   * so "Copied"/"Shared" text lands on the export button, not Share's. */
+  function fallbackCopyText(text, onSuccess) {
     var ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
     ta.style.top = '-9999px';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); showShareCopied(); } catch (e) { /* silent */ }
+    try { document.execCommand('copy'); (onSuccess || showShareCopied)(); } catch (e) { /* silent */ }
     document.body.removeChild(ta);
   }
 
-  function showShareCopied() {
-    var originalText = t('tournament.share');
-    shareTournamentBtn.textContent = t('tournament.shareCopied');
-    shareTournamentBtn.classList.add('btn--share--copied');
+  /** `btn` defaults to the Tournament destination's Share button; the Results
+   * destination passes its own #completion-share-btn (see handleShareTournament()). */
+  function showShareCopied(btn) {
+    btn = btn || shareTournamentBtn;
+    var originalText = btn.textContent;
+    btn.textContent = t('tournament.shareCopied');
+    btn.classList.add('btn--share--copied');
     setTimeout(function () {
-      shareTournamentBtn.textContent = originalText;
-      shareTournamentBtn.classList.remove('btn--share--copied');
+      btn.textContent = originalText;
+      btn.classList.remove('btn--share--copied');
     }, 2500);
   }
 
@@ -1906,14 +2600,10 @@
       tournamentGroupsEl.appendChild(banner);
     }
 
-    // Live scoreboard panel
-    if (!isReadOnly && scoreboardMatchId) {
-      renderScoreboardPanel();
-      scoreboardPanelEl.hidden = false;
-    } else {
-      scoreboardPanelEl.hidden = true;
-      scoreboardPanelEl.innerHTML = '';
-    }
+    // Live scoreboard panel — stays open (in a revoked, controls-disabled state) even
+    // when isReadOnly flips true mid-scoring (REQ-UX-43); renderScoreboardPanel() owns
+    // that branch internally so a revoked view is never just silently hidden.
+    refreshScoreboardPanel();
   }
 
   /** Owner-authored custom-rules note (REQ-FMT-07), visible read-only to every role
@@ -1982,8 +2672,14 @@
    * Unresolved sides show a localized slot placeholder instead of a team name; a match's
    * action button is offered only when the projection marks it `scorable` — resolveFormat
    * already forces that to false for every match in an `invalid` stage, so this render
-   * guard never needs its own separate invalid-stage check. */
-  function renderStagePanel(stage) {
+   * guard never needs its own separate invalid-stage check.
+   * `options.readOnly` (REQ-UX-51 "bracket (read-only)", corrective pass) suppresses the
+   * action button unconditionally — the Results destination reuses this same function but
+   * must never let an owner/scorer open the scoreboard from there (wrong destination, and
+   * #completion-bracket-content is innerHTML-rebuilt per snapshot with no focus capture).
+   * The Tournament destination's own call is unchanged (options omitted → false). */
+  function renderStagePanel(stage, options) {
+    var readOnly = !!(options && options.readOnly);
     var panel = document.createElement('div');
     panel.className = 'tournament-stage';
     panel.dataset.stageStatus = stage.status;
@@ -2032,7 +2728,7 @@
 
       // A single action button covers enter + edit + live tracking, all via the existing
       // scoreboard panel (handleScoreboard pre-fills liveScore from the finished result).
-      if (!isReadOnly && projected.scorable) {
+      if (!readOnly && !isReadOnly && projected.scorable) {
         var btnGroup = document.createElement('div');
         btnGroup.className = 'match-card__btn-group';
 
@@ -2060,6 +2756,88 @@
     return panel;
   }
 
+  /** Snapshot survival for the scoring view (mirrors captureCommandCenterFocus() /
+   * restoreCommandCenterFocus()): captures enough to re-find the focused control after
+   * refreshScoreboardPanel() rebuilds the panel — including from an unrelated snapshot
+   * re-render (subscribeToSession -> renderTournament() -> refreshScoreboardPanel()).
+   * Null when focus is outside the panel. */
+  function captureScoreboardFocus() {
+    var active = document.activeElement;
+    if (!active || !scoreboardPanelEl.contains(active)) return null;
+    var cls = active.classList;
+    if (cls.contains('finish-confirm__confirm')) return { type: 'finish-confirm__confirm' };
+    if (cls.contains('finish-confirm__keep-scoring')) return { type: 'finish-confirm__keep-scoring' };
+    if (cls.contains('scoreboard__save--finish')) return { type: 'scoreboard__save--finish' };
+    if (cls.contains('scoreboard__save')) return { type: 'scoreboard__save' };
+    if (cls.contains('scoreboard__inc') || cls.contains('scoreboard__dec')) {
+      var type = cls.contains('scoreboard__inc') ? 'scoreboard__inc' : 'scoreboard__dec';
+      var teamPanels = Array.prototype.slice.call(scoreboardPanelEl.querySelectorAll('.scoreboard__team'));
+      var teamIndex = teamPanels.findIndex(function (tp) { return tp.contains(active); });
+      return { type: type, teamIndex: teamIndex };
+    }
+    if (cls.contains('scoring-conflict__retry')) return { type: 'scoring-conflict__retry' };
+    if (cls.contains('scoring-conflict__discard')) return { type: 'scoring-conflict__discard' };
+    if (cls.contains('scoring-offline__retry')) return { type: 'scoring-offline__retry' };
+    if (cls.contains('scoreboard__back')) return { type: 'scoreboard__back' };
+    return null;
+  }
+
+  /** Restores focus captured by captureScoreboardFocus() after the panel has been
+   * rebuilt. A missing target (e.g. the control no longer exists in the new state) is a
+   * silent no-op. */
+  function restoreScoreboardFocus(ref) {
+    if (!ref) return;
+    var target = null;
+    if (ref.type === 'scoreboard__inc' || ref.type === 'scoreboard__dec') {
+      var teamPanel = scoreboardPanelEl.querySelectorAll('.scoreboard__team')[ref.teamIndex];
+      target = teamPanel && teamPanel.querySelector('.' + ref.type);
+    } else {
+      target = scoreboardPanelEl.querySelector('.' + ref.type);
+    }
+    if (target) target.focus();
+  }
+
+  /** Owns scoreboard-panel visibility, the single call site every state-change flow
+   * (commitScore, subscribeToSession's isReadOnly flip, Cancel/Discard/Confirm) uses at
+   * its own well-defined moment — never automatically from setSyncState(), so an
+   * in-flight validation message (see scoreboardErrorMessage) is never torn down
+   * mid-write. Unhides before rendering so a caller's own post-call .focus() (and any
+   * focus set from inside renderScoreboardPanel() itself) lands on a visible node.
+   * Captures/restores focus internally so an UNRELATED re-render (a snapshot arriving
+   * while the user has focus in this panel) never silently drops focus to <body> — a
+   * caller with a more specific target (e.g. requestFinishConfirmation() focusing
+   * Confirm) simply re-focuses after this returns, taking precedence. */
+  function refreshScoreboardPanel() {
+    if (scoreboardMatchId) {
+      var focusRef = captureScoreboardFocus();
+      scoreboardPanelEl.hidden = false;
+      renderScoreboardPanel();
+      restoreScoreboardFocus(focusRef);
+    } else {
+      scoreboardPanelEl.hidden = true;
+      scoreboardPanelEl.innerHTML = '';
+    }
+  }
+
+  /** REQ-UX-41/F.6 focus management once a score commit resolves to 'synced': the
+   * next-match-card action, or the "See results" link once nothing remains — shared by
+   * both the Firebase and the local (non-Firebase, REQ-UX-44) commit paths. */
+  function focusAfterScoreSynced() {
+    var target = nextMatchCardEl && (nextMatchCardEl.querySelector('.next-match-card__action') ||
+      nextMatchCardEl.querySelector('.next-match-card__results-link'));
+    if (target) target.focus();
+  }
+
+  /** Shared entry point for both the manual Finish tap and the auto-finish increment
+   * path (REQ-UX-41/D11) — never commits straight away; sets pendingFinish, re-renders
+   * the in-view confirm row, and focuses Confirm (F.6). */
+  function requestFinishConfirmation(score1, score2) {
+    pendingFinish = { score1: score1, score2: score2 };
+    refreshScoreboardPanel();
+    var confirmBtn = scoreboardPanelEl.querySelector('.finish-confirm__confirm');
+    if (confirmBtn) confirmBtn.focus();
+  }
+
   function renderScoreboardPanel() {
     scoreboardPanelEl.innerHTML = '';
 
@@ -2085,9 +2863,44 @@
     // Stage Set Rules (REQ-FMT-20) — pointsTo:null (classic/unrecognized match) means
     // unrestricted free-entry scoring, so the caption and the +/- cap below are skipped.
     var rules = rulesForMatch(tournamentState.format, match.id);
+    // Sync state is match-scoped (REQ-UX-42 integrity): syncStatus.dataset.state and
+    // lastScoreCommand are single global vars shared across every match, so a conflict/
+    // denied/saving/offline state left over from a DIFFERENT match (e.g. Back -> open a
+    // different match while match A's write is still unresolved) must never leak into
+    // this match's controls, chip, or conflict/denied/offline display. Only trust the
+    // live global state when the in-flight command actually targets THIS match; a bare
+    // local validation failure (scoreboardErrorMessage, already reset per match by
+    // handleScoreboard()) is the one case that legitimately has no lastScoreCommand yet.
+    var commandForThisMatch = lastScoreCommand && lastScoreCommand.matchId === scoreboardMatchId ? lastScoreCommand : null;
+    var syncState = commandForThisMatch ? syncStatus.dataset.state : (scoreboardErrorMessage ? 'invalid' : null);
 
     var panel = document.createElement('div');
     panel.className = 'scoreboard animate__animated animate__fadeInUp';
+
+    // Header: back affordance + in-view sync chip (REQ-UX-40/43) — a distinct exit from
+    // the bottom Cancel button, matching the design wireframe's top-of-view back link.
+    var header = document.createElement('div');
+    header.className = 'scoreboard__header';
+    var backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'scoreboard__back';
+    backBtn.textContent = t('tournament.scoreboard.back');
+    backBtn.addEventListener('click', function () {
+      scoreboardMatchId = null;
+      liveScore = { score1: 0, score2: 0 };
+      renderTournament();
+    });
+    header.appendChild(backBtn);
+
+    var syncChip = document.createElement('span');
+    syncChip.id = 'scoring-sync';
+    syncChip.className = 'sync-status';
+    syncChip.setAttribute('role', 'status');
+    syncChip.setAttribute('aria-live', 'polite');
+    syncChip.dataset.state = syncState || '';
+    syncChip.textContent = syncState ? t('tournament.sync.' + syncState) : '';
+    header.appendChild(syncChip);
+    panel.appendChild(header);
 
     // Heading
     var heading = document.createElement('h3');
@@ -2104,17 +2917,48 @@
       '<span class="scoreboard__team-tag">' + escapeHTML(name2) + '</span>';
     panel.appendChild(matchLabel);
 
-    if (rules.pointsTo != null) {
+    // Stage/group + Set Rules context (REQ-UX-40) — the same convention already used by
+    // renderNextMatchCard()'s metaParts line, so the two views read identically.
+    var metaParts = [];
+    if (match.groupId) metaParts.push(t('tournament.group', { id: match.groupId }));
+    if (rules.pointsTo != null) metaParts.push(formatStageRuleLabel(rules));
+    if (metaParts.length) {
       var ruleCaption = document.createElement('p');
       ruleCaption.className = 'scoreboard__rule';
-      ruleCaption.textContent = formatStageRuleLabel(rules);
+      ruleCaption.textContent = metaParts.join(' · ');
       panel.appendChild(ruleCaption);
+    }
+
+    // Revoked mid-scoring (REQ-UX-43): the view stays open but read-only — no controls,
+    // no Save/Finish; the confirmed result already on the match is never lost/replaced.
+    if (isReadOnly) {
+      var revokedMsg = document.createElement('p');
+      revokedMsg.className = 'scoreboard__revoked';
+      revokedMsg.setAttribute('role', 'alert');
+      revokedMsg.textContent = t('tournament.sync.revoked');
+      panel.appendChild(revokedMsg);
+      var confirmedScore = document.createElement('p');
+      confirmedScore.className = 'scoreboard__match-label';
+      // The last confirmed score, whether the match is finished or still live in progress
+      // (score1/score2 are non-null the moment scoring starts) — never gated on `played`
+      // alone, so a mid-match revoke never mislabels an in-progress score as "no result".
+      confirmedScore.textContent = (match.score1 != null && match.score2 != null)
+        ? (match.score1 + ' – ' + match.score2) : '—';
+      panel.appendChild(confirmedScore);
+      scoreboardPanelEl.appendChild(panel);
+      return;
     }
 
     var errorEl = document.createElement('p');
     errorEl.className = 'scoreboard__error';
     errorEl.setAttribute('role', 'alert');
     errorEl.setAttribute('aria-live', 'polite');
+    errorEl.textContent = (syncState === 'invalid' && scoreboardErrorMessage) ? scoreboardErrorMessage : '';
+
+    // A conflict/denied write or an in-flight save freezes the local attempt so Retry
+    // always resubmits exactly what the server rejected/queued (REQ-UX-42/43); a pending
+    // Finish confirmation freezes it too so the score can't drift under the prompt.
+    var controlsDisabled = !!pendingFinish || syncState === 'saving' || syncState === 'conflict' || syncState === 'denied';
 
     // Teams grid
     var teamsGrid = document.createElement('div');
@@ -2130,6 +2974,7 @@
       var teamName = document.createElement('p');
       teamName.className = 'scoreboard__team-name';
       teamName.textContent = side.name;
+      teamName.title = side.name; // REQ-UX-40/73: full name always available once clamped to 2 lines
       teamPanel.appendChild(teamName);
 
       var scoreDisplay = document.createElement('p');
@@ -2144,6 +2989,7 @@
       decBtn.className = 'scoreboard__dec';
       decBtn.textContent = '−'; // −
       decBtn.setAttribute('aria-label', '− ' + side.name);
+      decBtn.disabled = controlsDisabled;
       decBtn.addEventListener('click', (function (key, display) {
         return function () {
           if (liveScore[key] > 0) {
@@ -2158,6 +3004,7 @@
       incBtn.className = 'scoreboard__inc';
       incBtn.textContent = '+';
       incBtn.setAttribute('aria-label', '+ ' + side.name);
+      incBtn.disabled = controlsDisabled;
       incBtn.addEventListener('click', (function (key, display) {
         return function () {
           // No-op once the set is already decided with no overtime (REQ-FMT-20) —
@@ -2169,11 +3016,11 @@
           liveScore[key]++;
           display.textContent = liveScore[key];
 
-          // Auto-finish through the existing commitScore('finished') transaction —
-          // same expectedRevision/conflict semantics as a manual Finish (REQ-FMT-21).
+          // Auto-finish routes through the same in-view confirmation as a manual
+          // Finish tap — never commits straight from the increment (REQ-UX-41/D11).
           var after = matchOutcome(rules, liveScore.score1, liveScore.score2);
           if (after.finished) {
-            commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, 'finished');
+            requestFinishConfirmation(liveScore.score1, liveScore.score2);
           }
         };
       })(side.scoreKey, scoreDisplay));
@@ -2187,10 +3034,138 @@
 
     panel.appendChild(teamsGrid);
 
-    // Actions: Cancel + Save
+    // Conflict block (REQ-UX-42): the server's confirmed result, the local attempt
+    // labelled as not saved, and Retry/Discard reachable without leaving the view.
+    if (syncState === 'conflict') {
+      var localAttempt = lastScoreCommand || { score1: liveScore.score1, score2: liveScore.score2 };
+      var serverResult = conflictServerResult || { score1: 0, score2: 0 };
+      var conflictBlock = document.createElement('div');
+      conflictBlock.className = 'scoring-conflict';
+      conflictBlock.setAttribute('role', 'alert');
+      conflictBlock.setAttribute('tabindex', '-1');
+      var conflictLocal = document.createElement('p');
+      conflictLocal.className = 'scoring-conflict__local';
+      conflictLocal.textContent = t('tournament.scoreboard.conflictLocal', { score1: localAttempt.score1, score2: localAttempt.score2 });
+      var conflictServer = document.createElement('p');
+      conflictServer.className = 'scoring-conflict__server';
+      conflictServer.textContent = t('tournament.scoreboard.conflictServer', { score1: serverResult.score1, score2: serverResult.score2 });
+      var conflictActions = document.createElement('div');
+      conflictActions.className = 'scoring-conflict__actions';
+      var retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'scoring-conflict__retry';
+      retryBtn.textContent = t('tournament.sync.retry');
+      retryBtn.addEventListener('click', function () {
+        if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, errorEl, lastScoreCommand.status);
+      });
+      var discardBtn = document.createElement('button');
+      discardBtn.type = 'button';
+      discardBtn.className = 'scoring-conflict__discard';
+      discardBtn.textContent = t('tournament.scoreboard.discard');
+      discardBtn.addEventListener('click', function () {
+        lastScoreCommand = null;
+        conflictServerResult = null;
+        liveScore = { score1: serverResult.score1 || 0, score2: serverResult.score2 || 0 };
+        setSyncState(null);
+        refreshScoreboardPanel();
+      });
+      conflictActions.appendChild(retryBtn);
+      conflictActions.appendChild(discardBtn);
+      conflictBlock.appendChild(conflictLocal);
+      conflictBlock.appendChild(conflictServer);
+      conflictBlock.appendChild(conflictActions);
+      panel.appendChild(conflictBlock);
+    }
+
+    // Offline (REQ-UX-43): the state matrix requires a visible in-view Retry for THIS
+    // match — the persistent strip's #retry-score-btn sits far off-screen once the
+    // scoring view is open at a true narrow viewport. Values stay editable (REQ-UX-44's
+    // "kept" invariant); this is icon+text via the existing tournament.sync.offline key.
+    if (syncState === 'offline') {
+      var offlineBlock = document.createElement('div');
+      offlineBlock.className = 'scoring-offline';
+      offlineBlock.setAttribute('role', 'alert');
+      var offlineMsg = document.createElement('p');
+      offlineMsg.className = 'scoring-offline__message';
+      offlineMsg.textContent = t('tournament.sync.offline');
+      offlineBlock.appendChild(offlineMsg);
+      var offlineRetryBtn = document.createElement('button');
+      offlineRetryBtn.type = 'button';
+      offlineRetryBtn.className = 'scoring-offline__retry';
+      offlineRetryBtn.textContent = t('tournament.sync.retry');
+      offlineRetryBtn.addEventListener('click', function () {
+        if (lastScoreCommand) commitScore(lastScoreCommand.matchId, lastScoreCommand.score1, lastScoreCommand.score2, errorEl, lastScoreCommand.status);
+      });
+      offlineBlock.appendChild(offlineRetryBtn);
+      panel.appendChild(offlineBlock);
+    }
+
+    if (syncState === 'denied') {
+      var deniedMsg = document.createElement('p');
+      deniedMsg.className = 'scoreboard__denied';
+      deniedMsg.setAttribute('role', 'alert');
+      deniedMsg.textContent = t('tournament.scoreboard.denied');
+      panel.appendChild(deniedMsg);
+    }
+
+    // Actions: Cancel + Save progress + Finish, OR the in-view Finish confirmation row
+    // (REQ-UX-41) — never both at once.
+    if (pendingFinish) {
+      var finishConfirm = document.createElement('div');
+      finishConfirm.className = 'finish-confirm';
+      var question = document.createElement('p');
+      question.className = 'finish-confirm__question';
+      question.textContent = t('tournament.scoreboard.finishConfirm', { score1: pendingFinish.score1, score2: pendingFinish.score2 });
+      finishConfirm.appendChild(question);
+      var finishActions = document.createElement('div');
+      finishActions.className = 'finish-confirm__actions';
+      var confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'finish-confirm__confirm';
+      confirmBtn.textContent = t('tournament.scoreboard.confirm');
+      confirmBtn.addEventListener('click', function () {
+        var toCommit = pendingFinish;
+        pendingFinish = null;
+        if (toCommit) commitScore(scoreboardMatchId, toCommit.score1, toCommit.score2, errorEl, 'finished');
+      });
+      var keepScoringBtn = document.createElement('button');
+      keepScoringBtn.type = 'button';
+      keepScoringBtn.className = 'finish-confirm__keep-scoring';
+      keepScoringBtn.textContent = t('tournament.scoreboard.keepScoring');
+      keepScoringBtn.addEventListener('click', function () {
+        pendingFinish = null;
+        refreshScoreboardPanel();
+        var finishBtn = scoreboardPanelEl.querySelector('.scoreboard__save--finish');
+        if (finishBtn) finishBtn.focus();
+      });
+      finishActions.appendChild(confirmBtn);
+      finishActions.appendChild(keepScoringBtn);
+      finishConfirm.appendChild(finishActions);
+      panel.appendChild(finishConfirm);
+      scoreboardPanelEl.appendChild(panel);
+      return;
+    }
+
+    // Save progress + Finish share the primary row (REQ-UX-40 wireframe); Cancel gets its
+    // own row below — three buttons on one flex row cannot stay >=44px tall and fit
+    // 320px without shrinking below their own text's min-content width (REQ-UX-73).
     var actions = document.createElement('div');
     actions.className = 'scoreboard__actions';
+    ['live', 'finished'].forEach(function (status) {
+      var action = document.createElement('button'); action.type = 'button';
+      action.className = 'scoreboard__save' + (status === 'finished' ? ' scoreboard__save--finish' : '');
+      action.textContent = t(status === 'live' ? 'tournament.match.saveProgress' : 'tournament.match.finish');
+      action.disabled = controlsDisabled;
+      action.addEventListener('click', function () {
+        if (status === 'finished') requestFinishConfirmation(liveScore.score1, liveScore.score2);
+        else commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, status);
+      });
+      actions.appendChild(action);
+    });
+    panel.appendChild(actions);
 
+    var secondaryActions = document.createElement('div');
+    secondaryActions.className = 'scoreboard__actions scoreboard__actions--secondary';
     var cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
     cancelBtn.className = 'scoreboard__cancel';
@@ -2200,15 +3175,8 @@
       liveScore = { score1: 0, score2: 0 };
       renderTournament();
     });
-
-    actions.appendChild(cancelBtn);
-    ['live', 'finished'].forEach(function (status) {
-      var action = document.createElement('button'); action.type = 'button'; action.className = 'scoreboard__save';
-      action.textContent = t(status === 'live' ? 'tournament.match.saveProgress' : 'tournament.match.finish');
-      action.addEventListener('click', function () { commitScore(scoreboardMatchId, liveScore.score1, liveScore.score2, errorEl, status); });
-      actions.appendChild(action);
-    });
-    panel.appendChild(actions);
+    secondaryActions.appendChild(cancelBtn);
+    panel.appendChild(secondaryActions);
     panel.appendChild(errorEl);
 
     scoreboardPanelEl.appendChild(panel);
@@ -2289,7 +3257,10 @@
     var ul = document.createElement('ul');
     ul.className = 'match-list';
 
-    matches.filter(function (match) { return (match.status || (match.played ? 'finished' : 'pending')) === matchFilter; }).forEach(function (match) {
+    // REQ-UX-32: the #match-filters toggle is retired — the command center's
+    // stacked Live/Pending/Recently finished sections own status filtering
+    // now, so every per-group match shows here unfiltered.
+    matches.forEach(function (match) {
       var team1 = tournamentState.teams.find(function (tm) { return tm.id === match.team1Id; });
       var team2 = tournamentState.teams.find(function (tm) { return tm.id === match.team2Id; });
       var name1 = team1 ? team1.name : match.team1Id;

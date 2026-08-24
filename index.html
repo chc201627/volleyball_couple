@@ -7,7 +7,7 @@
   <meta name="description" content="Randomly match beach volleyball players into couples with gender-balanced pairing.">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
 
-  <link rel="stylesheet" href="css/styles.css?v=1.8.1">
+  <link rel="stylesheet" href="css/styles.css?v=1.9.0">
 
 </head>
 <body>
@@ -334,18 +334,15 @@
     <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden data-view-slot="tournament">
       <div class="tournament-header">
         <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
-        <div class="tournament-header__actions">
-          <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
-            Share
-          </button>
-          <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
-            Reset Tournament
-          </button>
-        </div>
       </div>
       <div class="tournament-readonly-banner" id="readonly-banner" hidden>
         <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
       </div>
+
+      <!-- Next Match card (REQ-UX-30/31) — first content block below the status strip -->
+      <div class="next-match-card" id="next-match-card" hidden></div>
+
+      <!-- Inline scorer-access-request card (REQ-UX-34), reusing #access-request/#access-members -->
       <div class="tournament-ops" id="tournament-ops" hidden>
         <p id="access-status" class="tournament-ops__status" role="status" aria-live="polite"></p>
         <div id="access-request" class="access-request" hidden>
@@ -353,12 +350,16 @@
           <button id="request-access-btn" class="btn btn--primary" type="button" data-i18n="tournament.access.request">Request scoring access</button>
         </div>
         <ul id="access-members" class="access-members" hidden></ul>
-        <div id="match-filters" class="match-filters" role="group" data-i18n-aria-label="tournament.filter.label">
-          <button class="match-filters__btn match-filters__btn--active" type="button" data-filter="pending" data-i18n="tournament.filter.pending">Pending</button>
-          <button class="match-filters__btn" type="button" data-filter="live" data-i18n="tournament.filter.live">Live</button>
-          <button class="match-filters__btn" type="button" data-filter="finished" data-i18n="tournament.filter.finished">Finished</button>
-        </div>
       </div>
+
+      <!-- Stage progress (REQ-UX-33) -->
+      <div class="stage-progress" id="tournament-stage-progress" hidden></div>
+
+      <!-- Stacked Live / Up next / Recently finished sections, collapse after 5 (REQ-UX-32) -->
+      <div class="match-day-section" id="tournament-live-section" hidden></div>
+      <div class="match-day-section" id="tournament-pending-section" hidden></div>
+      <div class="match-day-section" id="tournament-recently-finished-section" hidden></div>
+
       <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
         <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
         <p class="tournament-custom-rules__text" id="tournament-custom-rules-text"></p>
@@ -369,8 +370,61 @@
       <div class="tournament-stages" id="tournament-stages" hidden>
         <!-- Knockout stage panels rendered by JS (formatted sessions only) -->
       </div>
+
+      <!-- REQ-UX-30 order: moved out of the header so Next Match + nav never overlap. -->
+      <div class="tournament-header__actions" id="tournament-quick-actions">
+        <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
+          Share
+        </button>
+        <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
+          Reset Tournament
+        </button>
+      </div>
+
       <div class="scoreboard-panel" id="scoreboard-panel" hidden>
         <!-- Live scoreboard rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Session-not-found state (REQ-UX-62) -->
+    <div class="session-missing" id="session-not-found" data-view-slot="tournament" hidden>
+      <p class="session-missing__icon" aria-hidden="true">⛔</p>
+      <h2 class="section__heading" data-i18n="workspace.tournament.notFound.heading">Session unavailable</h2>
+      <p class="session-missing__text" data-i18n="workspace.tournament.notFound.text">This link is missing, expired, or you do not have permission to read it. Ask the organizer for a new link.</p>
+      <button class="btn btn--primary" id="session-not-found-reset-btn" type="button" data-i18n="workspace.tournament.notFound.startLocalSetup">Start a local setup</button>
+    </div>
+
+    <!-- Results / completion (REQ-UX-50..53) -->
+    <section class="section section--completion" id="completion-section" aria-labelledby="completion-heading" data-view-slot="results">
+      <h2 id="completion-heading" class="section__heading" data-i18n="workspace.results.heading">Results</h2>
+
+      <div class="results-banner" id="completion-banner" hidden>
+        <span aria-hidden="true">⏳</span>
+        <span data-i18n="workspace.results.inProgress">Tournament in progress — live standings, no champion yet</span>
+      </div>
+
+      <div class="results-empty" id="completion-empty" hidden>
+        <p data-i18n="workspace.results.empty">No results yet</p>
+        <button class="btn btn--primary" id="completion-empty-setup-btn" type="button" data-i18n="workspace.results.emptyLink">Go to Setup</button>
+      </div>
+
+      <div class="champion-card" id="completion-champion" hidden></div>
+
+      <p class="completion-summary" id="completion-summary"></p>
+
+      <div class="completion-standings" id="completion-standings" hidden>
+        <!-- Standings tables rendered by JS (renderStandingsTable(), read-only) -->
+      </div>
+
+      <details class="disclosure completion-bracket" id="completion-bracket" hidden>
+        <summary class="disclosure__summary" data-i18n="workspace.results.bracket">Bracket</summary>
+        <div class="completion-bracket__content" id="completion-bracket-content"></div>
+      </details>
+
+      <div class="completion-actions" id="completion-actions" hidden>
+        <button class="btn btn--share" id="completion-share-btn" type="button" data-i18n="tournament.share">Share</button>
+        <button class="btn" id="completion-export-btn" type="button" data-i18n="workspace.results.export">Copy / share summary</button>
+        <button class="btn btn--warning" id="completion-start-another-btn" type="button" data-i18n="workspace.results.startAnother">Start another tournament</button>
       </div>
     </section>
 
@@ -385,7 +439,7 @@
   </main>
 
   <footer class="footer">
-    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.8.1</p>
+    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.9.0</p>
   </footer>
 
   <!-- Firebase Realtime Database (compat SDK v10) -->
@@ -393,18 +447,18 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
-  <script src="js/firebase-config.js?v=1.8.1"></script>
+  <script src="js/firebase-config.js?v=1.9.0"></script>
 
-  <script src="js/pairing.js?v=1.8.1"></script>
-  <script src="js/player-import.js?v=1.8.1"></script>
-  <script src="js/i18n.js?v=1.8.1"></script>
-  <script src="js/tournament.js?v=1.8.1"></script>
-  <script src="js/tournament-format.js?v=1.8.1"></script>
-  <script src="js/tournament-day.js?v=1.8.1"></script>
-  <script src="js/tournament-repository.js?v=1.8.1"></script>
-  <script src="js/king-of-court.js?v=1.8.1"></script>
-  <script src="js/workspace.js?v=1.8.1"></script>
-  <script src="js/app.js?v=1.8.1"></script>
+  <script src="js/pairing.js?v=1.9.0"></script>
+  <script src="js/player-import.js?v=1.9.0"></script>
+  <script src="js/i18n.js?v=1.9.0"></script>
+  <script src="js/tournament.js?v=1.9.0"></script>
+  <script src="js/tournament-format.js?v=1.9.0"></script>
+  <script src="js/tournament-day.js?v=1.9.0"></script>
+  <script src="js/tournament-repository.js?v=1.9.0"></script>
+  <script src="js/king-of-court.js?v=1.9.0"></script>
+  <script src="js/workspace.js?v=1.9.0"></script>
+  <script src="js/app.js?v=1.9.0"></script>
 
 </body>
 </html>
