@@ -7,7 +7,7 @@
   <meta name="description" content="Randomly match beach volleyball players into couples with gender-balanced pairing.">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
 
-  <link rel="stylesheet" href="css/styles.css?v=1.8.1">
+  <link rel="stylesheet" href="css/styles.css?v=1.9.0">
 
 </head>
 <body>
@@ -20,9 +20,20 @@
     <p class="header__subtitle" data-i18n="page.subtitle">Register players and generate random couples for your game</p>
   </header>
 
+  <div class="workspace-status" id="workspace-status" role="status" aria-live="polite">
+    <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
+    <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
+  </div>
+
   <main class="main">
+  <div class="workspace" id="workspace" data-view="setup">
+    <!-- Compact event summary (REQ-UX-10) -->
+    <section class="section section--summary" id="event-summary" data-view-slot="setup">
+      <p class="event-summary__line" id="event-summary-line"></p>
+    </section>
+
     <!-- Input Section -->
-    <section class="section section--input" aria-labelledby="input-heading">
+    <section class="section section--input" aria-labelledby="input-heading" data-view-slot="setup">
       <h2 id="input-heading" class="section__heading" data-i18n="form.heading">Add Player</h2>
       <div class="entry-tabs" role="tablist" aria-label="Player entry mode" data-i18n-aria-label="import.modeLabel">
         <button class="entry-tab entry-tab--active" id="single-mode-tab" type="button" role="tab" aria-selected="true" aria-controls="player-form" data-i18n="import.singleMode">One player</button>
@@ -85,7 +96,7 @@
     </section>
 
     <!-- Player List Section -->
-    <section class="section section--players" aria-labelledby="players-heading">
+    <section class="section section--players" aria-labelledby="players-heading" data-view-slot="setup">
       <h2 id="players-heading" class="section__heading">
         Registered Players (<span id="player-count">0</span>)
       </h2>
@@ -96,8 +107,14 @@
       <p class="player-list__empty" id="empty-message" data-i18n="players.empty">No players added yet</p>
     </section>
 
-    <!-- Action Section -->
-    <section class="section section--actions" aria-labelledby="actions-heading">
+    <!-- Readiness checklist (REQ-UX-11/12) — before both CTAs (Generate/Start) -->
+    <section class="section section--readiness" id="readiness-checklist" aria-labelledby="readiness-heading" data-view-slot="setup">
+      <h2 id="readiness-heading" class="section__heading" data-i18n="workspace.checklist.heading">Ready to start</h2>
+      <ul class="readiness" id="readiness-list"></ul>
+    </section>
+
+    <!-- Setup Actions: match type, pairing, format, generate/start (REQ-UX-10) -->
+    <section class="section section--actions" id="setup-actions" aria-labelledby="actions-heading" data-view-slot="setup">
       <h2 id="actions-heading" class="sr-only">Actions</h2>
       <div class="actions">
         <!-- Match Type Selector (hidden for read-only viewers via JS) -->
@@ -158,12 +175,6 @@
           Generate Couples
         </button>
         <p class="actions__hint" id="generate-hint" data-i18n="actions.hint">Add at least 2 players to generate couples</p>
-        <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
-          Regenerate Couples
-        </button>
-        <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
-          Clear All Players
-        </button>
         <div class="tournament-setup" id="tournament-setup" hidden>
           <label class="tournament-setup__label" for="group-count" data-i18n="tournament.groupsLabel">Groups:</label>
           <div class="tournament-setup__options" id="group-count-options">
@@ -196,10 +207,61 @@
             </div>
             <p class="form__error" id="format-error" role="alert" aria-live="polite"></p>
           </div>
+          <div class="format-locked-note" id="format-locked-note" hidden>
+            <p class="format-locked-note__text" data-i18n="workspace.setup.formatLocked.note">Locked — reset tournament to change</p>
+            <button class="btn btn--warning btn--small" id="format-locked-reset-btn" type="button" data-i18n="tournament.reset">Reset Tournament</button>
+          </div>
           <button class="btn btn--success btn--large" id="start-tournament-btn" type="button" data-i18n="tournament.start">
             Start Tournament
           </button>
         </div>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden data-view-slot="teams">
+      <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
+      <p class="teams-summary" id="teams-summary-line"></p>
+      <div class="couples-grid" id="couples-grid">
+        <!-- Couple cards rendered by JS -->
+      </div>
+      <div class="unmatched" id="unmatched-notice" hidden>
+        <!-- Unmatched player notice rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Teams Actions: progressive-disclosure regenerate/edit + mode fork (REQ-UX-21/22/23) -->
+    <section class="section section--actions" id="teams-actions" aria-labelledby="teams-actions-heading" data-view-slot="teams">
+      <h2 id="teams-actions-heading" class="sr-only">Team options</h2>
+      <div class="actions">
+        <details class="disclosure" id="teams-options-disclosure">
+          <summary class="disclosure__summary" data-i18n="workspace.teams.moreOptions">More options</summary>
+          <div class="disclosure__content">
+            <button class="btn btn--primary btn--large" id="regenerate-btn" hidden data-i18n="actions.regenerate">
+              Regenerate Couples
+            </button>
+            <button class="btn btn--large" id="edit-pairs-btn" type="button" hidden data-i18n="workspace.teams.editPairs">
+              Edit pairs
+            </button>
+            <button class="btn btn--warning" id="clear-btn" hidden data-i18n="actions.clearAll">
+              Clear All Players
+            </button>
+          </div>
+        </details>
+
+        <!-- Mode fork: Tournament | King of the Court (REQ-UX-22/23) -->
+        <div class="mode-fork" id="teams-mode-fork" hidden>
+          <h3 class="mode-fork__heading" data-i18n="workspace.teams.forkHeading">How do you want to play?</h3>
+          <div class="mode-fork__options">
+            <button class="btn btn--success btn--large" id="teams-fork-tournament-btn" type="button" data-i18n="workspace.teams.forkTournament">
+              Tournament
+            </button>
+            <button class="btn btn--large" id="teams-fork-king-btn" type="button" data-i18n="workspace.teams.forkKing">
+              King of the Court
+            </button>
+          </div>
+        </div>
+
         <!-- King of the Court Setup (shown after couples generated, no active tournament or king game) -->
         <div class="king-setup" id="king-setup" hidden>
           <div class="king-setup__options">
@@ -219,25 +281,14 @@
               <button class="king-setup__opt" data-target="10" type="button">10</button>
             </div>
           </div>
-          <button class="btn btn--success btn--large" id="start-king-btn"
+          <button class="btn btn--success btn--large" id="start-king-btn" hidden
                   type="button" data-i18n="king.start">Start King of the Court</button>
         </div>
       </div>
     </section>
 
-    <!-- Results Section -->
-    <section class="section section--results" id="results-section" aria-labelledby="results-heading" hidden>
-      <h2 id="results-heading" class="section__heading" data-i18n="results.heading">Generated Couples</h2>
-      <div class="couples-grid" id="couples-grid">
-        <!-- Couple cards rendered by JS -->
-      </div>
-      <div class="unmatched" id="unmatched-notice" hidden>
-        <!-- Unmatched player notice rendered by JS -->
-      </div>
-    </section>
-
     <!-- King of the Court Section -->
-    <section class="section section--king" id="king-section" aria-labelledby="king-heading" hidden>
+    <section class="section section--king" id="king-section" aria-labelledby="king-heading" hidden data-view-slot="tournament">
       <div class="king-header">
         <h2 id="king-heading" class="section__heading" data-i18n="king.heading">King of the Court</h2>
         <button class="btn btn--warning btn--small" id="reset-king-btn"
@@ -280,21 +331,18 @@
     </section>
 
     <!-- Tournament Section -->
-    <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden>
+    <section class="section section--tournament" id="tournament-section" aria-labelledby="tournament-heading" hidden data-view-slot="tournament">
       <div class="tournament-header">
         <h2 id="tournament-heading" class="section__heading" data-i18n="tournament.heading">Tournament</h2>
-        <div class="tournament-header__actions">
-          <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
-            Share
-          </button>
-          <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
-            Reset Tournament
-          </button>
-        </div>
       </div>
       <div class="tournament-readonly-banner" id="readonly-banner" hidden>
         <span data-i18n="tournament.readonlyBanner">👁 View only — ask the organizer for the latest link</span>
       </div>
+
+      <!-- Next Match card (REQ-UX-30/31) — first content block below the status strip -->
+      <div class="next-match-card" id="next-match-card" hidden></div>
+
+      <!-- Inline scorer-access-request card (REQ-UX-34), reusing #access-request/#access-members -->
       <div class="tournament-ops" id="tournament-ops" hidden>
         <p id="access-status" class="tournament-ops__status" role="status" aria-live="polite"></p>
         <div id="access-request" class="access-request" hidden>
@@ -302,14 +350,16 @@
           <button id="request-access-btn" class="btn btn--primary" type="button" data-i18n="tournament.access.request">Request scoring access</button>
         </div>
         <ul id="access-members" class="access-members" hidden></ul>
-        <div id="match-filters" class="match-filters" role="group" data-i18n-aria-label="tournament.filter.label">
-          <button class="match-filters__btn match-filters__btn--active" type="button" data-filter="pending" data-i18n="tournament.filter.pending">Pending</button>
-          <button class="match-filters__btn" type="button" data-filter="live" data-i18n="tournament.filter.live">Live</button>
-          <button class="match-filters__btn" type="button" data-filter="finished" data-i18n="tournament.filter.finished">Finished</button>
-        </div>
-        <p id="sync-status" class="sync-status" role="status" aria-live="polite"></p>
-        <button id="retry-score-btn" class="btn btn--warning" type="button" hidden data-i18n="tournament.sync.retry">Retry</button>
       </div>
+
+      <!-- Stage progress (REQ-UX-33) -->
+      <div class="stage-progress" id="tournament-stage-progress" hidden></div>
+
+      <!-- Stacked Live / Up next / Recently finished sections, collapse after 5 (REQ-UX-32) -->
+      <div class="match-day-section" id="tournament-live-section" hidden></div>
+      <div class="match-day-section" id="tournament-pending-section" hidden></div>
+      <div class="match-day-section" id="tournament-recently-finished-section" hidden></div>
+
       <details class="tournament-custom-rules" id="tournament-custom-rules" hidden>
         <summary class="tournament-custom-rules__summary" id="tournament-custom-rules-summary"></summary>
         <p class="tournament-custom-rules__text" id="tournament-custom-rules-text"></p>
@@ -320,14 +370,76 @@
       <div class="tournament-stages" id="tournament-stages" hidden>
         <!-- Knockout stage panels rendered by JS (formatted sessions only) -->
       </div>
+
+      <!-- REQ-UX-30 order: moved out of the header so Next Match + nav never overlap. -->
+      <div class="tournament-header__actions" id="tournament-quick-actions">
+        <button class="btn btn--share btn--small" id="share-tournament-btn" data-i18n="tournament.share">
+          Share
+        </button>
+        <button class="btn btn--warning btn--small" id="reset-tournament-btn" data-i18n="tournament.reset">
+          Reset Tournament
+        </button>
+      </div>
+
       <div class="scoreboard-panel" id="scoreboard-panel" hidden>
         <!-- Live scoreboard rendered by JS -->
       </div>
     </section>
+
+    <!-- Session-not-found state (REQ-UX-62) -->
+    <div class="session-missing" id="session-not-found" data-view-slot="tournament" hidden>
+      <p class="session-missing__icon" aria-hidden="true">⛔</p>
+      <h2 class="section__heading" data-i18n="workspace.tournament.notFound.heading">Session unavailable</h2>
+      <p class="session-missing__text" data-i18n="workspace.tournament.notFound.text">This link is missing, expired, or you do not have permission to read it. Ask the organizer for a new link.</p>
+      <button class="btn btn--primary" id="session-not-found-reset-btn" type="button" data-i18n="workspace.tournament.notFound.startLocalSetup">Start a local setup</button>
+    </div>
+
+    <!-- Results / completion (REQ-UX-50..53) -->
+    <section class="section section--completion" id="completion-section" aria-labelledby="completion-heading" data-view-slot="results">
+      <h2 id="completion-heading" class="section__heading" data-i18n="workspace.results.heading">Results</h2>
+
+      <div class="results-banner" id="completion-banner" hidden>
+        <span aria-hidden="true">⏳</span>
+        <span data-i18n="workspace.results.inProgress">Tournament in progress — live standings, no champion yet</span>
+      </div>
+
+      <div class="results-empty" id="completion-empty" hidden>
+        <p data-i18n="workspace.results.empty">No results yet</p>
+        <button class="btn btn--primary" id="completion-empty-setup-btn" type="button" data-i18n="workspace.results.emptyLink">Go to Setup</button>
+      </div>
+
+      <div class="champion-card" id="completion-champion" hidden></div>
+
+      <p class="completion-summary" id="completion-summary"></p>
+
+      <div class="completion-standings" id="completion-standings" hidden>
+        <!-- Standings tables rendered by JS (renderStandingsTable(), read-only) -->
+      </div>
+
+      <details class="disclosure completion-bracket" id="completion-bracket" hidden>
+        <summary class="disclosure__summary" data-i18n="workspace.results.bracket">Bracket</summary>
+        <div class="completion-bracket__content" id="completion-bracket-content"></div>
+      </details>
+
+      <div class="completion-actions" id="completion-actions" hidden>
+        <button class="btn btn--share" id="completion-share-btn" type="button" data-i18n="tournament.share">Share</button>
+        <button class="btn" id="completion-export-btn" type="button" data-i18n="workspace.results.export">Copy / share summary</button>
+        <button class="btn btn--warning" id="completion-start-another-btn" type="button" data-i18n="workspace.results.startAnother">Start another tournament</button>
+      </div>
+    </section>
+
+    <!-- Workspace bottom nav: 4 destinations (owner) / 2 (scorer, spectator) / 1
+         (session-not-found), plus the single contextual center action (REQ-UX-01/04). -->
+    <nav class="workspace-nav" id="workspace-nav" aria-label="Workspace">
+      <div class="workspace-nav__items" id="workspace-nav-items"></div>
+      <button class="workspace-nav__cta" id="workspace-nav-cta" type="button" hidden></button>
+    </nav>
+    <div class="toast" id="workspace-toast" role="status" aria-live="polite" hidden></div>
+  </div>
   </main>
 
   <footer class="footer">
-    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.8.1</p>
+    <p data-i18n="footer.copyright">&copy; 2026 Beach Volleyball Couple Matching &mdash; v1.9.0</p>
   </footer>
 
   <!-- Firebase Realtime Database (compat SDK v10) -->
@@ -335,16 +447,18 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
-  <script src="js/firebase-config.js?v=1.8.1"></script>
+  <script src="js/firebase-config.js?v=1.9.0"></script>
 
-  <script src="js/pairing.js?v=1.8.1"></script>
-  <script src="js/player-import.js?v=1.8.1"></script>
-  <script src="js/i18n.js?v=1.8.1"></script>
-  <script src="js/tournament.js?v=1.8.1"></script>
-  <script src="js/tournament-format.js?v=1.8.1"></script>
-  <script src="js/tournament-repository.js?v=1.8.1"></script>
-  <script src="js/king-of-court.js?v=1.8.1"></script>
-  <script src="js/app.js?v=1.8.1"></script>
+  <script src="js/pairing.js?v=1.9.0"></script>
+  <script src="js/player-import.js?v=1.9.0"></script>
+  <script src="js/i18n.js?v=1.9.0"></script>
+  <script src="js/tournament.js?v=1.9.0"></script>
+  <script src="js/tournament-format.js?v=1.9.0"></script>
+  <script src="js/tournament-day.js?v=1.9.0"></script>
+  <script src="js/tournament-repository.js?v=1.9.0"></script>
+  <script src="js/king-of-court.js?v=1.9.0"></script>
+  <script src="js/workspace.js?v=1.9.0"></script>
+  <script src="js/app.js?v=1.9.0"></script>
 
 </body>
 </html>
