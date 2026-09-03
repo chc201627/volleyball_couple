@@ -331,7 +331,7 @@ var t, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Start another tournament',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.9.0'
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v1.9.1'
 
     },
     es: {
@@ -649,7 +649,7 @@ var t, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Iniciar otro torneo',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.9.0'
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v1.9.1'
 
     }
   };

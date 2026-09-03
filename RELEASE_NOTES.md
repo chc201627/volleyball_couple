@@ -1,5 +1,12 @@
 # Release Notes
 
+## v1.9.1 — Round-Robin Match Order Preservation
+
+- Fixed match schedule ordering in tournament repository decoding and group match views:
+  - When sessions are synchronized with Firebase, matches stored in `structure/matchesById` were previously deserialized in object-key order (`A-t0-t1`, `A-t0-t2`, `A-t0-t3`), which clustered team 0's matches consecutively.
+  - Matches are now explicitly sorted by `order` upon decoding in `TournamentRepository` and before rendering in `renderMatchList`, preserving the intended polygon/circle round-robin schedule across courts and rounds.
+- Static assets only; no Firebase Rules change.
+
 ## v1.9.0 — Guided Organizer Workspace
 
 - Reorganized the single long conditional page into four guided destinations — **Setup → Teams → Tournament → Results** — behind a persistent, role-scoped bottom nav with a raised contextual center action (Generate teams → Start tournament → Score next match → Share results for organizers; Score next match for scorers; Request scoring access → Share for spectators). View state is memory/localStorage only; the share URL is unchanged.

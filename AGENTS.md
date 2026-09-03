@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Repository guidance for coding agents. The production application is currently **v1.7.0**.
+Repository guidance for coding agents. The production application is currently **v1.9.1**.
 
 ## Project
 
