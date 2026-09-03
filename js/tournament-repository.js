@@ -163,7 +163,9 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         teams: (stored.teamIds || []).map(function (id) { return teamsById[id]; }).filter(Boolean),
       };
     });
-    var matches = values(structure.matchesById);
+    var matches = values(structure.matchesById).sort(function (a, b) {
+      return (a.order || 0) - (b.order || 0);
+    });
     return {
       players: players,
       teams: teams,

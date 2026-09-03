@@ -50,6 +50,8 @@
         assert(snapshot.schemaVersion === 2 && snapshot.legacy === false, 'createSession exposes a schema-v2 snapshot');
         assert(snapshot.tournament.matches.every(match => match.status === 'pending' && match.revision === 0),
           'v2 projection supplies Pending revision-zero results');
+        assert(snapshot.tournament.matches.every((m, idx) => idx === 0 || (m.order || 0) >= (snapshot.tournament.matches[idx - 1].order || 0)),
+          'v2 matches decoded from structure.matchesById are sorted by order');
         const firstId = snapshot.tournament.matches[0].id;
         const beforeOther = JSON.stringify(snapshot.tournament.matches[1]);
         const saved = await repo.saveResult(created.sessionId, {

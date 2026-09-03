@@ -3199,6 +3199,8 @@
     // Match list
     var groupMatches = tournamentState.matches.filter(function (m) {
       return m.groupId === group.id;
+    }).sort(function (a, b) {
+      return (a.order || 0) - (b.order || 0);
     });
     if (groupMatches.length > 0) {
       panel.appendChild(renderMatchList(group, groupMatches));
