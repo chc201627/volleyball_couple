@@ -1,5 +1,15 @@
 # Release Notes
 
+## v1.9.2 — Inline Match Finder
+
+- Added an inline, real-time match finder directly above the tournament group and knockout stage views:
+  - Real-time case- and accent-insensitive filtering (`normalizeSearchString`) across player names, team labels, group identifiers, and knockout stage names.
+  - Direct score/edit/resume action button on matching result cards to open scoring immediately without scrolling through long schedules.
+  - Clean keyboard support (ESC key clears search and restores full tournament view) and dedicated clear button.
+  - Mobile-first compliance with ≥44px touch targets and responsive layout verified at 320px viewport.
+  - Fully bilingual (English and Spanish).
+- Static assets only; no Firebase Rules change.
+
 ## v1.9.1 — Round-Robin Match Order Preservation
 
 - Fixed match schedule ordering in tournament repository decoding and group match views:
