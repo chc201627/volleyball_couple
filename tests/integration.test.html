@@ -355,6 +355,32 @@
         <!-- Stage progress (REQ-UX-33) -->
         <div class="stage-progress" id="tournament-stage-progress" hidden></div>
 
+        <!-- Inline match search (finder) -->
+        <div class="match-search" id="match-search" hidden>
+          <label for="match-search-input" class="match-search__label sr-only" data-i18n="tournament.search.label">Search matches by player or team</label>
+          <div class="match-search__box">
+            <span class="match-search__icon" aria-hidden="true">🔍</span>
+            <input
+              type="search"
+              id="match-search-input"
+              class="form__input match-search__input"
+              data-i18n-placeholder="tournament.search.placeholder"
+              placeholder="Search team or player…"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button
+              type="button"
+              id="match-search-clear-btn"
+              class="match-search__clear"
+              data-i18n-aria-label="tournament.search.clear"
+              aria-label="Clear search"
+              hidden
+            >&times;</button>
+          </div>
+          <div class="match-search__results" id="match-search-results" hidden></div>
+        </div>
+
         <!-- Stacked Live / Up next / Recently finished sections, collapse after 5 (REQ-UX-32) -->
         <div class="match-day-section" id="tournament-live-section" hidden></div>
         <div class="match-day-section" id="tournament-pending-section" hidden></div>
@@ -2342,6 +2368,91 @@
           'fg=' + disabledCtaFg + ' bg=' + disabledCtaBg);
 
         navProbe.remove();
+      })();
+
+      // ===== INLINE MATCH FINDER (REQ-UX-finder) =====
+      await (async function testInlineMatchFinder() {
+        const finderFixture = {
+          players: [
+            { id: 'p1', name: 'Ana Lopez' }, { id: 'p2', name: 'Carlos Gomez' },
+            { id: 'p3', name: 'Beatriz Silva' }, { id: 'p4', name: 'David Perez' }
+          ],
+          teams: [
+            { id: 't0', name: 'Ana & Carlos', players: [{ name: 'Ana Lopez' }, { name: 'Carlos Gomez' }] },
+            { id: 't1', name: 'Beatriz & David', players: [{ name: 'Beatriz Silva' }, { name: 'David Perez' }] }
+          ],
+          groups: [{ id: 'A', teams: [{ id: 't0' }, { id: 't1' }] }],
+          matches: [
+            { id: 'A-t0-t1', groupId: 'A', order: 0, status: 'pending', played: false, score1: null, score2: null, revision: 0, team1Id: 't0', team2Id: 't1' }
+          ]
+        };
+        var appFrame = document.getElementById('app-frame');
+        appFrame.style.cssText = 'display:block;width:320px';
+        document.getElementById('tournament-section').hidden = false;
+        testRepository.emit({ role: 'owner', accessStatus: 'approved', tournament: finderFixture });
+
+        const searchContainer = document.getElementById('match-search');
+        const searchInput = document.getElementById('match-search-input');
+        const clearBtn = document.getElementById('match-search-clear-btn');
+        const resultsContainer = document.getElementById('match-search-results');
+
+        assert(!!searchContainer, 'Match Finder: #match-search container exists in DOM');
+        assert(!!searchInput, 'Match Finder: #match-search-input exists');
+        assert(!!clearBtn, 'Match Finder: #match-search-clear-btn exists');
+        assert(!!resultsContainer, 'Match Finder: #match-search-results exists');
+
+        // Navigate to Tournament view
+        const tourNavBtn = document.querySelector('#workspace-nav-items [data-view-id="tournament"]');
+        if (tourNavBtn) tourNavBtn.click();
+
+        assert(!searchContainer.hidden, 'Match Finder: search container is visible during active tournament');
+        assert(clearBtn.hidden, 'Match Finder: clear button is hidden when search is empty');
+        assert(resultsContainer.hidden, 'Match Finder: results container is hidden when search is empty');
+
+        // Type player name to filter
+        searchInput.value = 'Ana';
+        searchInput.dispatchEvent(new Event('input'));
+
+        assert(!clearBtn.hidden, 'Match Finder: clear button appears when search has text');
+        assert(!resultsContainer.hidden, 'Match Finder: results container is visible when search has text');
+
+        const groupsEl = document.getElementById('tournament-groups');
+        assert(groupsEl.hidden, 'Match Finder: normal group list is hidden while search is active');
+
+        const foundCards = resultsContainer.querySelectorAll('.match-card');
+        assert(foundCards.length > 0, 'Match Finder: found matching match cards for "Ana"');
+
+        // Accent / case insensitivity
+        searchInput.value = 'ana';
+        searchInput.dispatchEvent(new Event('input'));
+        const lowerCards = resultsContainer.querySelectorAll('.match-card');
+        assert(lowerCards.length === foundCards.length, 'Match Finder: search is case-insensitive');
+
+        const firstCard = resultsContainer.querySelector('.match-card');
+        const actionBtn = firstCard ? firstCard.querySelector('.match-card__btn') : null;
+        assert(!!actionBtn, 'Match Finder: result card contains an action button');
+        const btnRect = actionBtn.getBoundingClientRect();
+        assert(btnRect.height >= 44, 'Match Finder: action button touch target height is at least 44px (got ' + btnRect.height + 'px)');
+
+        const clearRect = clearBtn.getBoundingClientRect();
+        assert(clearRect.width >= 44 && clearRect.height >= 44, 'Match Finder: clear button touch target is at least 44x44px (got ' + clearRect.width + 'x' + clearRect.height + 'px)');
+
+        // Clear search restores normal tournament view
+        clearBtn.click();
+        assert(searchInput.value === '', 'Match Finder: clicking clear button clears input');
+        assert(resultsContainer.hidden, 'Match Finder: results container hidden after clear');
+        assert(!groupsEl.hidden, 'Match Finder: normal tournament groups restored after clear');
+
+        // Escape key clears search
+        searchInput.value = 'Ana';
+        searchInput.dispatchEvent(new Event('input'));
+        assert(!resultsContainer.hidden, 'Match Finder: search active before escape');
+        searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        assert(searchInput.value === '', 'Match Finder: escape key clears search input');
+        assert(resultsContainer.hidden, 'Match Finder: results hidden after escape key');
+        assert(!groupsEl.hidden, 'Match Finder: groups restored after escape key');
+
+        appFrame.style.cssText = 'display:none';
       })();
 
       // ===== Summary =====

@@ -355,6 +355,32 @@
       <!-- Stage progress (REQ-UX-33) -->
       <div class="stage-progress" id="tournament-stage-progress" hidden></div>
 
+      <!-- Inline match search (finder) -->
+      <div class="match-search" id="match-search" hidden>
+        <label for="match-search-input" class="match-search__label sr-only" data-i18n="tournament.search.label">Search matches by player or team</label>
+        <div class="match-search__box">
+          <span class="match-search__icon" aria-hidden="true">🔍</span>
+          <input
+            type="search"
+            id="match-search-input"
+            class="form__input match-search__input"
+            data-i18n-placeholder="tournament.search.placeholder"
+            placeholder="Search team or player…"
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button
+            type="button"
+            id="match-search-clear-btn"
+            class="match-search__clear"
+            data-i18n-aria-label="tournament.search.clear"
+            aria-label="Clear search"
+            hidden
+          >&times;</button>
+        </div>
+        <div class="match-search__results" id="match-search-results" hidden></div>
+      </div>
+
       <!-- Stacked Live / Up next / Recently finished sections, collapse after 5 (REQ-UX-32) -->
       <div class="match-day-section" id="tournament-live-section" hidden></div>
       <div class="match-day-section" id="tournament-pending-section" hidden></div>

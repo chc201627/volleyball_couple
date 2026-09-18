@@ -42,6 +42,7 @@
   var workspaceSessionState = 'ok';  // 'ok' | 'loading' | 'notFound' — REQ-UX-62
   var workspaceToastTimer = null;
   var emptySetupFocused = false;     // REQ-UX-80: guards the empty-Setup auto-focus to once per entry
+  let matchSearchQuery = '';         // active tournament match search query
 
   // --- DOM References ---
   const form = document.getElementById('player-form');
@@ -141,6 +142,10 @@
   const tournamentRecentlyFinishedSectionEl = document.getElementById('tournament-recently-finished-section');
   const sessionNotFoundEl = document.getElementById('session-not-found');
   const sessionNotFoundResetBtn = document.getElementById('session-not-found-reset-btn');
+  const matchSearchEl = document.getElementById('match-search');
+  const matchSearchInputEl = document.getElementById('match-search-input');
+  const matchSearchClearBtn = document.getElementById('match-search-clear-btn');
+  const matchSearchResultsEl = document.getElementById('match-search-results');
 
   // --- Results / completion (REQ-UX-50..53) DOM references ---
   const completionBannerEl = document.getElementById('completion-banner');
@@ -227,6 +232,19 @@
     challengerWinsBtn.addEventListener('click', function () { handleRally('challenger'); });
     kingWinConditionToggle.addEventListener('click', handleKingConditionClick);
     kingTargetToggle.addEventListener('click', handleKingTargetClick);
+
+    if (matchSearchInputEl) {
+      matchSearchInputEl.addEventListener('input', handleMatchSearchInput);
+      matchSearchInputEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && matchSearchQuery) {
+          handleMatchSearchClear();
+          e.preventDefault();
+        }
+      });
+    }
+    if (matchSearchClearBtn) {
+      matchSearchClearBtn.addEventListener('click', handleMatchSearchClear);
+    }
 
     // Load players from localStorage
     try {
@@ -987,6 +1005,12 @@
   function captureCommandCenterFocus() {
     var active = document.activeElement;
     if (!active || active === document.body) return null;
+    if (active === matchSearchInputEl) {
+      return { type: 'match-search-input', cursor: matchSearchInputEl.selectionStart };
+    }
+    if (active === matchSearchClearBtn) {
+      return { type: 'match-search-clear' };
+    }
     if (active === nextMatchCardEl.querySelector('.next-match-card__action')) {
       return { type: 'next-match-action' };
     }
@@ -1012,7 +1036,18 @@
   function restoreCommandCenterFocus(ref) {
     if (!ref) return;
     var target = null;
-    if (ref.type === 'next-match-action') {
+    if (ref.type === 'match-search-input') {
+      if (matchSearchInputEl) {
+        matchSearchInputEl.focus();
+        if (typeof ref.cursor === 'number') {
+          matchSearchInputEl.setSelectionRange(ref.cursor, ref.cursor);
+        }
+      }
+      return;
+    }
+    if (ref.type === 'match-search-clear') {
+      target = matchSearchClearBtn;
+    } else if (ref.type === 'next-match-action') {
       target = nextMatchCardEl.querySelector('.next-match-card__action');
     } else if (ref.type === 'access-member') {
       target = accessMembers.querySelector('[data-member="' + ref.member + '"][data-access="' + ref.access + '"]') ||
@@ -1052,6 +1087,11 @@
       tournamentLiveSectionEl.hidden = true;
       tournamentPendingSectionEl.hidden = true;
       tournamentRecentlyFinishedSectionEl.hidden = true;
+      if (matchSearchEl) matchSearchEl.hidden = true;
+      if (matchSearchResultsEl) {
+        matchSearchResultsEl.hidden = true;
+        matchSearchResultsEl.innerHTML = '';
+      }
       return;
     }
     var resolution = tournamentState.format ? currentResolution : null;
@@ -1066,6 +1106,7 @@
     renderMatchDaySection(tournamentLiveSectionEl, 'live', day.live, day.counts.live);
     renderMatchDaySection(tournamentPendingSectionEl, 'pending', day.pending, day.counts.pending);
     renderMatchDaySection(tournamentRecentlyFinishedSectionEl, 'recentlyFinished', day.recentlyFinished, day.counts.recentlyFinished);
+    renderMatchSearch();
   }
 
   /** REQ-UX-31: the Next Match card and its 4 reason states. The action
@@ -1263,6 +1304,200 @@
 
     li.appendChild(row);
     return li;
+  }
+
+  // --- Match Search / Finder (REQ-UX-finder) ---
+
+  function normalizeSearchString(s) {
+    return String(s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  function matchMatchesSearch(rawMatch, query) {
+    if (!query) return true;
+    var q = normalizeSearchString(query);
+    if (!q) return true;
+    var words = q.split(/\s+/).filter(Boolean);
+
+    var projected = findProjectedMatch(rawMatch.id);
+    var team1 = tournamentState && tournamentState.teams
+      ? tournamentState.teams.find(function (t) { return t.id === rawMatch.team1Id; })
+      : null;
+    var name1 = rawMatch.team1Id
+      ? resolveMatchTeamName(rawMatch.team1Id)
+      : formatSlotLabel(projected ? projected.team1Slot : rawMatch.team1Slot);
+    var p1Names = team1 && team1.players ? team1.players.map(function (p) { return p.name; }).join(' ') : '';
+
+    var team2 = tournamentState && tournamentState.teams
+      ? tournamentState.teams.find(function (t) { return t.id === rawMatch.team2Id; })
+      : null;
+    var name2 = rawMatch.team2Id
+      ? resolveMatchTeamName(rawMatch.team2Id)
+      : formatSlotLabel(projected ? projected.team2Slot : rawMatch.team2Slot);
+    var p2Names = team2 && team2.players ? team2.players.map(function (p) { return p.name; }).join(' ') : '';
+
+    var stageInfo = '';
+    if (rawMatch.groupId) {
+      stageInfo = t('tournament.group', { id: rawMatch.groupId }) + ' grupo group ' + rawMatch.groupId;
+    } else if (rawMatch.stageId) {
+      stageInfo = t('tournament.format.stage.' + rawMatch.stageId) + ' ' + rawMatch.stageId;
+    }
+
+    var fullText = normalizeSearchString(name1 + ' ' + p1Names + ' ' + name2 + ' ' + p2Names + ' ' + stageInfo);
+
+    return words.every(function (word) {
+      return fullText.indexOf(word) !== -1;
+    });
+  }
+
+  function renderSearchResultRow(rawMatch) {
+    var projected = findProjectedMatch(rawMatch.id);
+    var name1 = rawMatch.team1Id ? resolveMatchTeamName(rawMatch.team1Id) : formatSlotLabel(projected ? projected.team1Slot : rawMatch.team1Slot);
+    var name2 = rawMatch.team2Id ? resolveMatchTeamName(rawMatch.team2Id) : formatSlotLabel(projected ? projected.team2Slot : rawMatch.team2Slot);
+    var hasScore = rawMatch.score1 != null && rawMatch.score2 != null;
+    var isPlayed = !!rawMatch.played;
+    var status = rawMatch.status || (isPlayed ? 'finished' : 'pending');
+    var isActive = scoreboardMatchId === rawMatch.id;
+    var scorable = projected ? projected.scorable : true;
+
+    var li = document.createElement('li');
+    li.dataset.status = status;
+    li.dataset.matchId = rawMatch.id;
+    li.className = 'match-card' + (isPlayed ? ' match-card--played' : '') + (isActive ? ' match-card--active' : '');
+
+    var row = document.createElement('div');
+    row.className = 'match-card__row';
+
+    var teamsEl = document.createElement('span');
+    teamsEl.className = 'match-card__teams';
+    teamsEl.innerHTML = escapeHTML(name1) +
+      ' <span class="match-card__vs">' + escapeHTML(t('tournament.match.vs')) + '</span> ' +
+      escapeHTML(name2);
+    row.appendChild(teamsEl);
+
+    var scoreEl = document.createElement('span');
+    scoreEl.className = 'match-card__score' + (hasScore ? ' match-card__score--played' : '');
+    scoreEl.textContent = hasScore ? (rawMatch.score1 + ' – ' + rawMatch.score2) : '–';
+    row.appendChild(scoreEl);
+
+    if (!isReadOnly && scorable) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'match-card__btn' + (isActive ? ' match-card__btn--track-active' : '');
+      btn.textContent = status === 'live'
+        ? t('workspace.tournament.matchRow.resume')
+        : (hasScore ? t('tournament.match.edit') : t('workspace.tournament.matchRow.score'));
+      btn.addEventListener('click', (function (mid) {
+        return function () { handleScoreboard(mid); };
+      })(rawMatch.id));
+      row.appendChild(btn);
+    }
+
+    li.appendChild(row);
+
+    var metaText = '';
+    if (rawMatch.groupId) {
+      metaText = t('tournament.group', { id: rawMatch.groupId });
+    } else if (rawMatch.stageId) {
+      metaText = t('tournament.format.stage.' + rawMatch.stageId);
+    }
+    if (metaText) {
+      var metaEl = document.createElement('p');
+      metaEl.className = 'match-card__rule';
+      metaEl.textContent = metaText;
+      li.appendChild(metaEl);
+    }
+
+    return li;
+  }
+
+  function renderMatchSearch() {
+    if (!tournamentState || !tournamentState.matches || tournamentState.matches.length === 0) {
+      if (matchSearchEl) matchSearchEl.hidden = true;
+      if (matchSearchResultsEl) {
+        matchSearchResultsEl.hidden = true;
+        matchSearchResultsEl.innerHTML = '';
+      }
+      return;
+    }
+
+    if (matchSearchEl) matchSearchEl.hidden = false;
+    var query = matchSearchQuery.trim();
+    var isSearching = query.length > 0;
+    if (matchSearchClearBtn) matchSearchClearBtn.hidden = !isSearching;
+
+    if (!isSearching) {
+      if (matchSearchResultsEl) {
+        matchSearchResultsEl.hidden = true;
+        matchSearchResultsEl.innerHTML = '';
+      }
+      tournamentGroupsEl.hidden = false;
+      var knockoutStages = currentResolution
+        ? currentResolution.stages.filter(function (stage) { return stage.kind === 'knockout'; })
+        : [];
+      tournamentStagesEl.hidden = knockoutStages.length === 0;
+      return;
+    }
+
+    // Hide other sections so organizer directly sees search results
+    nextMatchCardEl.hidden = true;
+    tournamentStageProgressEl.hidden = true;
+    tournamentLiveSectionEl.hidden = true;
+    tournamentPendingSectionEl.hidden = true;
+    tournamentRecentlyFinishedSectionEl.hidden = true;
+    tournamentGroupsEl.hidden = true;
+    tournamentStagesEl.hidden = true;
+
+    if (!matchSearchResultsEl) return;
+    matchSearchResultsEl.hidden = false;
+    matchSearchResultsEl.innerHTML = '';
+
+    var matches = tournamentState.matches.slice().sort(function (a, b) {
+      return (a.order || 0) - (b.order || 0);
+    });
+
+    var filtered = matches.filter(function (m) {
+      return matchMatchesSearch(m, query);
+    });
+
+    var countHeading = document.createElement('p');
+    countHeading.className = filtered.length > 0 ? 'match-search__count' : 'match-search__empty';
+    countHeading.setAttribute('role', 'status');
+    countHeading.setAttribute('aria-live', 'polite');
+    countHeading.textContent = filtered.length > 0
+      ? t('tournament.search.resultsCount', { count: filtered.length })
+      : t('tournament.search.noResults', { query: query });
+    matchSearchResultsEl.appendChild(countHeading);
+
+    if (filtered.length > 0) {
+      var ul = document.createElement('ul');
+      ul.className = 'match-list';
+      filtered.forEach(function (m) {
+        ul.appendChild(renderSearchResultRow(m));
+      });
+      matchSearchResultsEl.appendChild(ul);
+    }
+  }
+
+  function handleMatchSearchInput() {
+    matchSearchQuery = matchSearchInputEl ? matchSearchInputEl.value : '';
+    if (matchSearchQuery.trim().length === 0) {
+      renderTournament();
+      renderCommandCenter();
+    } else {
+      renderMatchSearch();
+    }
+  }
+
+  function handleMatchSearchClear() {
+    if (matchSearchInputEl) matchSearchInputEl.value = '';
+    matchSearchQuery = '';
+    renderTournament();
+    renderCommandCenter();
+    if (matchSearchInputEl) matchSearchInputEl.focus();
   }
 
   // --- Results / completion (REQ-UX-50..53) ---
@@ -1979,6 +2214,13 @@
     activeMatchId = null;
     scoreboardMatchId = null;
     liveScore = { score1: 0, score2: 0 };
+    matchSearchQuery = '';
+    if (matchSearchInputEl) matchSearchInputEl.value = '';
+    if (matchSearchResultsEl) {
+      matchSearchResultsEl.innerHTML = '';
+      matchSearchResultsEl.hidden = true;
+    }
+    if (matchSearchClearBtn) matchSearchClearBtn.hidden = true;
     saveTournamentState();
     if (tournamentRepository) {
       tournamentRepository.createSession(tournamentState).then(function (result) {
@@ -2010,6 +2252,14 @@
     activeMatchId = null;
     scoreboardMatchId = null;
     liveScore = { score1: 0, score2: 0 };
+    matchSearchQuery = '';
+    if (matchSearchInputEl) matchSearchInputEl.value = '';
+    if (matchSearchResultsEl) {
+      matchSearchResultsEl.innerHTML = '';
+      matchSearchResultsEl.hidden = true;
+    }
+    if (matchSearchClearBtn) matchSearchClearBtn.hidden = true;
+    if (matchSearchEl) matchSearchEl.hidden = true;
     // Match ids are deterministic (groupId-team1Id-team2Id from index-based team ids,
     // e.g. "A-t1-t2") — a brand-new, same-shaped tournament can legitimately reuse an
     // OLD tournament's match id. Any lingering conflict/offline/denied scratch state
@@ -2589,6 +2839,11 @@
       : [];
     knockoutStages.forEach(function (stage) { tournamentStagesEl.appendChild(renderStagePanel(stage)); });
     tournamentStagesEl.hidden = knockoutStages.length === 0;
+
+    if (matchSearchQuery && matchSearchQuery.trim().length > 0) {
+      tournamentGroupsEl.hidden = true;
+      tournamentStagesEl.hidden = true;
+    }
 
     // Tournament complete banner — formatted sessions use the bracket projection's
     // `complete` flag (REQ-FMT-05); classic sessions keep isTournamentComplete unchanged.
