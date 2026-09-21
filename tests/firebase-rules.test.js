@@ -309,3 +309,101 @@ test('Firebase repository creates schema v2 and transacts a result', async () =>
   app.database().goOffline();
   await app.delete();
 });
+
+// ─── Result history (v2.0.0) ─────────────────────────────────────────────────
+
+const APPROVED = { scorer: { label: 'Court one', status: 'approved', requestedAt: 1, decidedAt: 2 } };
+
+function historyEntry(actor, revision, overrides) {
+  return Object.assign({
+    score1: 21,
+    score2: 18,
+    status: 'finished',
+    revision,
+    updatedBy: actor,
+    updatedAt: serverTimestamp(),
+    authorLabel: 'Court one',
+    action: revision === 1 ? 'created' : 'edited',
+  }, overrides || {});
+}
+
+function savePayload(actor, revision, matchId = 'matchA') {
+  return {
+    [`tournaments/${SESSION_ID}/results/${matchId}`]: result(actor, revision),
+    [`tournaments/${SESSION_ID}/resultHistory/${matchId}/${revision}`]: historyEntry(actor, revision),
+  };
+}
+
+test('result and history land together in one atomic update', async () => {
+  await seed(APPROVED);
+  await assertSucceeds(update(ref(db('scorer')), savePayload('scorer', 1)));
+  await assertSucceeds(update(ref(db('scorer')), savePayload('scorer', 2)));
+});
+
+test('history is append-only — nobody rewrites a stored revision, not even the owner', async () => {
+  await seed(APPROVED);
+  await assertSucceeds(update(ref(db('scorer')), savePayload('scorer', 1)));
+  const entry = ref(db('scorer'), `tournaments/${SESSION_ID}/resultHistory/matchA/1`);
+  await assertFails(set(entry, historyEntry('scorer', 1, { score1: 9 })));
+  await assertFails(set(ref(db('owner'), `tournaments/${SESSION_ID}/resultHistory/matchA/1`), historyEntry('owner', 1)));
+});
+
+test('a losing race is rejected whole — neither result nor history is written', async () => {
+  await seed(APPROVED);
+  await assertSucceeds(update(ref(db('scorer')), savePayload('scorer', 1)));
+  // Stale client still believes the stored revision is 0, so it retries revision 1.
+  await assertFails(update(ref(db('owner')), savePayload('owner', 1)));
+  const stored = await get(ref(db(), `tournaments/${SESSION_ID}/resultHistory/matchA/1`));
+  if (stored.val().updatedBy !== 'scorer') throw new Error('Expected the first writer to survive the race');
+});
+
+test('a history revision must follow the stored result revision', async () => {
+  await seed(APPROVED);
+  await assertFails(set(ref(db('scorer'), `tournaments/${SESSION_ID}/resultHistory/matchA/2`), historyEntry('scorer', 2)));
+  await assertSucceeds(update(ref(db('scorer')), savePayload('scorer', 1)));
+  await assertFails(set(ref(db('scorer'), `tournaments/${SESSION_ID}/resultHistory/matchA/3`), historyEntry('scorer', 3)));
+});
+
+test('history rejects unknown actions, stray fields and a missing author', async () => {
+  await seed(APPROVED);
+  const at = revision => ref(db('scorer'), `tournaments/${SESSION_ID}/resultHistory/matchA/${revision}`);
+  await assertFails(set(at(1), historyEntry('scorer', 1, { action: 'deleted' })));
+  await assertFails(set(at(1), historyEntry('scorer', 1, { note: 'extra' })));
+  const anonymous = historyEntry('scorer', 1);
+  delete anonymous.authorLabel;
+  await assertFails(set(at(1), anonymous));
+  await assertFails(set(at(1), historyEntry('scorer', 1, { updatedBy: 'someone-else' })));
+});
+
+test('a revoked device cannot append history, a spectator can read it', async () => {
+  await seed(APPROVED);
+  await assertSucceeds(update(ref(db('scorer')), savePayload('scorer', 1)));
+  await assertSucceeds(set(ref(db('owner'), `tournamentAccess/${SESSION_ID}/members/scorer`), {
+    label: 'Court one', status: 'revoked', requestedAt: 1, decidedAt: serverTimestamp(),
+  }));
+  await assertFails(update(ref(db('scorer')), savePayload('scorer', 2)));
+  // Authorship is readable by anyone with the link precisely because it is denormalized.
+  await assertSucceeds(get(ref(db('viewer'), `tournaments/${SESSION_ID}/resultHistory`)));
+  await assertFails(get(ref(db('viewer'), `tournamentAccess/${SESSION_ID}/members/scorer`)));
+});
+
+test('ownerLabel is optional, bounded, and fixed at creation', async () => {
+  await assertSucceeds(set(ref(db('owner'), 'tournaments/labelled01'), Object.assign(session(), {
+    ownerUid: 'owner', createdAt: serverTimestamp(), ownerLabel: 'Pipe',
+  })));
+  // Sessions created before v2 carry no label and must keep validating.
+  await assertSucceeds(set(ref(db('owner'), 'tournaments/unlabelled1'), Object.assign(session(), {
+    ownerUid: 'owner', createdAt: serverTimestamp(),
+  })));
+  await assertFails(set(ref(db('owner'), 'tournaments/toolong0001'), Object.assign(session(), {
+    ownerUid: 'owner', createdAt: serverTimestamp(), ownerLabel: 'x'.repeat(51),
+  })));
+});
+
+test('the version floor is world-readable and client-writable by nobody', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(), 'config/minClientVersion'), '2.0.0');
+  });
+  await assertSucceeds(get(ref(db(), 'config/minClientVersion')));
+  await assertFails(set(ref(db('owner'), 'config/minClientVersion'), '9.9.9'));
+});

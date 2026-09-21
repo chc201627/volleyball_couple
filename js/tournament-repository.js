@@ -198,6 +198,60 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     return liveOrFinished && validScores &&
       (command.status !== 'finished' || command.score1 !== command.score2);
   }
+  /** `created` on the first result for a match, `conflictResolved` when the command is
+   * the user's answer to a losing race, `edited` otherwise. The distinction is what lets
+   * the history separate "someone scored this" from "someone corrected it". */
+  function historyAction(current, command) {
+    if (!current) return 'created';
+    if (command && command.afterConflict) return 'conflictResolved';
+    return 'edited';
+  }
+  /** Author label is DENORMALIZED into every entry on purpose: the readable label lives
+   * under `tournamentAccess/{sid}/members/{uid}/label`, whose .read is the owner or that
+   * uid alone, so a spectator resolving authorship live would only ever see UIDs. Copying
+   * it is also the truthful thing — the history is an immutable snapshot and the name at
+   * the time of the edit is the correct one to show. */
+  function historyEntry(command, revision, uid, authorLabel, action, timestamp) {
+    return {
+      score1: command.score1,
+      score2: command.score2,
+      status: command.status,
+      revision: revision,
+      updatedBy: uid,
+      updatedAt: timestamp,
+      authorLabel: String(authorLabel || 'Organizador').slice(0, 50),
+      action: action,
+    };
+  }
+  /** Flattens `{matchId: {revision: entry}}` into a newest-first list. Sorting on the
+   * stored `revision` rather than the key keeps the order right even if a client ever
+   * wrote an entry under a mismatched key. */
+  function decodeHistory(raw) {
+    var entries = [];
+    Object.keys(raw || {}).forEach(function (matchId) {
+      var byRevision = raw[matchId] || {};
+      Object.keys(byRevision).forEach(function (key) {
+        var entry = byRevision[key];
+        if (!entry) return;
+        entries.push({
+          matchId: matchId,
+          revision: entry.revision,
+          score1: entry.score1,
+          score2: entry.score2,
+          status: entry.status,
+          updatedBy: entry.updatedBy,
+          updatedAt: entry.updatedAt,
+          authorLabel: entry.authorLabel,
+          action: entry.action,
+        });
+      });
+    });
+    entries.sort(function (a, b) {
+      if (a.updatedAt !== b.updatedAt) return (b.updatedAt || 0) - (a.updatedAt || 0);
+      return (b.revision || 0) - (a.revision || 0);
+    });
+    return entries;
+  }
   createInMemoryTournamentRepository = function (options) {
     options = options || {};
     var runtime = options.runtime || { uid: options.uid || 'memory-device', authState: 'ready', connection: 'online' };
@@ -207,6 +261,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     var now = typeof options.now === 'function' ? options.now : Date.now;
     var sessions = clone(options.sessions || {});
     var watchers = {};
+    var historyWatchers = {};
     var sequence = 0;
     function accessFor(session) {
       return session.access && session.access[runtime.uid] ? session.access[runtime.uid].status : null;
@@ -227,20 +282,40 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     function notify(sessionId) {
       var current = snapshot(sessions[sessionId]);
       (watchers[sessionId] || []).slice().forEach(function (listener) { listener(current); });
+      var history = decodeHistory(sessions[sessionId] && sessions[sessionId].resultHistory);
+      (historyWatchers[sessionId] || []).slice().forEach(function (listener) { listener(history); });
+    }
+    function authorLabelFor(session) {
+      if (session.ownerUid === runtime.uid) return session.ownerLabel || 'Organizador';
+      var member = session.access && session.access[runtime.uid];
+      return (member && member.label) || 'Anotador';
     }
     return {
-      createSession: function (tournament) {
+      createSession: function (tournament, options) {
         var sessionId = 'memory-' + (++sequence);
+        var ownerLabel = options && options.ownerLabel;
         sessions[sessionId] = {
           schemaVersion: (tournament && tournament.format) ? 3 : 2,
           ownerUid: runtime.uid,
           createdAt: now(),
           structure: encodeStructure(tournament || {}),
           results: {},
+          resultHistory: {},
           access: {},
         };
+        if (ownerLabel) sessions[sessionId].ownerLabel = String(ownerLabel).slice(0, 50);
         notify(sessionId);
         return Promise.resolve({ sessionId: sessionId });
+      },
+      watchHistory: function (sessionId, onSnapshot) {
+        if (!historyWatchers[sessionId]) historyWatchers[sessionId] = [];
+        historyWatchers[sessionId].push(onSnapshot);
+        onSnapshot(decodeHistory(sessions[sessionId] && sessions[sessionId].resultHistory));
+        return function () {
+          historyWatchers[sessionId] = (historyWatchers[sessionId] || []).filter(function (item) {
+            return item !== onSnapshot;
+          });
+        };
       },
       watchSession: function (sessionId, onSnapshot) {
         if (!watchers[sessionId]) watchers[sessionId] = [];
@@ -286,17 +361,31 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         if (command.expectedRevision !== currentRevision) {
           return Promise.resolve({ status: 'conflict', current: clone(current) });
         }
+        var revision = currentRevision + 1;
+        var timestamp = now();
         var result = {
           score1: command.score1,
           score2: command.score2,
           status: command.status,
-          revision: currentRevision + 1,
+          revision: revision,
           updatedBy: runtime.uid,
-          updatedAt: now(),
+          updatedAt: timestamp,
         };
+        // Result and history entry land together, mirroring the single multi-path
+        // update the Firebase adapter performs — a history with holes would be worse
+        // than no history at all.
         session.results[command.matchId] = result;
+        session.resultHistory = session.resultHistory || {};
+        session.resultHistory[command.matchId] = session.resultHistory[command.matchId] || {};
+        session.resultHistory[command.matchId][revision] = historyEntry(
+          command, revision, runtime.uid, authorLabelFor(session),
+          historyAction(current, command), timestamp
+        );
         notify(sessionId);
-        return Promise.resolve({ status: 'synced', result: clone(result) });
+        // Same shape the Firebase adapter returns, `updatedAt` included: see the contract
+        // note on its saveResult. Keeping the two adapters identical is what stops a
+        // browser harness from passing on a field production never hands back.
+        return Promise.resolve({ status: 'synced', result: { score1: result.score1, score2: result.score2, status: result.status, revision: revision, updatedBy: runtime.uid } });
       },
       removeSession: function (sessionId) {
         var session = sessions[sessionId];
@@ -324,6 +413,9 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     var authState = currentUser ? 'ready' : 'pending';
     var connected = true;
     var signingIn = null;
+    /** Per-session authorship cache filled by watchSession, so a save does not pay an
+     * extra round trip to find out what name to stamp on the history entry. */
+    var authorship = {};
 
     function requireUser() {
       if (auth.currentUser) { currentUser = auth.currentUser; authState = 'ready'; return Promise.resolve(currentUser); }
@@ -361,7 +453,11 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         ownRef = membersRef = null; access = requests = null;
         if (!currentUser) { emit(); return; }
         ownRef = db.ref('tournamentAccess/' + sessionId + '/members/' + currentUser.uid);
-        ownRef.on('value', function (snap) { access = snap.val(); emit(); }, function () { access = null; emit(); });
+        ownRef.on('value', function (snap) {
+          access = snap.val();
+          authorship[sessionId] = Object.assign({}, authorship[sessionId], { memberLabel: access && access.label });
+          emit();
+        }, function () { access = null; emit(); });
         if (raw && raw.ownerUid === currentUser.uid) {
           membersRef = db.ref('tournamentAccess/' + sessionId + '/members');
           membersRef.on('value', function (snap) { requests = snap.val() || {}; emit(); });
@@ -372,21 +468,55 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         if (!user) requireUser().catch(function () { authState = 'error'; emit(); });
       });
       connectedRef.on('value', function (snap) { connected = snap.val() !== false; emit(); });
-      sessionRef.on('value', function (snap) { raw = snap.val(); bindPrivate(); emit(); });
+      sessionRef.on('value', function (snap) {
+        raw = snap.val();
+        authorship[sessionId] = Object.assign({}, authorship[sessionId], {
+          ownerUid: raw && raw.ownerUid,
+          ownerLabel: raw && raw.ownerLabel,
+        });
+        bindPrivate();
+        emit();
+      });
       return function () { sessionRef.off(); connectedRef.off(); if (ownRef) ownRef.off(); if (membersRef) membersRef.off(); stopAuth(); };
+    }
+    /** Cache first; the reads below only run when a save happens without an active
+     * subscription. Both paths are readable by the writer: `ownerLabel` is public and a
+     * member can always read its own entry. */
+    function resolveAuthorLabel(sessionId, user) {
+      var cached = authorship[sessionId] || {};
+      if (cached.ownerUid === user.uid) return Promise.resolve(cached.ownerLabel || 'Organizador');
+      if (cached.ownerUid && cached.memberLabel) return Promise.resolve(cached.memberLabel);
+      return db.ref('tournaments/' + sessionId + '/ownerUid').once('value').then(function (snap) {
+        if (snap.val() === user.uid) {
+          return db.ref('tournaments/' + sessionId + '/ownerLabel').once('value')
+            .then(function (label) { return label.val() || 'Organizador'; });
+        }
+        return db.ref('tournamentAccess/' + sessionId + '/members/' + user.uid + '/label').once('value')
+          .then(function (label) { return label.val() || 'Anotador'; });
+      }).catch(function () { return 'Anotador'; });
     }
 
     return {
-      createSession: function (tournament) {
+      createSession: function (tournament, options) {
         return requireUser().then(function (user) {
           var sessionRef = db.ref('tournaments').push();
-          return sessionRef.set({
+          var payload = {
             schemaVersion: (tournament && tournament.format) ? 3 : 2, ownerUid: user.uid, createdAt: { '.sv': 'timestamp' },
             structure: encodeStructure(tournament || {}),
-          }).then(function () { return { status: 'synced', sessionId: sessionRef.key }; });
+          };
+          // Written once, at creation: the session node's .write only allows create and
+          // delete, so ownerLabel is immutable afterwards by construction.
+          var ownerLabel = options && options.ownerLabel;
+          if (ownerLabel) payload.ownerLabel = String(ownerLabel).slice(0, 50);
+          return sessionRef.set(payload).then(function () { return { status: 'synced', sessionId: sessionRef.key }; });
         }).catch(classify);
       },
       watchSession: watchSession,
+      watchHistory: function (sessionId, onSnapshot) {
+        var ref = db.ref('tournaments/' + sessionId + '/resultHistory');
+        ref.on('value', function (snap) { onSnapshot(decodeHistory(snap.val())); }, function () { onSnapshot([]); });
+        return function () { ref.off(); };
+      },
       requestAccess: function (sessionId, label) {
         return requireUser().then(function (user) {
           return db.ref('tournamentAccess/' + sessionId + '/members/' + user.uid).set({
@@ -402,21 +532,51 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
           }).then(function () { return { status: 'synced' }; });
         }).catch(classify);
       },
+      /** Multi-path update rather than a transaction: a transaction cannot atomically
+       * touch a sibling node, so result and history could drift apart. Concurrency safety
+       * is NOT lost — the rules already pin `revision` to stored + 1, so a device that
+       * loses the race is rejected instead of overwriting.
+       *
+       * CONTRACT: `result` carries everything the client knows at write time and
+       * deliberately OMITS `updatedAt`. The rules require `updatedAt === now` (server
+       * clock), so the value is a `.sv` sentinel here and only exists once the server
+       * resolves it. It arrives through `watchSession` on the decoded match, which is
+       * where its only consumer reads it (tournament-day.js sorts recently-finished by
+       * it). Reading it back would cost an extra round trip on the most
+       * latency-sensitive action in the app, courtside, to hand back a value nobody
+       * asks for synchronously. */
       saveResult: function (sessionId, command) {
         if (!validResult(command)) return Promise.resolve({ status: 'invalid' });
         if (!connected) return Promise.resolve({ status: 'offline' });
         return requireUser().then(function (user) {
-          var conflict = null;
-          var resultRef = db.ref('tournaments/' + sessionId + '/results/' + command.matchId);
-          return resultRef.transaction(function (current) {
-            var revision = current ? current.revision : 0;
-            if (revision !== command.expectedRevision) { conflict = current; return; }
-            return {
+          return resolveAuthorLabel(sessionId, user).then(function (authorLabel) {
+            var base = 'tournaments/' + sessionId + '/';
+            var revision = command.expectedRevision + 1;
+            var result = {
               score1: command.score1, score2: command.score2, status: command.status,
-              revision: revision + 1, updatedBy: user.uid, updatedAt: { '.sv': 'timestamp' },
+              revision: revision, updatedBy: user.uid, updatedAt: { '.sv': 'timestamp' },
             };
-          }, undefined, false).then(function (outcome) {
-            return outcome.committed ? { status: 'synced', result: outcome.snapshot.val() } : { status: 'conflict', current: clone(conflict) };
+            var action = historyAction(command.expectedRevision > 0 ? { revision: command.expectedRevision } : null, command);
+            var payload = {};
+            payload[base + 'results/' + command.matchId] = result;
+            payload[base + 'resultHistory/' + command.matchId + '/' + revision] =
+              historyEntry(command, revision, user.uid, authorLabel, action, { '.sv': 'timestamp' });
+            return db.ref().update(payload).then(function () {
+              // updatedAt stays unresolved here; the authoritative value arrives through
+              // watchSession. No consumer reads it off this return value.
+              return { status: 'synced', result: { score1: result.score1, score2: result.score2, status: result.status, revision: revision, updatedBy: user.uid } };
+            }, function (error) {
+              // Losing the race and lacking permission both surface as the same rejection,
+              // so re-read the stored revision to tell them apart. The results node is
+              // world-readable, so this read works even for a revoked scorer.
+              return db.ref(base + 'results/' + command.matchId).once('value').then(function (snap) {
+                var stored = snap.val();
+                if ((stored ? stored.revision : 0) !== command.expectedRevision) {
+                  return { status: 'conflict', current: clone(stored) };
+                }
+                throw error;
+              }, function () { throw error; });
+            });
           });
         }).catch(classify);
       },
