@@ -1,0 +1,53 @@
+/* ============================================
+   Reset — v2.0.0
+   Normalisation only. Anything that positions the application lives in
+   app-shell.css; anything that styles a widget lives in ui-components.css.
+   ============================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* Stops iOS from inflating text in landscape, which silently breaks the
+     320px budget the release checklist treats as a blocker. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-body);
+  line-height: 1.45;
+  color: var(--text-1);
+  background: var(--surface-0);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+ul, ol { list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; }
+input, select, textarea { font: inherit; color: inherit; }
+svg { display: block; flex: none; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-control);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

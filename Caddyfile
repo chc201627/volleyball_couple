@@ -1,0 +1,57 @@
+# Static serving and cache policy — overrides the Caddyfile that Railpack
+# generates by default (Railpack serves static files with Caddy and prefers a
+# Caddyfile found at the project root).
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# Production was sending NO Cache-Control header at all — only ETag and
+# Last-Modified. With no explicit policy a browser falls back to heuristic
+# freshness, roughly 10% of the age of the document, so index.html could be
+# served from cache for hours without ever asking the server. That is what made
+# the ?v= query strings only half-work: the versioned asset URLs live inside
+# index.html, so if the HTML itself never revalidates, nobody ever learns the
+# asset URLs changed.
+#
+# ROLLOUT ORDER MATTERS
+# ---------------------
+# Ship this file BEFORE the version it is meant to roll out. Clients still
+# holding a heuristically-cached index.html will not see a new deploy until
+# their own freshness window expires; once they have picked up `no-cache`
+# once, every later release reaches them on the next load.
+
+:{$PORT:3000}
+
+root * {$RAILPACK_STATIC_FILE_ROOT:.}
+encode zstd gzip
+
+# HTML always revalidates. Railway already sends a strong ETag, so the usual
+# outcome is a 304 with an empty body — cheap enough to do on every load, and
+# the only thing that guarantees a release is actually picked up.
+@html {
+	path *.html /
+}
+header @html Cache-Control "no-cache"
+
+# The service worker decides which build every other asset comes from, so it
+# must never be served stale. A cached worker is the one failure mode that can
+# pin an installed app to an old version indefinitely.
+@service_worker {
+	path /service-worker.js
+}
+header @service_worker Cache-Control "no-cache"
+
+# Everything else is immutable by construction: assets are requested with a
+# ?v=X.Y.Z that changes on every release, so a new build asks for different
+# URLs rather than hoping a cached one expired.
+@immutable {
+	path *.css *.js *.png *.jpg *.jpeg *.svg *.webp *.woff2 *.ico
+	not path /service-worker.js
+}
+header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+header {
+	X-Content-Type-Options nosniff
+	-Server
+}
+
+file_server

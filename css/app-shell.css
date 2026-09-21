@@ -1,0 +1,69 @@
+/* ============================================
+   App shell — v2.0.0
+   The frame every screen renders into: app bar on top, scrolling main in the
+   middle, navigation at the bottom, overlays above everything.
+
+   Only the active screen lives in #app-main. There is no hidden-toggling of
+   sibling screens, which is why this file carries no [hidden] override: v1
+   needed `[hidden] { display: none !important }` because layout rules kept
+   winning against the attribute.
+   ============================================ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.app__main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  /* The tab bar is fixed, so the scroll container reserves its height instead
+     of letting it sit on top of the last row — the overlap visible at 390,
+     600 and 960 in v1.9.1. */
+  padding-bottom: calc(var(--tab-bar-height) + var(--space-5) + env(safe-area-inset-bottom, 0px));
+}
+
+.app__action-bar {
+  position: sticky;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(to top, var(--surface-0) 70%, transparent);
+}
+
+.app__tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--surface-1);
+}
+
+.app__overlay:empty { display: none; }
+
+/* --- Breakpoints ---
+   From 600px the navigation moves into the app bar and the fixed tab bar is
+   dropped entirely, which is where v1's sticky nav overlapped content most
+   visibly. Layout columns arrive with the screens that use them. */
+@media (min-width: 600px) {
+  .app__main {
+    width: min(100%, 920px);
+    margin-inline: auto;
+    padding: var(--space-5) var(--space-5) var(--space-6);
+  }
+  .app__tab-bar { display: none; }
+  .app__action-bar {
+    position: static;
+    padding-inline: 0;
+    background: none;
+  }
+}

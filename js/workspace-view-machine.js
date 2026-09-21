@@ -4,8 +4,7 @@
  * 10-13, 60-62.
  *
  * Standalone pure-function module (no DOM access, no side effects, no i18n,
- * no Date/Math.random). Loads immediately before app.js in the contractual
- * script order.
+ * no Date/Math.random). Loads before the UI layer in the contractual script order.
  *
  * Exposed function: computeWorkspace(input)
  */
@@ -13,6 +12,82 @@
 /* exported computeWorkspace */
 
 var WORKSPACE_VIEWS = ['setup', 'teams', 'tournament', 'results'];
+
+/** v2 routing has three axes, and the distinction between the last two is what
+ * keeps the tab bar at four entries no matter how many flows exist:
+ *
+ *   destination — the four tab-bar entries above
+ *   sub-view    — a filter *within* a destination (Tournament only)
+ *   overlay     — a stacked screen or sheet with its own bar and a way back
+ *
+ * Scoring, history, access and share are overlays, not destinations: they are
+ * things you do and come back from, not places you live in.
+ */
+var WORKSPACE_SUBVIEWS = { tournament: ['today', 'groups', 'bracket'] };
+var WORKSPACE_OVERLAYS = [
+  'scoring', 'history', 'matchHistory', 'requestAccess', 'scorers', 'share', 'modeFork',
+];
+
+/** Sub-view resolution. Only Tournament has them; everything else resolves to
+ * null so a screen never has to ask "do I have tabs?". Bracket is hidden
+ * rather than shown-empty when the session's format has no knockout stage —
+ * an always-present tab that is always empty teaches people to ignore it. */
+function workspaceSubView(input, view) {
+  var allowed = WORKSPACE_SUBVIEWS[view];
+  if (!allowed) return { subView: null, subViewItems: [] };
+  var items = allowed.filter(function (id) {
+    return id !== 'bracket' || !!input.hasBracket;
+  }).map(function (id) {
+    return { id: id, labelKey: 'workspace.tournament.tab.' + id };
+  });
+  var requested = input.currentSubView;
+  var resolved = items.some(function (item) { return item.id === requested; }) ? requested : 'today';
+  return { subView: resolved, subViewItems: items };
+}
+
+/** Whether a requested overlay may open for the current state and role.
+ * Returning a reason key rather than silently dropping it means the caller can
+ * explain the refusal instead of appearing to ignore the tap. */
+function workspaceOverlayAllowed(id, input) {
+  switch (id) {
+    case 'scoring':
+      if (input.role !== 'owner' && input.role !== 'scorer') {
+        return { enabled: false, reasonKey: 'workspace.overlay.blocked.readOnly' };
+      }
+      return { enabled: !!input.hasTournament, reasonKey: input.hasTournament ? null : 'workspace.overlay.blocked.noTournament' };
+    case 'history':
+      return { enabled: !!input.hasTournament, reasonKey: input.hasTournament ? null : 'workspace.overlay.blocked.noTournament' };
+    case 'matchHistory':
+      // Only reachable for a match that actually has something to show. This is
+      // the rule behind the per-match entrypoint: no revisions, no icon.
+      return { enabled: (input.overlayMatchRevisions || 0) > 0, reasonKey: 'workspace.overlay.blocked.noRevisions' };
+    case 'requestAccess':
+      return { enabled: input.role === 'spectator', reasonKey: 'workspace.overlay.blocked.alreadyScoring' };
+    case 'scorers':
+      return { enabled: input.role === 'owner', reasonKey: 'workspace.overlay.blocked.ownerOnly' };
+    case 'share':
+      return { enabled: !!input.sessionId, reasonKey: 'workspace.overlay.blocked.noSession' };
+    case 'modeFork':
+      return {
+        enabled: !!input.couplesGenerated && !input.hasTournament && !input.hasKingGame,
+        reasonKey: 'workspace.overlay.blocked.modeChosen',
+      };
+    default:
+      return { enabled: false, reasonKey: null };
+  }
+}
+
+function workspaceOverlay(input) {
+  var requested = input.currentOverlay;
+  if (!requested || WORKSPACE_OVERLAYS.indexOf(requested) === -1) {
+    return { overlay: null, overlayBlockedReasonKey: null };
+  }
+  var allowed = workspaceOverlayAllowed(requested, input);
+  return {
+    overlay: allowed.enabled ? requested : null,
+    overlayBlockedReasonKey: allowed.enabled ? null : allowed.reasonKey,
+  };
+}
 
 /** REQ-UX-11 readiness checklist. `enoughPlayers`/`teamsGenerated`/
  * `groupFeasible`/`formatValid` are blocking; `noUnmatched` and
@@ -50,7 +125,7 @@ function workspaceFirstBlocker(readiness) {
 /** Default-view derivation table (design "Default-view / primary-action").
  * `hasTournament`/`hasKingGame` is checked BEFORE `couplesGenerated` — fixed:
  * after a page reload restoring a running LOCAL tournament/king game,
- * `couplesGenerated` (a separate, non-persisted module flag in app.js) is
+ * `couplesGenerated` (a separate, non-persisted orchestrator flag) is
  * still false, which previously forced 'setup' even though a tournament was
  * already active, contradicting REQ-UX-05's "tournament or king in progress
  * → Tournament" row. A tournament/king existing already implies teams were
@@ -162,7 +237,7 @@ function workspacePrimaryAction(input, readiness) {
  * role-scoped nav, the single contextual primary action and the readiness
  * checklist from application state.
  *
- * @param {object} input - see design "Module Design > js/workspace.js > Input"
+ * @param {object} input - see design "Module Design > workspace view machine > Input"
  * @returns {object} WorkspaceView
  */
 function computeWorkspace(input) {
@@ -180,6 +255,9 @@ function computeWorkspace(input) {
     if (reach.enabled && visibleForRole) view = input.currentView;
   }
 
+  var sub = workspaceSubView(input, view);
+  var overlay = workspaceOverlay(input);
+
   return {
     view: view,
     defaultView: defaultView,
@@ -187,5 +265,9 @@ function computeWorkspace(input) {
     primaryAction: workspacePrimaryAction(input, readiness),
     readiness: readiness,
     formatLocked: !!input.hasTournament,
+    subView: sub.subView,
+    subViewItems: sub.subViewItems,
+    overlay: overlay.overlay,
+    overlayBlockedReasonKey: overlay.overlayBlockedReasonKey,
   };
 }

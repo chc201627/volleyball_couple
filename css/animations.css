@@ -1,0 +1,128 @@
+/* ============================================
+   Motion — v2.0.0
+   Replaces the Animate.css CDN. Board M1 is the spec.
+
+   Two rules govern everything here:
+
+   1. No animation is ever a precondition for completing an operation. v1.9.1
+      broke this: removePlayer() waited on `animationend` to commit the delete,
+      so if the CDN failed to load the event never fired and the player was
+      never removed. State changes first, motion decorates.
+
+   2. Reduced motion removes the movement, not the information. The end state
+      of every animation below is the resting state, so disabling motion still
+      leaves the check, the toast and the highlight on screen.
+   ============================================ */
+
+/* --- list-in: rows entering a list (players, couples, queue, matches) --- */
+@keyframes list-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.anim-list-in {
+  animation: list-in 180ms ease-out both;
+}
+/* Stagger is capped: past ~8 rows the delay stops helping and starts feeling
+   like lag, so later rows all land together. */
+.anim-list-in:nth-child(1) { animation-delay: 0ms; }
+.anim-list-in:nth-child(2) { animation-delay: 24ms; }
+.anim-list-in:nth-child(3) { animation-delay: 48ms; }
+.anim-list-in:nth-child(4) { animation-delay: 72ms; }
+.anim-list-in:nth-child(5) { animation-delay: 96ms; }
+.anim-list-in:nth-child(6) { animation-delay: 120ms; }
+.anim-list-in:nth-child(7) { animation-delay: 144ms; }
+.anim-list-in:nth-child(n + 8) { animation-delay: 168ms; }
+
+/* --- list-out: a row being removed --- */
+@keyframes list-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateX(12px); }
+}
+.anim-list-out {
+  animation: list-out 140ms ease-in both;
+}
+
+/* --- score-bump: the number reacting to + / − --- */
+@keyframes score-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.anim-score-bump {
+  animation: score-bump 120ms ease-out;
+}
+
+/* --- winner-flash: the winning side when a result is saved (board M2) --- */
+@keyframes winner-flash {
+  0%   { box-shadow: 0 0 0 0 var(--overlay-accent-12); }
+  35%  { box-shadow: 0 0 0 6px var(--overlay-accent-12); }
+  100% { box-shadow: 0 0 0 0 rgba(200, 255, 0, 0); }
+}
+.anim-winner-flash {
+  animation: winner-flash 420ms ease-out;
+}
+
+/* --- sheet-in: bottom sheets (share, mode fork) --- */
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.anim-sheet-in {
+  animation: sheet-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.anim-scrim-in {
+  animation: scrim-in 240ms ease-out both;
+}
+
+/* --- screen-in: switching destination. Opacity only: a tab bar switch is not
+       a spatial move, and sliding it would imply a hierarchy that is not there. --- */
+@keyframes screen-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.anim-screen-in {
+  animation: screen-in 120ms linear both;
+}
+
+/* --- progress-fill: stage progress bar reacting to a new result --- */
+.anim-progress-fill {
+  transition: width 300ms ease-in-out;
+}
+
+/* --- sync-pulse: the status dot while a save is in flight --- */
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.anim-sync-pulse {
+  animation: sync-pulse 1200ms ease-in-out infinite;
+}
+
+/* --- toast-in: ephemeral notices --- */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.anim-toast-in {
+  animation: toast-in 200ms ease-out both;
+}
+
+/* --- Reduced motion ---
+   Durations collapse rather than the rules being removed, so `animationend`
+   still fires for anything that listens. Nothing here is load-bearing, but a
+   listener that never fires is exactly the class of bug this file exists to
+   fix, so it stays safe by construction. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

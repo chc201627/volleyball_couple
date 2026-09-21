@@ -16,7 +16,7 @@
 
 /** Sections longer than this collapse behind "Show all (N)" (REQ-UX-32, D12).
  * The module always returns full arrays plus counts — collapsing is a
- * rendering concern owned by app.js. */
+ * rendering concern owned by the screen modules. */
 var TOURNAMENT_DAY_COLLAPSE_AFTER = 5;
 
 /** A stage's sort weight: the format's stage `order`, or 1 when there is no
@@ -27,7 +27,7 @@ function tournamentDayStageOrder(format, stageId) {
   return stage ? stage.order : 1;
 }
 
-/** Matches the fallback already used throughout app.js: prefer the explicit
+/** Matches the fallback used throughout the tournament modules: prefer the explicit
  * `status` field, else derive it from `played`. */
 function tournamentDayMatchStatus(match) {
   return match.status || (match.played ? 'finished' : 'pending');

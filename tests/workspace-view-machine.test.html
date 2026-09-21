@@ -18,7 +18,7 @@
 <body>
   <h1>Workspace Module — Test Suite</h1>
   <div id="results"></div>
-  <script src="../js/workspace.js"></script>
+  <script src="../js/workspace-view-machine.js"></script>
   <script>
     const results = document.getElementById('results');
     let passed = 0;
@@ -187,6 +187,48 @@
     assert(noSignalYet.ok === true, 'firebaseConnected defaults to ok when no session is subscribed yet (undefined input)');
     var offlineItem = computeWorkspace(baseInput({ firebaseAvailable: true, firebaseConnected: false })).readiness.filter(function (r) { return r.key === 'firebaseConnected'; })[0];
     assert(offlineItem.ok === false && offlineItem.blocking === false, 'firebaseConnected: false -> not-ok, still non-blocking (REQ-UX-80 offline cell)');
+
+    // ===== Three-axis routing (v2.0.0) =====
+    function routed(overrides) { return computeWorkspace(baseInput(Object.assign({ hasTournament: true, couplesGenerated: true, teamCount: 4 }, overrides || {}))); }
+
+    assert(computeWorkspace(baseInput()).subView === null, 'Setup has no sub-view — only Tournament carries tabs');
+    assert(routed({ currentView: 'tournament' }).subView === 'today', 'Tournament defaults to the Hoy sub-view');
+    assert(routed({ currentView: 'tournament', currentSubView: 'groups' }).subView === 'groups', 'A valid sub-view is honoured');
+    assert(routed({ currentView: 'tournament', currentSubView: 'nope' }).subView === 'today', 'An unknown sub-view falls back to Hoy');
+
+    var noBracket = routed({ currentView: 'tournament', currentSubView: 'bracket', hasBracket: false });
+    assert(noBracket.subViewItems.map(function (i) { return i.id; }).join() === 'today,groups', 'Bracket tab is absent without knockout stages');
+    assert(noBracket.subView === 'today', 'Requesting an absent Bracket falls back to Hoy rather than showing an empty tab');
+    var withBracket = routed({ currentView: 'tournament', currentSubView: 'bracket', hasBracket: true });
+    assert(withBracket.subView === 'bracket' && withBracket.subViewItems.length === 3, 'Bracket is reachable once the format has knockout stages');
+
+    assert(computeWorkspace(baseInput()).overlay === null, 'No overlay by default');
+    assert(routed({ currentOverlay: 'nope' }).overlay === null, 'An unknown overlay is refused');
+    assert(routed({ currentOverlay: 'scoring' }).overlay === 'scoring', 'An owner may open scoring');
+    var readOnlyScoring = routed({ role: 'spectator', currentOverlay: 'scoring' });
+    assert(readOnlyScoring.overlay === null && readOnlyScoring.overlayBlockedReasonKey === 'workspace.overlay.blocked.readOnly',
+      'A spectator cannot open scoring, and is told why');
+    assert(routed({ role: 'scorer', currentOverlay: 'scoring' }).overlay === 'scoring', 'An approved scorer may open scoring');
+
+    assert(routed({ currentOverlay: 'matchHistory', overlayMatchRevisions: 0 }).overlay === null,
+      'Per-match history refuses to open for a match with no revisions — the rule behind hiding its icon');
+    assert(routed({ currentOverlay: 'matchHistory', overlayMatchRevisions: 2 }).overlay === 'matchHistory',
+      'Per-match history opens once the match has been scored');
+
+    assert(routed({ role: 'spectator', currentOverlay: 'requestAccess' }).overlay === 'requestAccess', 'A spectator may request access');
+    assert(routed({ role: 'owner', currentOverlay: 'requestAccess' }).overlay === null, 'The owner has nothing to request');
+    assert(routed({ role: 'owner', currentOverlay: 'scorers' }).overlay === 'scorers', 'Only the owner manages scorers');
+    assert(routed({ role: 'scorer', currentOverlay: 'scorers' }).overlay === null, 'A scorer cannot manage scorers');
+
+    assert(routed({ currentOverlay: 'share', sessionId: 's1' }).overlay === 'share', 'Share opens for a shared session');
+    assert(routed({ currentOverlay: 'share' }).overlay === null, 'Share refuses without a session to share');
+
+    var forkReady = computeWorkspace(baseInput({ couplesGenerated: true, teamCount: 4, currentOverlay: 'modeFork' }));
+    assert(forkReady.overlay === 'modeFork', 'The mode fork opens once teams exist and no mode has been chosen');
+    assert(routed({ currentOverlay: 'modeFork' }).overlay === null, 'The mode fork is gone once a tournament is running');
+
+    assert(routed({ currentOverlay: 'history' }).overlay === 'history', 'Full history opens for a running tournament');
+    assert(computeWorkspace(baseInput({ currentOverlay: 'history' })).overlay === null, 'Full history refuses without a tournament');
 
     // ===== Summary =====
     const total = passed + failed;

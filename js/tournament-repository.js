@@ -541,7 +541,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
        * deliberately OMITS `updatedAt`. The rules require `updatedAt === now` (server
        * clock), so the value is a `.sv` sentinel here and only exists once the server
        * resolves it. It arrives through `watchSession` on the decoded match, which is
-       * where its only consumer reads it (tournament-day.js sorts recently-finished by
+       * where its only consumer reads it (tournament-day-selectors.js sorts recently-finished by
        * it). Reading it back would cost an extra round trip on the most
        * latency-sensitive action in the app, courtside, to hand back a value nobody
        * asks for synchronously. */

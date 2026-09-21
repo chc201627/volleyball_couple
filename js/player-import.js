@@ -3,7 +3,7 @@
  *
  * Pure, framework-agnostic parsing and validation. It deliberately exposes
  * only parsePlayerImport() and validatePlayerImport(); UI, IDs, and storage
- * remain app.js responsibilities.
+ * remain orchestrator responsibilities.
  */
 /* exported parsePlayerImport, validatePlayerImport */
 var parsePlayerImport, validatePlayerImport;

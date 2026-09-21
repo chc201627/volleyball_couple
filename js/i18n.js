@@ -706,7 +706,7 @@ var t, setLanguage, getLanguage;
     document.documentElement.lang = lang;
     applyTranslations();
     updateSwitcherButtons();
-    // Notify app.js to re-render dynamic content
+    // Notify the orchestrator to re-render dynamic content
     if (typeof window._onLanguageChange === 'function') {
       window._onLanguageChange();
     }

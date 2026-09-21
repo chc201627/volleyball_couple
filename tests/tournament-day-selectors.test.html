@@ -20,7 +20,7 @@
   <div id="results"></div>
   <script src="../js/tournament.js"></script>
   <script src="../js/tournament-format.js"></script>
-  <script src="../js/tournament-day.js"></script>
+  <script src="../js/tournament-day-selectors.js"></script>
   <script>
     const results = document.getElementById('results');
     let passed = 0;
@@ -308,7 +308,7 @@
     })();
 
     (function () {
-      // tournament-day.js only depends on tournament.js/tournament-format.js (not
+      // tournament-day-selectors.js only depends on tournament.js/tournament-format.js (not
       // king-of-court.js), so this fixture is a plain object shaped like a finished
       // KingState rather than a real createKingGame()/recordRally() run.
       const king = { winner: { id: 't1', name: 'Team 1' } };
