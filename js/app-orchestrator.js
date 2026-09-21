@@ -5,13 +5,11 @@
  * components.js and the screen modules. v1's app.js grew to 3,685 lines
  * precisely because it did both.
  *
- * Slice B ships the shell and the routing. Screens register themselves into
- * `UIScreens` and arrive one slice at a time; anything not yet registered
- * renders a placeholder rather than a blank page, so the chain stays
- * inspectable while it is being built.
+ * Screens register themselves into `UIScreens` (js/ui/screen-registry.js) and
+ * arrive one slice at a time; anything not yet registered renders a
+ * placeholder rather than a blank page, so the chain stays inspectable while
+ * it is being built.
  */
-/* exported UIScreens */
-var UIScreens = {};
 (function () {
   'use strict';
 
@@ -25,9 +23,9 @@ var UIScreens = {};
     { id: 'results', icon: 'list-ordered', labelKey: 'workspace.nav.results' },
   ];
 
-  /** Everything the view machine needs that is not yet wired to real state.
-   * Slice C replaces these reads with the live roster, session and repository;
-   * keeping them in one object makes that swap a single edit. */
+  /** Routing state only. The roster, configuration and generated teams live in
+   * AppState, which owns their persistence; mixing the two is how v1's app.js
+   * ended up as one 3,685-line object. */
   var state = {
     currentView: null,
     currentSubView: null,
@@ -37,18 +35,20 @@ var UIScreens = {};
     lang: 'es',
   };
 
+  var appState = AppState.create();
   var nodes = {};
 
   function workspaceInput() {
+    var snapshot = appState.get();
     return {
       role: 'owner',
       sessionState: 'ok',
-      playerCount: 0,
-      teamSize: 2,
-      couplesGenerated: false,
-      teamCount: 0,
-      unmatchedCount: 0,
-      groupCount: 1,
+      playerCount: snapshot.players.length,
+      teamSize: snapshot.teamSize,
+      couplesGenerated: !!snapshot.teams,
+      teamCount: snapshot.teams ? snapshot.teams.length : 0,
+      unmatchedCount: snapshot.unmatched.length,
+      groupCount: snapshot.groupCount,
       formatValidation: null,
       hasTournament: false,
       hasKingGame: false,
@@ -67,6 +67,25 @@ var UIScreens = {};
       overlayMatchRevisions: state.overlayMatchRevisions,
       sessionId: null,
     };
+  }
+
+  /** The contextual primary action the view machine resolved, performed. It
+   * navigates as a side effect rather than only moving the user there, which
+   * is what REQ-UX-04 asks of the single centre action. */
+  function runPrimaryAction(action) {
+    if (!action || action.enabled === false) return;
+    if (action.id === 'generateTeams') { generateTeams(); return; }
+    if (action.id === 'addPlayers') {
+      var field = document.getElementById('setup-name');
+      if (field) field.focus();
+      return;
+    }
+    if (action.targetView) navigate(action.targetView);
+  }
+
+  function generateTeams() {
+    var result = appState.generateTeams();
+    if (result.ok) navigate('teams');
   }
 
   function navigate(viewId) {
@@ -142,17 +161,29 @@ var UIScreens = {};
     }));
   }
 
+  /** Everything a screen is allowed to reach. Screens get state and intents,
+   * never the shell's internals — that boundary is what lets a screen be read
+   * on its own. */
+  function screenContext(view) {
+    return {
+      view: view,
+      state: state,
+      appState: appState,
+      canGenerate: appState.get().players.length >= appState.get().teamSize * 2,
+      navigate: navigate,
+      selectSubView: selectSubView,
+      openOverlay: openOverlay,
+      closeOverlay: closeOverlay,
+      runPrimaryAction: runPrimaryAction,
+      generateTeams: generateTeams,
+      rerender: render,
+    };
+  }
+
   function renderScreen(view) {
     var screen = UIScreens[view.view];
     if (screen && typeof screen.render === 'function') {
-      DomHelpers.mount(nodes.main, screen.render({
-        view: view,
-        state: state,
-        navigate: navigate,
-        selectSubView: selectSubView,
-        openOverlay: openOverlay,
-        closeOverlay: closeOverlay,
-      }));
+      DomHelpers.mount(nodes.main, screen.render(screenContext(view)));
     } else {
       DomHelpers.mount(nodes.main, C.emptyState({
         icon: 'info',
@@ -169,12 +200,7 @@ var UIScreens = {};
     if (!view.overlay) { DomHelpers.clear(nodes.overlay); return; }
     var overlay = UIScreens[view.overlay];
     if (overlay && typeof overlay.render === 'function') {
-      DomHelpers.mount(nodes.overlay, overlay.render({
-        view: view,
-        state: state,
-        closeOverlay: closeOverlay,
-        openOverlay: openOverlay,
-      }));
+      DomHelpers.mount(nodes.overlay, overlay.render(screenContext(view)));
     } else {
       DomHelpers.mount(nodes.overlay, C.sheet({ title: view.overlay, onDismiss: closeOverlay }, [
         el('p', { class: 'c-sheet__sub', text: 'Pantalla pendiente en esta fase de la reconstrucción.' }),
@@ -208,7 +234,10 @@ var UIScreens = {};
       overlay: document.getElementById('app-overlay'),
     };
     if (typeof setLanguage === 'function') setLanguage(state.lang);
-    render();
+    appState.load();
+    // A state change re-renders the active screen; screens never poke the DOM
+    // of other screens, because no other screen is mounted.
+    appState.subscribe(function () { render(); });
     registerServiceWorker();
   }
 

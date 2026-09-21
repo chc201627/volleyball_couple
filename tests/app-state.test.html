@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>App State Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>App State — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/pairing.js"></script>
+  <script src="../js/app-state.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    function heading(title) { results.innerHTML += `<h2>${title}</h2>`; }
+
+    function fresh() {
+      localStorage.removeItem(AppState.KEYS.players);
+      localStorage.removeItem(AppState.KEYS.tournament);
+      localStorage.removeItem(AppState.KEYS.king);
+      const state = AppState.create();
+      state.load();
+      return state;
+    }
+
+    function seed(state, count) {
+      for (let i = 0; i < count; i++) {
+        state.addPlayer({ name: 'P' + i, gender: i % 2 ? 'male' : 'female', level: (i % 3) + 1 });
+      }
+      return state;
+    }
+
+    // ===== Roster =====
+    heading('Roster');
+    let state = fresh();
+    assert(state.get().players.length === 0, 'A fresh state starts with an empty roster');
+
+    state.addPlayer({ name: '  May  ', gender: 'female', level: 2 });
+    assert(state.get().players[0].name === 'May', 'Player names are trimmed on the way in');
+
+    assert(state.addPlayer({ name: '   ' }).ok === false, 'A blank name is rejected');
+    assert(state.get().players.length === 1, 'A rejected player is not added');
+
+    state.addPlayer({ name: 'May', gender: 'male' });
+    assert(state.get().players.length === 2,
+      'Duplicate names are allowed — REQ-VAL-06, two people called May is a normal Saturday');
+
+    state.addPlayer({ name: 'NoLevel', gender: 'female' });
+    assert(!('level' in state.get().players[2]),
+      'An unset level is OMITTED, never written as null or undefined — Firebase set() rejects undefined');
+
+    state.addPlayer({ name: 'BadLevel', gender: 'female', level: 9 });
+    assert(!('level' in state.get().players[3]), 'A level outside 1|2|3 is dropped rather than stored');
+
+    state.addPlayer({ name: 'Nobody', gender: 'alien' });
+    assert(state.get().players[4].gender === 'unspecified', 'An unknown gender falls back to unspecified');
+
+    const ids = state.get().players.map(p => p.id);
+    assert(new Set(ids).size === ids.length, 'Player ids are unique across rapid inserts');
+
+    // ===== Counts =====
+    heading('Counts');
+    state = seed(fresh(), 6);
+    const counts = state.get().counts;
+    assert(counts.total === 6 && counts.male === 3 && counts.female === 3,
+      'Gender counts are derived, not stored');
+
+    // ===== Persistence =====
+    heading('Persistence');
+    state = seed(fresh(), 4);
+    assert(JSON.parse(localStorage.getItem('bv-players')).length === 4,
+      'The roster persists under v1\'s bv-players key, so an existing phone keeps its data');
+
+    const reloaded = AppState.create();
+    reloaded.load();
+    assert(reloaded.get().players.length === 4, 'A new instance restores the roster from storage');
+
+    localStorage.setItem('bv-players', JSON.stringify([
+      { id: 1, name: 'Legacy', gender: 'martian', level: 7 },
+      { id: 2, name: '', gender: 'male' },
+      { id: 3 },
+    ]));
+    const legacy = AppState.create();
+    legacy.load();
+    assert(legacy.get().players.length === 1, 'Nameless stored entries are dropped on load');
+    assert(legacy.get().players[0].gender === 'unspecified' && !('level' in legacy.get().players[0]),
+      'A stored roster from an older version is normalised on the way in, not trusted');
+
+    localStorage.setItem('bv-players', '{not json');
+    const broken = AppState.create();
+    broken.load();
+    assert(broken.get().players.length === 0, 'Corrupt storage degrades to an empty roster instead of throwing');
+
+    // ===== Removal and clearing =====
+    heading('Removal');
+    state = seed(fresh(), 4);
+    const victim = state.get().players[1].id;
+    state.removePlayer(victim);
+    assert(state.get().players.length === 3, 'Removing a player shrinks the roster');
+    assert(state.removePlayer('nope').ok === false, 'Removing an unknown id is a no-op');
+    state.clearPlayers();
+    assert(state.get().players.length === 0 && localStorage.getItem('bv-players') === null,
+      'Clearing empties the roster and the stored copy');
+
+    // ===== Team generation =====
+    heading('Team generation');
+    state = seed(fresh(), 3);
+    assert(state.generateTeams().ok === false, '2v2 with 3 players is refused — not enough to fill two teams');
+
+    state = seed(fresh(), 6);
+    const generated = state.generateTeams();
+    assert(generated.ok && generated.teams.length === 3, '6 players make 3 couples');
+    const team = generated.teams[0];
+    assert(Array.isArray(team.players) && team.player1 && team.player2,
+      'Teams carry BOTH players[] and player1/player2 — v1 branched on this at a dozen call sites');
+    assert(team.type === 'mixed' || team.type === 'same', 'Every team is classified');
+
+    state = seed(fresh(), 5);
+    const odd = state.generateTeams();
+    assert(odd.unmatched.length === 1, 'An odd roster leaves exactly one player unmatched');
+
+    // ===== Roster changes invalidate teams =====
+    heading('Invalidation');
+    state = seed(fresh(), 6);
+    state.generateTeams();
+    assert(state.hasTeams() === true, 'Teams exist after generating');
+    state.addPlayer({ name: 'Latecomer', gender: 'male' });
+    assert(state.get().teams === null,
+      'Adding a player invalidates the teams — a tournament built from a stale roster breaks mid-match');
+
+    state = seed(fresh(), 6);
+    state.generateTeams();
+    state.setConfig({ teamSize: 3 });
+    assert(state.get().teams === null, 'Changing the team size invalidates teams — 2v2 pairs are not 3v3 teams');
+
+    // ===== Manual pairing =====
+    heading('Manual pairing');
+    state = seed(fresh(), 6);
+    let roster = state.get().players;
+    state.setConfig({ pairingMode: 'manual' });
+    state.setManualPairs([[roster[0].id, roster[1].id]]);
+    const manual = state.generateTeams();
+    assert(manual.teams.length === 3, 'Fixed pairs plus random fill still produce every team');
+    const firstNames = manual.teams[0].players.map(p => p.name).sort().join(',');
+    assert(firstNames === [roster[0].name, roster[1].name].sort().join(','),
+      'A manually fixed pair is honoured, and comes first');
+
+    state = seed(fresh(), 6);
+    roster = state.get().players;
+    state.setConfig({ pairingMode: 'manual' });
+    state.setManualPairs([[roster[0].id, roster[1].id]]);
+    state.removePlayer(roster[0].id);
+    assert(state.get().manualPairs.length === 0,
+      'A manual pair naming a removed player is dropped, never left pointing at a ghost');
+
+    // ===== Import =====
+    heading('Import');
+    state = fresh();
+    const imported = state.addPlayers([
+      { name: 'A', gender: 'female', level: 1 },
+      { name: 'B', gender: 'male' },
+      { name: '' },
+    ]);
+    assert(imported.ok && imported.added.length === 2, 'Blank rows are skipped on import');
+    assert(state.get().lastImport.length === 2, 'The import is marked so it can be undone');
+    state.undoImport();
+    assert(state.get().players.length === 0, 'Undo removes exactly the imported players');
+    assert(state.get().lastImport === null, 'Undo clears the mark so it cannot run twice');
+
+    state = seed(fresh(), 2);
+    state.addPlayers([{ name: 'C', gender: 'male' }]);
+    state.undoImport();
+    assert(state.get().players.length === 2, 'Undo leaves players who were there before the import');
+
+    // ===== Subscriptions =====
+    heading('Subscriptions');
+    state = fresh();
+    let notifications = 0;
+    const unsubscribe = state.subscribe(() => { notifications++; });
+    assert(notifications === 1, 'Subscribing emits the current state immediately');
+    state.addPlayer({ name: 'Ping', gender: 'male' });
+    assert(notifications === 2, 'A roster change notifies subscribers');
+    unsubscribe();
+    state.addPlayer({ name: 'Pong', gender: 'male' });
+    assert(notifications === 2, 'Unsubscribing stops notifications');
+
+    const snapshotA = state.get();
+    snapshotA.players.push({ name: 'Injected' });
+    assert(state.get().players.length !== snapshotA.players.length,
+      'Snapshots are copies — a caller cannot mutate state by holding one');
+
+    // ===== Summary =====
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>
