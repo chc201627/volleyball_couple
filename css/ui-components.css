@@ -702,3 +702,216 @@
   font-size: var(--font-meta);
   color: var(--text-3);
 }
+
+/* ============================================
+   Overlay screens (import, pairing, config)
+   Stacked full-screen surfaces with their own bar and a way back — not sheets,
+   because each is a task with several steps rather than a single choice.
+   ============================================ */
+
+.overlay-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-0);
+  overflow-y: auto;
+}
+.overlay-screen__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 600px) {
+  .overlay-screen__body {
+    width: min(100%, 720px);
+    margin-inline: auto;
+  }
+}
+
+/* --- Import --- */
+.import__textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: var(--font-family);
+  font-size: var(--font-body);
+  line-height: 1.6;
+  resize: vertical;
+}
+.import__hint { font-size: var(--font-caption); color: var(--text-3); }
+.import__counts { display: flex; gap: var(--space-2); }
+.c-chip--ok { background: var(--overlay-ok-12); color: var(--state-ok); }
+.c-chip--error { background: var(--overlay-error-12); color: var(--state-error); }
+.c-chip--warn { background: var(--overlay-warn-12); color: var(--state-warn); }
+
+.import__rows { display: flex; flex-direction: column; }
+.import__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+.import__row + .import__row { border-top: 1px solid var(--hairline); }
+.import__row-icon { margin-top: 2px; }
+.import__row-icon--ok { color: var(--state-ok); }
+.import__row-icon--error { color: var(--state-error); }
+.import__row-text { flex: 1 1 auto; min-width: 0; }
+.import__row-name-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.import__row-name { font-size: var(--font-body); font-weight: 600; overflow-wrap: anywhere; }
+.import__row-meta { font-size: var(--font-caption); color: var(--text-3); }
+.import__row-issue {
+  margin-top: 2px;
+  font-size: var(--font-caption);
+  color: var(--state-error);
+  overflow-wrap: anywhere;
+}
+.import__row-fix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+.import__fix-input { flex: 1 1 120px; min-width: 0; }
+
+/* --- Manual pairing --- */
+.pairing__fixed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding-left: var(--space-2);
+}
+.pairing__fixed-left { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.pairing__pin { color: var(--accent); }
+.pairing__fixed-name { font-size: var(--font-body); font-weight: 600; overflow-wrap: anywhere; }
+
+.pairing__pool-row { display: flex; gap: var(--space-2); }
+.pairing__candidate {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.pairing__candidate.is-selected {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+.pairing__candidate-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pairing__empty { font-size: var(--font-meta); color: var(--text-3); }
+
+/* --- Tournament config --- */
+.config__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  text-align: left;
+  cursor: pointer;
+}
+.config__option.is-active {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.config__option.is-active .config__option-title,
+.config__option.is-active .config__option-check { color: var(--accent); }
+.config__option.is-unavailable { opacity: 0.45; cursor: not-allowed; }
+.config__option-text { flex: 1 1 auto; min-width: 0; }
+.config__option-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.config__option-title { font-size: var(--font-body); font-weight: 700; }
+.config__option-desc {
+  margin-top: 2px;
+  font-size: var(--font-meta);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.config__option-check { flex: none; color: var(--text-3); }
+
+.config__summary-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-1);
+  font-size: 14px;
+}
+.config__summary-line svg { color: var(--text-3); }
+
+.config__customize {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+  font-size: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+.config__editor { display: flex; flex-direction: column; gap: var(--space-3); }
+.config__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+}
+.config__field-label { font-size: 14px; }
+.config__field-value {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--space-2);
+  background: var(--surface-2);
+  font-size: var(--font-meta);
+  font-weight: 700;
+}
+.config__field-value.is-locked { color: var(--text-3); }
+.config__rules {
+  width: 100%;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}

@@ -26,6 +26,7 @@ var WORKSPACE_VIEWS = ['setup', 'teams', 'tournament', 'results'];
 var WORKSPACE_SUBVIEWS = { tournament: ['today', 'groups', 'bracket'] };
 var WORKSPACE_OVERLAYS = [
   'scoring', 'history', 'matchHistory', 'requestAccess', 'scorers', 'share', 'modeFork',
+  'import', 'manualPairing', 'tournamentConfig', 'formatEditor',
 ];
 
 /** Sub-view resolution. Only Tournament has them; everything else resolves to
@@ -72,6 +73,25 @@ function workspaceOverlayAllowed(id, input) {
         enabled: !!input.couplesGenerated && !input.hasTournament && !input.hasKingGame,
         reasonKey: 'workspace.overlay.blocked.modeChosen',
       };
+    case 'import':
+      // Adding players is always available while the roster is still editable.
+      return { enabled: !input.hasTournament, reasonKey: 'workspace.overlay.blocked.tournamentRunning' };
+    case 'manualPairing':
+      // Fixing pairs by hand needs people to pair and a roster that can still
+      // change; once a tournament is running the teams are settled.
+      return {
+        enabled: input.playerCount >= 2 && !input.hasTournament,
+        reasonKey: input.hasTournament ? 'workspace.overlay.blocked.tournamentRunning' : 'workspace.overlay.blocked.noPlayers',
+      };
+    case 'tournamentConfig':
+      return {
+        enabled: !!input.couplesGenerated && !input.hasTournament,
+        reasonKey: input.hasTournament ? 'workspace.overlay.blocked.tournamentRunning' : 'workspace.overlay.blocked.noTeams',
+      };
+    case 'formatEditor':
+      // Reachable while a tournament runs, but read-only there — the format is
+      // locked once matches exist, and the screen says so rather than hiding.
+      return { enabled: !!input.couplesGenerated, reasonKey: 'workspace.overlay.blocked.noTeams' };
     default:
       return { enabled: false, reasonKey: null };
   }

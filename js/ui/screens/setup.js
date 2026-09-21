@@ -42,17 +42,42 @@
     return value === key ? fallback : value;
   }
 
+  /** The configuration that used to be three labelled rows of buttons taking
+   * a third of the Setup screen. Each chip states the current value and opens
+   * the place to change it; nothing is a mystery abbreviation. */
   function contextChips(ctx) {
     var config = ctx.appState.get();
+    var sizes = [2, 3, 4];
     var chips = [
-      { id: 'teamSize', label: config.teamSize + 'vs' + config.teamSize, active: true },
       {
-        id: 'pairingMode',
-        label: config.pairingMode === 'manual' ? label('pairing.modeManual', 'Manual') : label('pairing.modeRandom', 'Aleatorio'),
-        active: false,
-        onClick: function () { ctx.openOverlay('modeFork'); },
+        label: config.teamSize + 'vs' + config.teamSize,
+        active: true,
+        onClick: function () {
+          var next = sizes[(sizes.indexOf(config.teamSize) + 1) % sizes.length];
+          ctx.appState.setConfig({ teamSize: next });
+        },
+      },
+      {
+        label: config.pairingMode === 'manual'
+          ? label('pairing.modeManual', 'Manual')
+          : label('pairing.modeRandom', 'Aleatorio'),
+        active: config.pairingMode === 'manual',
+        onClick: function () {
+          var manual = config.pairingMode !== 'manual';
+          ctx.appState.setConfig({ pairingMode: manual ? 'manual' : 'random' });
+          // Switching to manual opens the screen where it is done: choosing the
+          // mode and never being shown where to use it is v1's dead end.
+          if (manual && config.players.length >= 2) ctx.openOverlay('manualPairing');
+        },
       },
     ];
+    if (config.teams) {
+      chips.push({
+        label: label('tournament.configShort', 'Torneo'),
+        active: false,
+        onClick: function () { ctx.openOverlay('tournamentConfig'); },
+      });
+    }
     return el('div', { class: 'setup__chips' }, chips.map(function (chip) {
       return C.pill({ label: chip.label, active: chip.active, onClick: chip.onClick });
     }));

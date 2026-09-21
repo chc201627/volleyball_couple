@@ -45,6 +45,9 @@ var PRECACHE = [
   './js/ui/ui-components.js',
   './js/ui/screen-registry.js',
   './js/ui/screens/setup.js',
+  './js/ui/screens/import.js',
+  './js/ui/screens/manual-pairing.js',
+  './js/ui/screens/tournament-config.js',
   './js/app-orchestrator.js',
 ];
 
