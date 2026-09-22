@@ -1294,3 +1294,153 @@
 @media (min-width: 600px) {
   .app__toast { left: auto; right: var(--space-5); width: min(360px, 100%); bottom: var(--space-5); }
 }
+
+/* ============================================
+   King of the Court
+   ============================================ */
+
+.king__throne {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--overlay-accent-12);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  text-align: center;
+}
+.king__throne-icon { color: var(--accent); }
+.king__team {
+  font-size: 24px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* Wins as progress towards the target, not a bare counter: "3" says nothing,
+   three of five filled says the round is nearly over. */
+.king__dots { display: flex; gap: var(--space-2); margin-top: var(--space-1); }
+.king__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--text-3);
+}
+.king__dot.is-filled { background: var(--accent); box-shadow: none; }
+.king__wins { font-size: var(--font-meta); font-weight: 600; color: var(--text-2); }
+
+.king__vs {
+  text-align: center;
+  font-size: var(--font-meta);
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: var(--text-3);
+}
+.king__challenger {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  text-align: center;
+}
+
+.king__actions { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Outlined, not a second solid colour. v1 stacked a green button on an amber
+   one, which is the worst pairing both outdoors and for red-green colour
+   blindness; here the two differ in shape as well. */
+.king__challenger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--touch-score);
+  border-radius: var(--radius-cta);
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1.5px var(--text-2);
+  color: var(--text-1);
+  font-size: var(--font-h2);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.king__queue-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-min);
+}
+.king__queue-index {
+  flex: none;
+  width: 18px;
+  font-size: var(--font-meta);
+  font-weight: 700;
+  color: var(--text-3);
+}
+.king__queue-name { font-size: var(--font-body); font-weight: 600; overflow-wrap: anywhere; }
+.king__queue-more { font-size: var(--font-meta); color: var(--text-3); }
+.king__log-row { display: flex; gap: var(--space-3); min-height: 32px; align-items: center; }
+.king__log-index { width: 24px; font-size: var(--font-caption); color: var(--text-3); }
+.king__log-text { font-size: var(--font-meta); }
+
+.king__champion,
+.results__champion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--overlay-accent-12);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  text-align: center;
+}
+.king__champion-icon,
+.results__champion-icon { color: var(--accent); }
+.king__champion-name,
+.results__champion-name {
+  font-size: var(--font-title);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.king__champion-how { font-size: 14px; color: var(--text-2); }
+.king__stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+}
+.king__stat-key { font-size: 14px; color: var(--text-2); }
+.king__stat-value { font-size: var(--font-body); font-weight: 700; }
+
+/* ============================================
+   Results
+   ============================================ */
+
+.results__format { font-size: var(--font-meta); color: var(--text-2); }
+.results__actions { display: flex; gap: var(--space-2); }
+.results__action {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-score);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+  color: var(--text-1);
+  cursor: pointer;
+}
+.results__action-label {
+  font-size: var(--font-caption);
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+  line-height: 1.3;
+}

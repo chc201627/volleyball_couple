@@ -55,7 +55,7 @@
       hasTournament: !!snapshot.tournament,
       hasKingGame: !!snapshot.king,
       hasBracket: !!(snapshot.tournament && snapshot.tournament.format),
-      complete: false,
+      complete: isComplete(snapshot),
       hasNextMatch: false,
       pendingRequestCount: 0,
       // Same test v1's initFirebase() applies, so both entry points agree on
@@ -74,6 +74,28 @@
   /** The contextual primary action the view machine resolved, performed. It
    * navigates as a side effect rather than only moving the user there, which
    * is what REQ-UX-04 asks of the single centre action. */
+  /** Completion drives the default destination and the Results copy, so it is
+   * read from the same selectors the screens use rather than tracked
+   * separately. A King round is complete when it has a winner. */
+  function isComplete(snapshot) {
+    if (snapshot.king) return !!snapshot.king.winner;
+    if (!snapshot.tournament) return false;
+    try {
+      var format = snapshot.tournament.format || null;
+      var resolution = format
+        ? resolveFormat(format, { groups: snapshot.tournament.groups, matches: snapshot.tournament.matches })
+        : null;
+      return tournamentDay({
+        format: format,
+        resolution: resolution,
+        matches: snapshot.tournament.matches,
+        groups: snapshot.tournament.groups,
+      }).complete;
+    } catch (error) {
+      return false;
+    }
+  }
+
   function runPrimaryAction(action) {
     if (!action || action.enabled === false) return;
     if (action.id === 'generateTeams') { generateTeams(); return; }
@@ -262,8 +284,19 @@
     };
   }
 
+  /** The Tournament destination holds whichever mode is actually being played.
+   * King of the Court is not a fifth tab: it is what "Torneo" means when the
+   * group chose it, and routing it here is what stops startKing() landing on a
+   * screen that only knows how to render tournaments. */
+  function screenIdFor(view) {
+    if (view.view !== 'tournament') return view.view;
+    var snapshot = appState.get();
+    if (!snapshot.tournament && snapshot.king) return 'king';
+    return 'tournament';
+  }
+
   function renderScreen(view) {
-    var screen = UIScreens[view.view];
+    var screen = UIScreens[screenIdFor(view)];
     if (screen && typeof screen.render === 'function') {
       DomHelpers.mount(nodes.main, screen.render(screenContext(view)));
     } else {
