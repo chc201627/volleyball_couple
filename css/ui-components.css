@@ -1597,3 +1597,25 @@
   background: var(--surface-1);
 }
 .history__current-score { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ============================================
+   Every match, and the search over it
+   ============================================ */
+
+/* The field stays put while the list scrolls under it: on a long schedule the
+   search is the reason you are here, and scrolling back up to reach it is the
+   thing this screen exists to avoid. */
+.matches__search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(var(--space-3) * -1) calc(var(--space-4) * -1) 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-0);
+}
+.matches__search-icon { flex: none; color: var(--text-3); }
+.matches__search .c-input { flex: 1 1 auto; min-width: 0; }
+.matches__count { font-size: var(--font-caption); color: var(--text-3); }

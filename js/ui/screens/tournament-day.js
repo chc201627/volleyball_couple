@@ -170,19 +170,19 @@
         tone: 'warn',
         views: day.live,
         limit: 3,
-        onSeeAll: function () { ctx.selectSubView('groups'); },
+        onSeeAll: function () { ctx.openOverlay('allMatches'); },
       }),
       matchSection(ctx, tournament, {
         label: label('tournament.upNext', 'Próximos'),
         views: day.pending,
         limit: 3,
-        onSeeAll: function () { ctx.selectSubView('groups'); },
+        onSeeAll: function () { ctx.openOverlay('allMatches'); },
       }),
       matchSection(ctx, tournament, {
         label: label('tournament.recentlyFinished', 'Recién terminados'),
         views: day.recentlyFinished,
         limit: 3,
-        onSeeAll: function () { ctx.selectSubView('groups'); },
+        onSeeAll: function () { ctx.openOverlay('allMatches'); },
       }),
     ].filter(Boolean);
   }
@@ -436,6 +436,145 @@
           }));
       });
   }
+
+  /* --- Every match, and finding one (C6) -------------------------------- */
+
+  var matchQuery = '';
+
+  /** The full schedule, which until now existed nowhere: "Ver todos" sent
+   * people to the Grupos tab, and Grupos only holds the standings table. With
+   * fifty-five matches the list is long, so the search that belongs with it
+   * lives here rather than on the day screen, where it would cost room on the
+   * one view whose whole point is to stay short.
+   *
+   * Nobody looks for "match 38". They look for the one Caro is playing, or for
+   * group B — so the field searches pairs, players, groups and stage names. */
+  UIScreens.allMatches = {
+    render: function (ctx) {
+      var snapshot = ctx.appState.get();
+      var tournament = snapshot.tournament;
+      if (!tournament) {
+        return el('div', { class: 'overlay-screen anim-screen-in' }, [
+          C.subBar({
+            title: label('matches.title', 'Todos los partidos'),
+            onBack: function () { ctx.closeOverlay(); },
+          }),
+          el('div', { class: 'overlay-screen__body' }, [
+            C.emptyState({ icon: 'trophy', title: label('tournament.none', 'Todavía no hay torneo') }),
+          ]),
+        ]);
+      }
+
+      var format = tournament.format || null;
+      var resolution = format
+        ? resolveFormat(format, { groups: tournament.groups, matches: tournament.matches })
+        : null;
+      var day = tournamentDay({
+        format: format,
+        resolution: resolution,
+        matches: tournament.matches,
+        groups: tournament.groups,
+        standings: calculateStandings(tournament.groups, tournament.matches, { extended: true }),
+      });
+
+      var search = searchMatchViews(day.all, matchQuery, {
+        teams: tournament.teams,
+        // Stage and group names reach the search already translated: the
+        // selector stays free of i18n, and "cuartos" finds what the screen
+        // calls Cuartos.
+        termsFor: function (view) {
+          var terms = [];
+          if (view.stageId) terms.push(label('tournament.format.stage.' + view.stageId, view.stageId));
+          if (view.groupId) terms.push(label('tournament.group', 'Grupo ' + view.groupId, { id: view.groupId }));
+          return terms;
+        },
+      });
+
+      var field = C.input({
+        id: 'match-search',
+        label: label('matches.search', 'Buscar por jugador, pareja o grupo'),
+        hideLabel: true,
+        placeholder: label('matches.search', 'Buscar por jugador, pareja o grupo'),
+        value: matchQuery,
+        onInput: function (event) { matchQuery = event.target.value; ctx.rerender(); },
+        onKeyDown: function (event) {
+          // Escape empties the field rather than closing the screen: the list
+          // behind it is where you were going.
+          if (event.key === 'Escape' && matchQuery) {
+            event.stopPropagation();
+            matchQuery = '';
+            ctx.rerender();
+          }
+        },
+      });
+
+      var searchBar = el('div', { class: 'matches__search' }, [
+        IconRegistry.icon('search', { size: 16, class: 'matches__search-icon' }),
+        field,
+        matchQuery ? C.iconButton({
+          icon: 'x',
+          tone: 'muted',
+          size: 16,
+          label: label('matches.clear', 'Borrar la búsqueda'),
+          onClick: function () { matchQuery = ''; ctx.rerender(); },
+        }) : null,
+      ]);
+
+      var body = [searchBar];
+
+      if (search.active) {
+        body.push(el('p', {
+          class: 'matches__count',
+          text: label('matches.results',
+            search.results.length + ' de ' + search.total + ' partidos',
+            { count: search.results.length, total: search.total }),
+        }));
+        if (!search.results.length) {
+          body.push(C.emptyState({
+            icon: 'search',
+            title: label('matches.noneTitle', 'Ningún partido coincide'),
+            text: label('matches.noneText', 'Prueba con el nombre de un jugador, de una pareja o de un grupo.'),
+          }));
+        } else {
+          // One panel while searching, not the three state groups: somebody who
+          // typed a name is not browsing. It stays a panel so the rows sit on
+          // the same surface they do everywhere else in the app.
+          body.push(C.panel({
+            label: label('matches.resultsLabel', 'Resultados'),
+            flush: true,
+          }, search.results.map(function (view) {
+            return matchRowFor(ctx, tournament, view);
+          })));
+        }
+      } else {
+        [
+          { label: label('tournament.live', 'En vivo'), tone: 'warn', views: day.live },
+          { label: label('tournament.upNext', 'Próximos'), views: day.pending },
+          { label: label('matches.finished', 'Terminados'), views: day.all.filter(function (view) {
+            return view.status === 'finished';
+          }) },
+        ].forEach(function (section) {
+          if (!section.views.length) return;
+          body.push(C.panel({
+            label: section.label + ' · ' + section.views.length,
+            labelTone: section.tone,
+            flush: true,
+          }, section.views.map(function (view) { return matchRowFor(ctx, tournament, view); })));
+        });
+      }
+
+      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+        C.subBar({
+          title: label('matches.title', 'Todos los partidos'),
+          sub: label('matches.progress',
+            day.progress.played + ' de ' + day.progress.total + ' jugados',
+            { played: day.progress.played, total: day.progress.total }),
+          onBack: function () { matchQuery = ''; ctx.closeOverlay(); },
+        }),
+        el('div', { class: 'overlay-screen__body' }, body),
+      ]);
+    },
+  };
 
   /* --- Screen ----------------------------------------------------------- */
 

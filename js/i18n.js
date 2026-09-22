@@ -459,6 +459,17 @@ var t, setLanguage, getLanguage;
       'history.timeline': 'Timeline',
       'history.conflictKept': 'this version stood',
       'history.fullTitle': 'Change history',
+
+      // Todos los partidos y su buscador (C6)
+      'matches.title': 'Every match',
+      'matches.progress': '{played} of {total} played',
+      'matches.search': 'Search by player, pair or group',
+      'matches.clear': 'Clear the search',
+      'matches.results': '{count} of {total} matches',
+      'matches.noneTitle': 'No match found',
+      'matches.noneText': 'Try a player name, a pair name or a group.',
+      'matches.finished': 'Finished',
+      'matches.resultsLabel': 'Results',
 },
     es: {
       // Formulario
@@ -903,6 +914,17 @@ var t, setLanguage, getLanguage;
       'history.timeline': 'Línea de tiempo',
       'history.conflictKept': 'se quedó esta versión',
       'history.fullTitle': 'Historial de cambios',
+
+      // Todos los partidos y su buscador (C6)
+      'matches.title': 'Todos los partidos',
+      'matches.progress': '{played} de {total} jugados',
+      'matches.search': 'Buscar por jugador, pareja o grupo',
+      'matches.clear': 'Borrar la búsqueda',
+      'matches.results': '{count} de {total} partidos',
+      'matches.noneTitle': 'Ningún partido coincide',
+      'matches.noneText': 'Prueba con el nombre de un jugador, de una pareja o de un grupo.',
+      'matches.finished': 'Terminados',
+      'matches.resultsLabel': 'Resultados',
 }
   };
 

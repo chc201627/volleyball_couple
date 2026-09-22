@@ -138,7 +138,7 @@ js/ui/screens/setup-import.js     A3
 js/ui/screens/setup-pairing.js    A4
 js/ui/screens/setup-format.js     A5, A6
 js/ui/screens/teams.js            B1, B2, B3
-js/ui/screens/today.js            C1
+js/ui/screens/today.js            C1, C6
 js/ui/screens/groups.js           C3
 js/ui/screens/bracket.js          C4
 js/ui/screens/scoring.js          C2, C2b, C5
@@ -372,7 +372,7 @@ Trabajo identificado y **deliberadamente aplazado**, no olvidado. Se cierra ante
 | # | Pendiente | Por qué está fuera de su slice | Dónde entra |
 |---|---|---|---|
 | P1 | **Código QR en el menú del torneo (board H1).** El menú lleva Historial, Anotadores, Compartir y Reiniciar; el QR del canvas no está. | Generar un QR sin dependencias y sin build es trabajo propio —o una librería, que choca con el criterio de no añadir dependencias, o un generador a mano—, no un detalle del slice H. | Antes de L, como slice propio. |
-| P2 | **Buscador de partidos por jugador o pareja.** `main` sacó **v1.9.2** con esta función construida sobre `js/app.js` y `css/styles.css`, que la rama v2 borra. Al integrar v2 la función desaparece del producto si no se reimplementa. | Llegó a `main` después de que la cadena v2 empezara; v2 no la tiene en ningún board del canvas. | Reimplementar sobre la pantalla de Torneo antes de fusionar v2 en `main`, o decidir explícitamente que se retira. |
+| ~~P2~~ | ~~**Buscador de partidos por jugador o pareja.**~~ **Hecho**, y no como port de v1: board **C6 · TORNEO · TODOS LOS PARTIDOS**, con el buscador dentro del listado completo. Al implementarlo apareció que en v2 «Ver todos» llevaba a Grupos —que solo tiene la tabla— así que el calendario completo no existía en ninguna pantalla; C6 lo es. | — | Cerrado. |
 
 **Nota de ramas:** toda la cadena vive en **una sola rama, `feat/redesign-v2`**. Los slices son commits, no ramas: la convención de Feature Branch Chain de §5 se sigue en el orden del trabajo, no en su topología.
 
@@ -385,6 +385,7 @@ Trabajo identificado y **deliberadamente aplazado**, no olvidado. Se cierra ante
 | A · Alta y configuración | A1–A6 | C |
 | B · Equipos | B1–B3 | D |
 | C · Día de torneo | C1, C3, C4 | E |
+| C · Todos los partidos y su buscador | C6 | P2 |
 | C · Anotar | C2, C2b, C5 | F |
 | D · Colaboración | D1–D4 | G |
 | E · King of the Court | E1, E2 | I |

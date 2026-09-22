@@ -223,6 +223,13 @@
     assert(routed({ role: 'spectator', currentOverlay: 'tournamentMenu' }).overlay === 'tournamentMenu',
       'A spectator may open the menu — sharing and the history are theirs to read too');
 
+    assert(routed({ currentOverlay: 'allMatches' }).overlay === 'allMatches',
+      'The full schedule opens while a tournament is running');
+    assert(routed({ role: 'spectator', currentOverlay: 'allMatches' }).overlay === 'allMatches',
+      'A spectator reads the schedule too — the rows are what refuse to score, not the screen');
+    assert(routed({ currentOverlay: 'allMatches', hasTournament: false }).overlay === null,
+      'With no tournament there is no schedule to list');
+
     assert(routed({ role: 'spectator', currentOverlay: 'requestAccess' }).overlay === 'requestAccess', 'A spectator may request access');
     assert(routed({ role: 'owner', currentOverlay: 'requestAccess' }).overlay === null, 'The owner has nothing to request');
     assert(routed({ role: 'owner', currentOverlay: 'scorers' }).overlay === 'scorers', 'Only the owner manages scorers');

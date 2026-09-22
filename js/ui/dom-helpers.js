@@ -95,12 +95,45 @@ var DomHelpers;
     return node;
   }
 
+  /** What the person was typing in, so a re-render can give it back.
+   *
+   * A screen that filters as you type re-renders on every keystroke, and this
+   * layer replaces the whole subtree — which threw focus to <body>. On a phone
+   * that closes the keyboard after the first letter: the roster search was
+   * unusable and any new one would have been too. The field is found again by
+   * its id, which is the only identity that survives being rebuilt, and the
+   * caret is put back where it was. */
+  function captureFocus(container) {
+    var active = document.activeElement;
+    if (!active || !active.id || !container.contains(active)) return null;
+    var selectable = active.tagName === 'INPUT' || active.tagName === 'TEXTAREA';
+    return {
+      id: active.id,
+      start: selectable ? active.selectionStart : null,
+      end: selectable ? active.selectionEnd : null,
+    };
+  }
+
+  function restoreFocus(container, captured) {
+    if (!captured) return;
+    var node = container.querySelector('#' + (window.CSS && CSS.escape
+      ? CSS.escape(captured.id)
+      : captured.id.replace(/([^\w-])/g, '\\$1')));
+    if (!node || node === document.activeElement) return;
+    node.focus();
+    if (captured.start != null && typeof node.setSelectionRange === 'function') {
+      try { node.setSelectionRange(captured.start, captured.end); } catch (error) { /* not a text field */ }
+    }
+  }
+
   /** Replaces a container's contents in one shot. The v2 shell renders the
    * active screen only, so this is the normal way a destination changes —
    * there is no hidden-toggling of sibling screens to keep in sync. */
   function mount(container, children) {
+    var captured = captureFocus(container);
     clear(container);
     append(container, children);
+    restoreFocus(container, captured);
     return container;
   }
 

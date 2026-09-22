@@ -9,10 +9,11 @@
  * Exposed functions:
  *   tournamentDay(input)
  *   formatTournamentSummary(view, labels)
+ *   searchMatchViews(views, query, options)
  *   TOURNAMENT_DAY_COLLAPSE_AFTER
  */
 
-/* exported tournamentDay, formatTournamentSummary, TOURNAMENT_DAY_COLLAPSE_AFTER */
+/* exported tournamentDay, formatTournamentSummary, searchMatchViews, TOURNAMENT_DAY_COLLAPSE_AFTER */
 
 /** Sections longer than this collapse behind "Show all (N)" (REQ-UX-32, D12).
  * The module always returns full arrays plus counts — collapsing is a
@@ -256,6 +257,10 @@ function tournamentDay(input) {
   return {
     nextMatch: nextMatch,
     nextMatchReason: nextMatchReason,
+    // Every match, in schedule order. The three lists below are what the day
+    // screen shows; this is what a search searches and what a full schedule
+    // lists — `recentlyFinished` is only the tail of what has been played.
+    all: views,
     live: live,
     pending: pendingAll,
     recentlyFinished: recentlyFinished,
@@ -308,4 +313,66 @@ function formatTournamentSummary(view, labels) {
   }
 
   return lines.join('\n');
+}
+
+
+/** Case- and accent-insensitive folding. "Maria" has to find "María": on a
+ * court nobody types accents, and a search that misses because of one is a
+ * search people stop using. Same normalisation the import parser applies, so
+ * both sides of the app agree on what two names being "the same" means. */
+function tournamentDayFold(value) {
+  var text = String(value == null ? '' : value).trim().toLowerCase();
+  if (typeof text.normalize === 'function') {
+    text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  return text;
+}
+
+/**
+ * Find matches by what a person remembers about them.
+ *
+ * At a tournament with fifty-five matches, nobody looks for "match 38" — they
+ * look for "the one Caro is playing", or "group B". So the haystack is every
+ * name attached to the match: both pairs, every player inside them, the group,
+ * and whatever else the caller knows (a stage name, already localised — this
+ * module stays free of i18n).
+ *
+ * Every word in the query has to match something, in any order: "caro lu"
+ * finds Caro & Cami vs Lu & Sepúlveda without caring which side is which.
+ *
+ * @param {Array} views - match views from tournamentDay()
+ * @param {string} query - what was typed
+ * @param {Object} [options] - { teams, termsFor }
+ * @returns {{ query: string, active: boolean, results: Array, total: number }}
+ */
+function searchMatchViews(views, query, options) {
+  var all = Array.isArray(views) ? views : [];
+  options = options || {};
+  var words = tournamentDayFold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) {
+    return { query: '', active: false, results: all.slice(), total: all.length };
+  }
+
+  var teamsById = {};
+  (options.teams || []).forEach(function (team) { teamsById[team.id] = team; });
+
+  function teamTerms(teamId) {
+    var team = teamsById[teamId];
+    if (!team) return [teamId];
+    var terms = [team.name];
+    (team.players || []).forEach(function (player) { terms.push(player && player.name); });
+    return terms;
+  }
+
+  var results = all.filter(function (view) {
+    var terms = teamTerms(view.team1Id).concat(teamTerms(view.team2Id));
+    if (view.groupId) terms.push(view.groupId);
+    if (typeof options.termsFor === 'function') {
+      terms = terms.concat(options.termsFor(view) || []);
+    }
+    var haystack = terms.filter(Boolean).map(tournamentDayFold).join(' ');
+    return words.every(function (word) { return haystack.indexOf(word) !== -1; });
+  });
+
+  return { query: String(query), active: true, results: results, total: all.length };
 }
