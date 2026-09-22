@@ -230,7 +230,7 @@ Tres capas, de menos a más:
 
 ## 5. Plan por slices
 
-Se sigue la convención del repo: **Feature Branch Chain**, cada slice un PR contra la rama del slice anterior, sobre el tracker `feat/redesign-v2`.
+Cada slice es una unidad de trabajo y un commit, todos sobre **una sola rama: `feat/redesign-v2`**. La cadena se mantiene en el orden de los commits, no en ramas separadas — una rama por slice multiplicaba los merges sin dar nada a cambio, porque la cadena es lineal y nadie trabaja en paralelo sobre ella.
 
 | # | Slice | Contenido | Boards | Depende de |
 |---|---|---|---|---|
@@ -364,6 +364,17 @@ Por cada slice, además de lo del checklist de release:
 
 1. **Podio de F2:** al llevar las medallas a la tabla, las tarjetas de 2º y 3º que había encima quedaron duplicando información y **las quité**. El campeón sigue teniendo su tarjeta grande. Si prefieres recuperar el podio, es reversible.
 2. **Medallas en F1 (torneo en curso):** están puestas, con la línea *"Posiciones provisionales: quedan 20 partidos por jugar"* debajo de la tabla. Una medalla de oro a mitad de torneo puede leerse como "ya ganó"; la leyenda lo acota, pero si prefieres que F1 vaya sin medallas hasta que el torneo cierre, es un cambio de una línea.
+
+### 9.3 Pendientes, para el final
+
+Trabajo identificado y **deliberadamente aplazado**, no olvidado. Se cierra antes del release de v2.0.0.
+
+| # | Pendiente | Por qué está fuera de su slice | Dónde entra |
+|---|---|---|---|
+| P1 | **Código QR en el menú del torneo (board H1).** El menú lleva Historial, Anotadores, Compartir y Reiniciar; el QR del canvas no está. | Generar un QR sin dependencias y sin build es trabajo propio —o una librería, que choca con el criterio de no añadir dependencias, o un generador a mano—, no un detalle del slice H. | Antes de L, como slice propio. |
+| P2 | **Buscador de partidos por jugador o pareja.** `main` sacó **v1.9.2** con esta función construida sobre `js/app.js` y `css/styles.css`, que la rama v2 borra. Al integrar v2 la función desaparece del producto si no se reimplementa. | Llegó a `main` después de que la cadena v2 empezara; v2 no la tiene en ningún board del canvas. | Reimplementar sobre la pantalla de Torneo antes de fusionar v2 en `main`, o decidir explícitamente que se retira. |
+
+**Nota de ramas:** toda la cadena vive en **una sola rama, `feat/redesign-v2`**. Los slices son commits, no ramas: la convención de Feature Branch Chain de §5 se sigue en el orden del trabajo, no en su topología.
 
 ---
 
