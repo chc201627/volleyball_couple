@@ -118,6 +118,41 @@
    * Failure is silent by design — the tournament is already playable locally,
    * and blocking the court on a network error would be worse than a link that
    * can be created later. */
+  /** Local write first, network second. The court does not wait for a phone to
+   * find signal: the result is applied and persisted immediately, and the
+   * server's answer only decides which state strip the screen shows afterwards.
+   * Without a session there is nothing to publish and the save is simply done. */
+  function saveResult(command) {
+    var applied = appState.applyResult(command.matchId, command.score1, command.score2, command.status);
+    if (!applied.ok) return Promise.resolve({ status: 'invalid' });
+    if (!repository || !sessionId) return Promise.resolve({ status: 'synced' });
+
+    var payload = Object.assign({}, applied.command, { afterConflict: !!command.afterConflict });
+    return repository.saveResult(sessionId, payload).then(function (outcome) {
+      return outcome || { status: 'synced' };
+    }).catch(function () {
+      // An unreachable server leaves the local result in place; the strip says
+      // offline rather than pretending the save failed entirely.
+      return { status: 'offline' };
+    });
+  }
+
+  /** Ephemeral confirmation, the last frame of board M2. It says who won,
+   * because v1 saved a score and told you nothing at all. */
+  function toast(options) {
+    if (!nodes.toast) return;
+    var node = el('div', { class: 'c-toast anim-toast-in', attrs: { role: 'status', 'aria-live': 'polite' } }, [
+      IconRegistry.icon('trophy', { size: 18, class: 'c-toast__icon' }),
+      el('div', { class: 'c-toast__text' }, [
+        el('p', { class: 'c-toast__title', text: options.title }),
+        options.sub ? el('p', { class: 'c-toast__sub', text: options.sub }) : null,
+      ]),
+    ]);
+    DomHelpers.mount(nodes.toast, node);
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(function () { DomHelpers.clear(nodes.toast); }, 3200);
+  }
+
   function publishSession() {
     if (!repository) return;
     var snapshot = appState.get();
@@ -220,6 +255,8 @@
       generateTeams: generateTeams,
       startTournament: startTournament,
       startKing: startKing,
+      saveResult: saveResult,
+      toast: toast,
       sessionId: sessionId,
       rerender: render,
     };
@@ -307,6 +344,7 @@
       main: document.getElementById('app-main'),
       tabbar: document.getElementById('app-tabbar'),
       overlay: document.getElementById('app-overlay'),
+      toast: document.getElementById('app-toast'),
     };
     if (typeof setLanguage === 'function') setLanguage(state.lang);
     repository = createRepository();

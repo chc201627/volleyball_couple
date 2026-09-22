@@ -379,6 +379,67 @@ var AppState;
         return { ok: true, tournament: tournament, ownerLabel: state.ownerLabel };
       },
 
+      /** Applies a result locally and returns the command the repository needs
+       * to publish it. The local write happens first and unconditionally: the
+       * court does not wait for the network, and a save that only lands when
+       * the signal returns is still a save. The orchestrator publishes
+       * afterwards and reports back what the server said. */
+      applyResult: function (matchId, score1, score2, status) {
+        if (!state.tournament) return { ok: false, reason: 'noTournament' };
+        var match = state.tournament.matches.filter(function (item) { return item.id === matchId; })[0];
+        if (!match) return { ok: false, reason: 'unknownMatch' };
+
+        var expectedRevision = match.revision || 0;
+        var resultMap = {};
+        state.tournament.matches.forEach(function (item) {
+          if (item.status && item.status !== 'pending') resultMap[item.id] = item;
+        });
+        resultMap[matchId] = {
+          id: matchId,
+          score1: score1,
+          score2: score2,
+          status: status,
+          revision: expectedRevision + 1,
+          updatedBy: match.updatedBy || null,
+          updatedAt: match.updatedAt || null,
+        };
+
+        state.tournament = Object.assign({}, state.tournament, {
+          matches: projectMatchResults(state.tournament.matches, resultMap),
+        });
+        writeJSON(KEYS.tournament, state.tournament);
+        emit();
+
+        return {
+          ok: true,
+          command: {
+            matchId: matchId,
+            score1: score1,
+            score2: score2,
+            status: status,
+            expectedRevision: expectedRevision,
+          },
+        };
+      },
+
+      /** Replaces the local copy with what the server actually holds. Used when
+       * a save loses a race: the conflict card offers both values and this is
+       * how the server's version is taken. */
+      adoptResult: function (matchId, result) {
+        if (!state.tournament || !result) return { ok: false };
+        var resultMap = {};
+        state.tournament.matches.forEach(function (item) {
+          if (item.status && item.status !== 'pending') resultMap[item.id] = item;
+        });
+        resultMap[matchId] = Object.assign({ id: matchId }, result);
+        state.tournament = Object.assign({}, state.tournament, {
+          matches: projectMatchResults(state.tournament.matches, resultMap),
+        });
+        writeJSON(KEYS.tournament, state.tournament);
+        emit();
+        return { ok: true };
+      },
+
       resetTournament: function () {
         state.tournament = null;
         removeKey(KEYS.tournament);

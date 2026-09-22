@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Score Input Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Score Input — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/tournament-format.js"></script>
+  <script src="../js/score-input.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+    function heading(title) { results.innerHTML += `<h2>${title}</h2>`; }
+
+    const S = scoreInput;
+
+    // ===== Sanitising =====
+    heading('What can be typed');
+    assert(S.sanitize('12') === '12', 'Digits pass through');
+    assert(S.sanitize('') === '', 'Empty stays empty — it is a state, not a zero');
+    assert(S.sanitize('1a2') === '12', 'Letters are stripped');
+    assert(S.sanitize('-5') === '5', 'A minus sign is stripped — a score cannot be negative');
+    assert(S.sanitize('9.5') === '95', 'A decimal point is stripped rather than rounding to something unexpected');
+    assert(S.sanitize('09') === '9', 'Leading zeros collapse — a scoreboard never reads 09');
+    assert(S.sanitize('000') === '0', 'All zeros collapse to a single zero');
+    assert(S.sanitize('12345') === '99', 'Anything over the cap clamps, so a stuck key cannot produce 12345');
+    assert(S.sanitize(null) === '' && S.sanitize(undefined) === '', 'Missing input is empty, not a crash');
+
+    // ===== Committing =====
+    heading('Leaving the field');
+    assert(S.commit('12', 9) === 12, 'A typed value commits');
+    assert(S.commit('', 9) === 9,
+      'Emptying and leaving reverts to the last saved value — clearing to retype is not scoring nothing');
+    assert(S.commit('', 0) === 0, 'Reverting to a saved zero still gives zero');
+    assert(S.commit('0', 9) === 0, 'An explicit zero is a real score, not an empty field');
+    assert(S.commit('abc', 7) === 7, 'A value with no digits behaves like empty');
+
+    // ===== Stepping =====
+    heading('Plus and minus');
+    assert(S.step('12', 1, 9) === '13', '+ operates on what is on screen');
+    assert(S.step('12', -1, 9) === '11',
+      '− operates on the typed value, not the stored one — typing 12 then − leaves 11');
+    assert(S.step('', 1, 9) === '10', 'With the field empty, + continues from the saved value');
+    assert(S.step('0', -1, 5) === '0', 'Cannot go below zero');
+    assert(S.step('99', 1, 0) === '99', 'Cannot go past the cap');
+
+    // ===== Validation =====
+    heading('What can be saved');
+    assert(S.validate({ score1: 9, score2: 7, status: 'finished' }).ok === true, 'A normal finished score saves');
+    const tie = S.validate({ score1: 9, score2: 9, status: 'finished' });
+    assert(tie.ok === false && tie.reason === 'tie',
+      'A drawn finished result is refused — firebase-rules.json rejects it outright');
+    assert(S.validate({ score1: 9, score2: 9, status: 'live' }).ok === true,
+      'The same scores are fine while the match is live, which is the way out of the tie');
+    assert(S.validate({ score1: -1, score2: 5, status: 'finished' }).reason === 'invalidScore', 'Negatives are refused');
+    assert(S.validate({ score1: 1.5, score2: 5, status: 'finished' }).reason === 'invalidScore', 'Fractions are refused');
+    assert(S.validate({ score1: 100, score2: 5, status: 'finished' }).reason === 'tooHigh', 'Over the cap is refused');
+
+    // ===== Stage rules =====
+    heading('Stage rules');
+    const to21 = { pointsTo: 21, overtime: false };
+    assert(S.validate({ score1: 21, score2: 18, status: 'finished' }, to21).ok === true, 'Reaching the target finishes the match');
+    assert(S.validate({ score1: 25, score2: 18, status: 'finished' }, to21).reason === 'overTarget',
+      'Past the target without overtime is not a score this format can produce');
+    assert(S.validate({ score1: 18, score2: 15, status: 'finished' }, to21).reason === 'notFinished',
+      'Short of the target cannot be saved as finished');
+    assert(S.validate({ score1: 18, score2: 15, status: 'live' }, to21).ok === true, 'The same scores are valid as a live match');
+
+    const overtime = { pointsTo: 21, overtime: true };
+    assert(S.validate({ score1: 23, score2: 21, status: 'finished' }, overtime).ok === true,
+      'With overtime, a two-point margin past the target is valid');
+    assert(S.validate({ score1: 22, score2: 21, status: 'finished' }, overtime).reason === 'notFinished',
+      'With overtime, a one-point margin is not finished yet');
+
+    assert(S.validate({ score1: 30, score2: 2, status: 'finished' }, { pointsTo: null }).ok === true,
+      'A classic session has no target, so any winning score is acceptable');
+
+    // ===== Helpers =====
+    heading('Helpers');
+    assert(S.suggestsFinished({ score1: 21, score2: 18 }, to21) === true, 'Reaching the target suggests the match is over');
+    assert(S.suggestsFinished({ score1: 18, score2: 12 }, to21) === false, 'Mid-match scores do not');
+    assert(S.suggestsFinished({ score1: 5, score2: 1 }, { pointsTo: null }) === false,
+      'Without a target nothing is suggested — the organiser decides');
+    assert(S.winnerOf(9, 7) === 1 && S.winnerOf(7, 9) === 2, 'The winner is the higher side');
+    assert(S.winnerOf(9, 9) === null, 'A tie has no winner, which is why it cannot be saved as finished');
+    assert(S.MAX === 99 && SCORE_INPUT_MAX === 99, 'The cap is exposed for the field to enforce in the markup too');
+
+    // ===== Summary =====
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>

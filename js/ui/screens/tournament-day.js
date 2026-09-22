@@ -61,10 +61,10 @@
         badge: view.revision > 1,
         label: label('history.forMatch', 'Historial de este partido'),
         onClick: function () {
-          ctx.openOverlay('matchHistory', { matchId: view.id, revisions: view.revision });
+          ctx.openOverlay('matchHistory', { matchId: view.matchId, revisions: view.revision });
         },
       }) : null,
-      onClick: function () { ctx.openOverlay('scoring', { matchId: view.id }); },
+      onClick: function () { ctx.openOverlay('scoring', { matchId: view.matchId }); },
     });
   }
 
@@ -86,7 +86,11 @@
     }
 
     var view = day.nextMatch;
-    var stageLabel = view.stageLabel ? label(view.stageLabel, view.stageLabel) : label('tournament.group', 'Grupo ' + view.groupId, { id: view.groupId });
+    // Knockout matches belong to a stage, group matches to a group; the view
+    // carries both ids and only one of them is meaningful per match.
+    var stageLabel = view.stageKind === 'knockout'
+      ? label('tournament.format.stage.' + view.stageId, view.stageId)
+      : label('tournament.group', 'Grupo ' + view.groupId, { id: view.groupId });
 
     return el('section', { class: 'c-panel day__hero' }, [
       el('div', { class: 'c-panel__head' }, [
@@ -96,7 +100,7 @@
       el('p', { class: 'day__hero-teams', text: matchTitle(tournament, view) }),
       C.button({
         label: label('workspace.tournament.nextMatch.scoreBtn', 'Anotar este partido'),
-        onClick: function () { ctx.openOverlay('scoring', { matchId: view.id }); },
+        onClick: function () { ctx.openOverlay('scoring', { matchId: view.matchId }); },
       }),
     ]);
   }
@@ -351,7 +355,7 @@
         return C.panel({ label: label(stage.label, stage.id) },
           stageMatches.map(function (match) {
             var view = day.pending.concat(day.live, day.recentlyFinished)
-              .filter(function (item) { return item.id === match.id; })[0];
+              .filter(function (item) { return item.matchId === match.id; })[0];
             var slots = [
               { id: match.team1Id, score: view ? view.score1 : null },
               { id: match.team2Id, score: view ? view.score2 : null },

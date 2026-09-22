@@ -1131,3 +1131,166 @@
 .bracket__slot.is-placeholder .bracket__score { color: var(--text-3); }
 .bracket__team { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .bracket__score { flex: none; font-size: var(--font-h2); font-weight: 700; }
+
+/* ============================================
+   Scoring
+   ============================================ */
+
+.scoring { gap: var(--space-3); }
+
+.scoring__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  transition: box-shadow 0.15s ease;
+}
+.scoring__block.is-winning { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.scoring__team-row { display: flex; align-items: center; gap: var(--space-2); }
+.scoring__won { color: var(--accent); }
+.scoring__team {
+  font-size: var(--font-h2);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.scoring__block.is-winning .scoring__team { color: var(--accent); }
+
+.scoring__stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.scoring__step {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 56px: the scoring target from CLAUDE.md, used one-handed in sunlight. */
+  width: var(--touch-score);
+  height: var(--touch-score);
+  border-radius: var(--radius-cta);
+  background: var(--surface-2);
+  color: var(--text-1);
+  cursor: pointer;
+}
+.scoring__step--add { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); }
+.scoring__step--add.is-winning {
+  background: var(--accent);
+  box-shadow: none;
+  color: var(--text-on-accent);
+}
+
+/* The field carries no box at rest: the rule underneath is the affordance, so
+   it reads as a score rather than competing with the two buttons beside it. */
+.scoring__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  padding: 0 0 var(--space-2);
+  border: 0;
+  border-bottom: 2px solid var(--hairline-strong);
+  border-radius: 0;
+  background: none;
+  color: var(--text-1);
+  font-family: var(--font-family);
+  font-size: var(--font-display);
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+}
+.scoring__value.is-winning { color: var(--accent); }
+.scoring__value:focus {
+  outline: none;
+  box-shadow: none;
+  border-bottom-color: var(--accent);
+  border-bottom-width: 3px;
+}
+
+.scoring__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.scoring__target { font-size: var(--font-meta); color: var(--text-3); }
+.scoring__undo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  color: var(--accent);
+  font-size: var(--font-meta);
+  font-weight: 700;
+  cursor: pointer;
+}
+.scoring__hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-size: var(--font-caption);
+  color: var(--text-3);
+}
+.scoring__reason {
+  min-height: 1em;
+  font-size: var(--font-meta);
+  color: var(--state-error);
+  text-align: center;
+}
+
+/* --- Conflict --- */
+.scoring__conflict { box-shadow: inset 0 0 0 1px var(--state-warn); }
+.scoring__conflict-head { display: flex; align-items: center; gap: var(--space-2); }
+.scoring__conflict-icon { color: var(--state-warn); }
+.scoring__conflict-title { font-size: var(--font-h2); font-weight: 700; }
+.scoring__conflict-body { font-size: var(--font-meta); color: var(--text-2); line-height: 1.45; }
+.scoring__choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-3);
+  text-align: left;
+  cursor: pointer;
+}
+.scoring__choice.is-active {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+.scoring__choice-who { font-size: var(--font-meta); color: var(--text-2); }
+.scoring__choice-score { font-size: var(--font-h1); font-weight: 700; color: var(--text-1); }
+.scoring__choice.is-active .scoring__choice-score { color: var(--accent); }
+
+/* --- Toast --- */
+.app__toast {
+  position: fixed;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(var(--tab-bar-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  pointer-events: none;
+}
+.app__toast:empty { display: none; }
+.c-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--overlay-accent-12);
+  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sheet);
+  backdrop-filter: blur(12px);
+}
+.c-toast__icon { color: var(--accent); }
+.c-toast__title { font-size: var(--font-body); font-weight: 700; }
+.c-toast__sub { font-size: var(--font-caption); color: var(--text-2); }
+@media (min-width: 600px) {
+  .app__toast { left: auto; right: var(--space-5); width: min(360px, 100%); bottom: var(--space-5); }
+}
