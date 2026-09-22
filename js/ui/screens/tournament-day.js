@@ -524,9 +524,10 @@
         ]));
       }
 
-      // The owner reaches Anotadores from inside the tournament, because that is
-      // where the nav badge points. A pending request gets its own strip: it
-      // means somebody is standing on the court waiting to be let in.
+      // Scorers, sharing, the history and resetting all moved into the app bar
+      // menu (board H1); what stays on the screen is the one thing that cannot
+      // wait behind a tap: somebody is standing on the court asking to be let
+      // in.
       if (session && session.role === 'owner') {
         var requests = session.requests || {};
         var uids = Object.keys(requests);
@@ -547,25 +548,6 @@
           }));
         }
 
-        body.push(el('div', { class: 'day__collab' }, [
-          C.button({
-            // No count on the label: at 320px the two buttons share the row and
-            // "Anotadores · 3" ellipsised into "Anotadore…". The pending count
-            // is on the nav badge, and the overlay states the total.
-            label: label('scorers.title', 'Anotadores'),
-            variant: 'ghost',
-            icon: 'users',
-            block: false,
-            onClick: function () { ctx.openOverlay('scorers'); },
-          }),
-          C.button({
-            label: label('day.share', 'Compartir'),
-            variant: 'ghost',
-            icon: 'share-2',
-            block: false,
-            onClick: function () { ctx.openOverlay('share'); },
-          }),
-        ]));
       }
 
       body = body.concat([

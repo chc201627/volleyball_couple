@@ -39,10 +39,27 @@
   var repository = null;
   var sessionId = null;
   var unsubscribeSession = null;
+  var unsubscribeHistory = null;
+  // The change history, newest first, as the repository reports it. Kept beside
+  // the session rather than in AppState: it is a view of the session, not of
+  // this device's tournament, and nothing about it survives a reload. Named in
+  // full because `history` is the browser's own global, used just below.
+  var historyEntries = [];
   // What the session last said we were, so a role change can be announced
   // rather than only re-rendered.
   var lastRole = null;
   var nodes = {};
+
+  /** How many devices are waiting to be let in. Only the owner is told: the
+   * request list is not readable by anyone else, so for a scorer it is always
+   * zero rather than unknown. */
+  function pendingRequestCount() {
+    var session = appState.get().session;
+    if (!session || !session.requests) return 0;
+    return Object.keys(session.requests).filter(function (uid) {
+      return session.requests[uid].status === 'pending';
+    }).length;
+  }
 
   function workspaceInput() {
     var snapshot = appState.get();
@@ -62,9 +79,7 @@
       hasBracket: !!(snapshot.tournament && snapshot.tournament.format),
       complete: isComplete(snapshot),
       hasNextMatch: false,
-      pendingRequestCount: session && session.requests
-        ? Object.keys(session.requests).filter(function (uid) { return session.requests[uid].status === 'pending'; }).length
-        : 0,
+      pendingRequestCount: pendingRequestCount(),
       firebaseConnected: session ? session.connection !== 'offline' : undefined,
       // Same test v1's initFirebase() applies, so both entry points agree on
       // whether a session is even possible.
@@ -198,6 +213,12 @@
       announceRoleChange(snapshot && snapshot.role);
       render();
     });
+    if (unsubscribeHistory) unsubscribeHistory();
+    historyEntries = [];
+    unsubscribeHistory = repository.watchHistory(id, function (entries) {
+      historyEntries = entries || [];
+      render();
+    });
   }
 
   /** A permission that changes has to be said out loud. Granting access closes
@@ -228,6 +249,8 @@
    * and the tournament in storage is still intact. */
   function leaveSession() {
     if (unsubscribeSession) { unsubscribeSession(); unsubscribeSession = null; }
+    if (unsubscribeHistory) { unsubscribeHistory(); unsubscribeHistory = null; }
+    historyEntries = [];
     sessionId = null;
     lastRole = null;
     // Only the hash identifies the session, so only the hash is dropped: the
@@ -258,6 +281,27 @@
   function setAccess(memberId, status) {
     if (!repository || !sessionId) return Promise.resolve({ status: 'denied' });
     return repository.setAccess(sessionId, memberId, status).catch(function () { return { status: 'offline' }; });
+  }
+
+  /** Starting over. The session is deleted rather than emptied: a reset is not
+   * an edit of the tournament, it is the end of it, and a link that survived
+   * would point at something nobody is playing. Failing to reach Firebase does
+   * not block it — the local tournament is this device's, and the session will
+   * be unreachable anyway once nobody writes to it. */
+  function resetTournament() {
+    if (repository && sessionId && repository.removeSession) {
+      repository.removeSession(sessionId).catch(function () { /* the local reset stands */ });
+    }
+    if (unsubscribeSession) { unsubscribeSession(); unsubscribeSession = null; }
+    if (unsubscribeHistory) { unsubscribeHistory(); unsubscribeHistory = null; }
+    historyEntries = [];
+    sessionId = null;
+    lastRole = null;
+    appState.clearSession();
+    appState.resetTournament();
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    state.currentOverlay = null;
+    navigate('setup');
   }
 
   function publishSession() {
@@ -333,10 +377,22 @@
   function renderChrome(view) {
     var items = destinationItems(view);
 
+    // Everything that is not the match in front of you lives in one menu, and
+    // only where it applies: on any other destination it would open onto
+    // actions about a tournament that is not on screen.
+    var menuAction = view.view === 'tournament' && appState.get().tournament ? [{
+      icon: 'ellipsis-vertical',
+      tone: 'muted',
+      label: label('history.menuLabel', 'Opciones del torneo'),
+      badge: pendingRequestCount() > 0,
+      onClick: function () { openOverlay('tournamentMenu'); },
+    }] : [];
+
     DomHelpers.mount(nodes.bar, C.appBar({
       title: label('workspace.nav.' + view.view, view.view),
       // Shown from 600px up, where the fixed tab bar is dropped.
       nav: { active: view.view, items: items, onSelect: navigate },
+      actions: menuAction,
       lang: {
         code: state.lang.toUpperCase(),
         label: label('app.toggleLanguage', 'Cambiar idioma'),
@@ -374,6 +430,8 @@
       setAccess: setAccess,
       shareUrl: shareUrl,
       leaveSession: leaveSession,
+      resetTournament: resetTournament,
+      history: historyEntries,
       sessionId: sessionId,
       rerender: render,
     };

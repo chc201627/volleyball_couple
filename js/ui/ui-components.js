@@ -297,6 +297,44 @@ var UIComponents;
     ]);
   }
 
+  /** An overflow menu anchored under the app bar (board H1).
+   *
+   * Not a sheet: a sheet is for a decision that deserves the whole bottom of
+   * the screen, and this is a list of places to go. It is dismissed by the
+   * scrim, each row is a full-width target, and anything destructive is put
+   * below a divider rather than sitting a thumb's width from "Share".
+   */
+  function menu(options, items) {
+    options = options || {};
+    var rows = [];
+    (items || []).forEach(function (item) {
+      if (!item) return;
+      if (item.divider) { rows.push(el('div', { class: 'c-menu__divider' })); return; }
+      rows.push(el('button', {
+        class: ['c-menu__item', item.tone && 'c-menu__item--' + item.tone],
+        attrs: { type: 'button', disabled: item.disabled },
+        on: { click: item.onClick },
+      }, [
+        icon(item.icon, { size: 18, class: 'c-menu__icon' }),
+        el('span', { class: 'c-menu__label', text: item.label }),
+        item.count ? el('span', { class: 'c-menu__count', text: String(item.count) }) : null,
+      ]));
+    });
+    return el('div', {
+      class: 'c-scrim c-scrim--top anim-scrim-in',
+      on: {
+        click: function (event) {
+          if (event.target === event.currentTarget && options.onDismiss) options.onDismiss();
+        },
+      },
+    }, [
+      el('div', {
+        class: 'c-menu anim-menu-in',
+        attrs: { role: 'menu', 'aria-label': options.label },
+      }, rows),
+    ]);
+  }
+
   function emptyState(options) {
     options = options || {};
     return el('div', { class: 'c-empty' }, [
@@ -458,6 +496,7 @@ var UIComponents;
     subTabs: subTabs,
     panel: panel,
     sheet: sheet,
+    menu: menu,
     emptyState: emptyState,
     statusStrip: statusStrip,
     progressBar: progressBar,

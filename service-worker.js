@@ -44,6 +44,7 @@ var VERSIONED = [
   './js/workspace-view-machine.js',
   './js/standings-view.js',
   './js/score-input.js',
+  './js/match-history.js',
   './js/app-state.js',
   './js/ui/dom-helpers.js',
   './js/ui/icon-registry.js',
@@ -59,6 +60,7 @@ var VERSIONED = [
   './js/ui/screens/king.js',
   './js/ui/screens/results.js',
   './js/ui/screens/collaboration.js',
+  './js/ui/screens/history.js',
   './js/app-orchestrator.js',
 ];
 

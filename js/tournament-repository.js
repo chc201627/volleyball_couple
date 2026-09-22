@@ -277,6 +277,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         role: owner ? 'owner' : (ownAccess === 'approved' ? 'scorer' : 'spectator'),
         accessStatus: ownAccess,
         requests: owner ? clone(session.access || {}) : null,
+        ownerUid: session.ownerUid || null,
+        viewerUid: runtime.authState === 'ready' ? runtime.uid : null,
       });
     }
     function notify(sessionId) {
@@ -439,6 +441,11 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         role: owner ? 'owner' : (status === 'approved' ? 'scorer' : 'spectator'),
         accessStatus: status,
         requests: owner ? (requests || {}) : null,
+        // Both uids travel with the snapshot so the history can say "you" and
+        // "the organiser" without a second lookup — and without a spectator
+        // needing read access to the member list, which they do not have.
+        ownerUid: raw.ownerUid || null,
+        viewerUid: uid || null,
       });
     }
 

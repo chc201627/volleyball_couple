@@ -469,6 +469,8 @@ var AppState;
           authState: snapshot.authState || 'pending',
           legacy: !!snapshot.legacy,
           schemaVersion: snapshot.schemaVersion,
+          ownerUid: snapshot.ownerUid || null,
+          viewerUid: snapshot.viewerUid || null,
         };
 
         if (snapshot.tournament) {

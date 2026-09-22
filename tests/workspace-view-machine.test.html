@@ -215,6 +215,14 @@
     assert(routed({ currentOverlay: 'matchHistory', overlayMatchRevisions: 2 }).overlay === 'matchHistory',
       'Per-match history opens once the match has been scored');
 
+    assert(routed({ currentOverlay: 'tournamentMenu' }).overlay === 'tournamentMenu',
+      'The tournament menu opens while a tournament is running');
+    var menuWithout = routed({ currentOverlay: 'tournamentMenu', hasTournament: false });
+    assert(menuWithout.overlay === null && menuWithout.overlayBlockedReasonKey === 'workspace.overlay.blocked.noTournament',
+      'With no tournament the menu has nothing to act on, and says so');
+    assert(routed({ role: 'spectator', currentOverlay: 'tournamentMenu' }).overlay === 'tournamentMenu',
+      'A spectator may open the menu — sharing and the history are theirs to read too');
+
     assert(routed({ role: 'spectator', currentOverlay: 'requestAccess' }).overlay === 'requestAccess', 'A spectator may request access');
     assert(routed({ role: 'owner', currentOverlay: 'requestAccess' }).overlay === null, 'The owner has nothing to request');
     assert(routed({ role: 'owner', currentOverlay: 'scorers' }).overlay === 'scorers', 'Only the owner manages scorers');

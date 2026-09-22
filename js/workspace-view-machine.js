@@ -26,7 +26,7 @@ var WORKSPACE_VIEWS = ['setup', 'teams', 'tournament', 'results'];
 var WORKSPACE_SUBVIEWS = { tournament: ['today', 'groups', 'bracket'] };
 var WORKSPACE_OVERLAYS = [
   'scoring', 'history', 'matchHistory', 'requestAccess', 'scorers', 'share', 'modeFork',
-  'import', 'manualPairing', 'tournamentConfig', 'formatEditor',
+  'tournamentMenu', 'import', 'manualPairing', 'tournamentConfig', 'formatEditor',
 ];
 
 /** Sub-view resolution. Only Tournament has them; everything else resolves to
@@ -62,6 +62,10 @@ function workspaceOverlayAllowed(id, input) {
       // Only reachable for a match that actually has something to show. This is
       // the rule behind the per-match entrypoint: no revisions, no icon.
       return { enabled: (input.overlayMatchRevisions || 0) > 0, reasonKey: 'workspace.overlay.blocked.noRevisions' };
+    case 'tournamentMenu':
+      // The menu is about a tournament: share it, see who may score it, read
+      // its history, end it. With no tournament there is nothing to open it on.
+      return { enabled: !!input.hasTournament, reasonKey: input.hasTournament ? null : 'workspace.overlay.blocked.noTournament' };
     case 'requestAccess':
       return { enabled: input.role === 'spectator', reasonKey: 'workspace.overlay.blocked.alreadyScoring' };
     case 'scorers':

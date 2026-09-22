@@ -48,6 +48,7 @@ Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a b
 | `js/tournament-day.js` | Pure, DOM-free selectors for the Tournament command center and Results screen: next match, live/pending/recently-finished lists, stage progress, and champion/outcome resolution. |
 | `js/tournament-repository.js` | Repository boundary for shared tournaments: schema codecs, in-memory tests, Firebase subscriptions, access requests, and transactional result saves. |
 | `js/king-of-court.js` | Throne/challenger queue and win conditions. |
+| `js/match-history.js` | Pure, DOM-free selectors over the change history: the diff against the previous revision, day grouping, filters by event, one match's timeline, and the legacy view for sessions that predate `resultHistory`. |
 | `js/workspace.js` | Pure, DOM-free view machine for the four-destination organizer workspace: resolved destination, role-scoped nav, single contextual primary action, and readiness checklist. |
 | `js/app.js` | IIFE-based application state, rendering, events, localStorage, localization, and repository orchestration. |
 | `js/firebase-config.js` | Firebase initialization and loopback-only emulator selection. |
