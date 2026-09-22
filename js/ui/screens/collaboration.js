@@ -77,7 +77,7 @@
         C.button({
           label: session.accessStatus === 'pending'
             ? label('access.resend', 'Volver a pedir')
-            : label('tournament.access.request', 'Pedir acceso'),
+            : label('access.requestShort', 'Pedir acceso'),
           disabled: requestState === 'sending',
           onClick: function () {
             requestState = 'sending';

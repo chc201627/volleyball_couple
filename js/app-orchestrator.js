@@ -337,7 +337,11 @@
       title: label('workspace.nav.' + view.view, view.view),
       // Shown from 600px up, where the fixed tab bar is dropped.
       nav: { active: view.view, items: items, onSelect: navigate },
-      lang: { code: state.lang.toUpperCase(), label: 'Cambiar idioma', onClick: toggleLanguage },
+      lang: {
+        code: state.lang.toUpperCase(),
+        label: label('app.toggleLanguage', 'Cambiar idioma'),
+        onClick: toggleLanguage,
+      },
     }));
 
     DomHelpers.mount(nodes.tabbar, C.tabBar({
@@ -394,7 +398,7 @@
       DomHelpers.mount(nodes.main, C.emptyState({
         icon: 'info',
         title: label('workspace.nav.' + view.view, view.view),
-        text: 'Pantalla pendiente en esta fase de la reconstrucción.',
+        text: label('app.screenPending', 'Pantalla pendiente en esta fase de la reconstrucción.'),
       }));
     }
     nodes.main.classList.remove('anim-screen-in');
@@ -409,7 +413,10 @@
       DomHelpers.mount(nodes.overlay, overlay.render(screenContext(view)));
     } else {
       DomHelpers.mount(nodes.overlay, C.sheet({ title: view.overlay, onDismiss: closeOverlay }, [
-        el('p', { class: 'c-sheet__sub', text: 'Pantalla pendiente en esta fase de la reconstrucción.' }),
+        el('p', {
+          class: 'c-sheet__sub',
+          text: label('app.screenPending', 'Pantalla pendiente en esta fase de la reconstrucción.'),
+        }),
       ]));
     }
   }
@@ -455,7 +462,18 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+    if (location.protocol !== 'https:') return;
+    // Never on a development host. The worker serves assets cache-first keyed on
+    // `?v=`, which is exactly right for a release and exactly wrong while the
+    // files change under a version that does not: every edit came back stale
+    // until the cache was cleared by hand. Registering it here buys nothing —
+    // an offline shell is for a beach, not for localhost.
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        registrations.forEach(function (registration) { registration.unregister(); });
+      }).catch(function () { /* nothing to clean up */ });
+      return;
+    }
     navigator.serviceWorker.register('service-worker.js').catch(function () {
       // An unavailable service worker costs the offline shell, nothing else.
       // The app must never depend on it having registered.

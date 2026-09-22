@@ -192,7 +192,8 @@
     var meta = [];
     if (player.gender === 'male') meta.push(label('form.genderMale', 'Hombre'));
     else if (player.gender === 'female') meta.push(label('form.genderFemale', 'Mujer'));
-    if (player.level) meta.push('N' + player.level);
+    // "N1" is an abbreviation of "Nivel 1" and says nothing in English.
+    if (player.level) meta.push(label('players.levelShort', 'N' + player.level, { level: player.level }));
 
     var row = el('div', { class: 'setup__player' }, [
       el('div', { class: 'setup__player-identity' }, [
@@ -267,7 +268,7 @@
           class: 'c-panel__action setup__see-all',
           attrs: { type: 'button' },
           on: { click: function () { showAllPlayers = true; ctx.rerender(); } },
-        }, [el('span', { text: label('setup.seeAll', 'Ver los ' + filtered.length) })]));
+        }, [el('span', { text: label('setup.seeAll', 'Ver los ' + filtered.length, { count: filtered.length }) })]));
       }
     }
 

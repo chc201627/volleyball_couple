@@ -53,6 +53,8 @@ Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a b
 | `js/firebase-config.js` | Firebase initialization and loopback-only emulator selection. |
 | `firebase-rules.json` | Least-privilege Realtime Database authorization and validation. |
 | `css/styles.css` | Mobile-first BEM styles and design tokens; breakpoints at 600px and 960px. |
+| `scripts/bump-version.js` | The one command that moves the release version across `index.html`, the service worker and `js/i18n.js`. |
+| `scripts/i18n-unused.js` | Translation sweep: missing keys, keys present in one language only, unsubstituted `{placeholders}`, and orphans. `--strict` exits non-zero. |
 
 Script order is contractual. Firebase CDN SDKs load first, followed by:
 
@@ -87,14 +89,13 @@ Script order is contractual. Firebase CDN SDKs load first, followed by:
 
 Static assets and Firebase Rules form one release and must be deployed and verified together.
 
-1. Run browser suites and `npm run test:rules`.
-2. Bump every local asset `?v=X.Y.Z` in `index.html`.
-3. Bump the footer version in `index.html` and both `footer.copyright` translations in `js/i18n.js`.
-4. Update release and requirements/task documentation when behavior changes.
-5. Deploy static assets through Railway and rules with `firebase deploy --only database`.
-6. Verify the production URL on a 320px mobile viewport and confirm Firebase permissions with separate devices/profiles.
+1. Run browser suites, `npm run test:rules`, and `node scripts/i18n-unused.js --strict`.
+2. Bump the version with `node scripts/bump-version.js X.Y.Z`. It rewrites every local asset `?v=` in `index.html`, `ASSET_VERSION` in `service-worker.js` (which names the cache and the precached URLs), and `footer.copyright` in both languages. Do not edit those by hand — they must agree.
+3. Update release and requirements/task documentation when behavior changes.
+4. Deploy static assets through Railway and rules with `firebase deploy --only database`.
+5. Verify the production URL on a 320px mobile viewport, in both languages, and confirm Firebase permissions with separate devices/profiles.
 
-The query-string bump is mandatory because the static host does not provide reliable cache invalidation for local assets.
+The version bump is mandatory because the static host does not provide reliable cache invalidation for local assets: the service worker serves them cache-first keyed on `?v=`, so an unbumped release is invisible to anyone who has opened the app before.
 
 ## Requirements and workflow
 

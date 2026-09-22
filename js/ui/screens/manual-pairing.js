@@ -93,7 +93,7 @@
 
     return C.panel({
       label: label('pairing.unpaired', 'Sin emparejar') + ' · ' + available.length,
-      action: { label: label('pairing.tapTwo', 'Toca ' + teamSize), onClick: null },
+      action: { label: label('pairing.tapTwo', 'Toca ' + teamSize, { n: teamSize }), onClick: null },
     }, rows.length ? rows : [
       el('p', { class: 'pairing__empty', text: label('pairing.allPaired', 'Ya están todos emparejados') }),
     ]);
@@ -122,15 +122,17 @@
           icon: 'info',
           tone: 'neutral',
           text: label('pairing.manualHint',
-            'Las ' + remaining + ' parejas restantes se generan al azar'),
+            'Las ' + remaining + ' parejas restantes se generan al azar', { count: remaining }),
         }),
       ].filter(Boolean);
 
       body.push(el('div', { class: 'app__action-bar' }, [
         C.button({
           label: selected.length === teamSize
-            ? label('pairing.fixSelected', 'Fijar ' + selected.map(function (id) { return nameOf(ctx, id); }).join(' & '))
-            : label('pairing.pickMore', 'Elige ' + teamSize + ' jugadores'),
+            ? label('pairing.fixSelected',
+                'Fijar ' + selected.map(function (id) { return nameOf(ctx, id); }).join(' & '),
+                { names: selected.map(function (id) { return nameOf(ctx, id); }).join(' & ') })
+            : label('pairing.pickMore', 'Elige ' + teamSize + ' jugadores', { n: teamSize }),
           disabled: selected.length !== teamSize,
           onClick: function () {
             ctx.appState.setManualPairs(pairs.concat([selected.slice()]));

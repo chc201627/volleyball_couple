@@ -62,7 +62,7 @@
       tone: 'warn',
       text: names + ' ' + label('unmatched.text', 'se queda sin pareja'),
       action: {
-        label: label('setup.empty.add', 'Añadir'),
+        label: label('teams.addPlayer', 'Añadir'),
         onClick: function () { ctx.navigate('setup'); },
       },
     });
@@ -263,8 +263,10 @@
         }, [
           IconRegistry.icon('chevron-right', { size: 15 }),
           el('span', {
-            text: label('tournament.configureFirst', 'Ajustar grupos y formato') +
-              ' · ' + snapshot.groupCount + (snapshot.groupCount === 1 ? ' grupo' : ' grupos'),
+            text: label('tournament.configureFirst', 'Ajustar grupos y formato') + ' · ' +
+              (snapshot.groupCount === 1
+                ? label('tournament.groupCount.one', '1 grupo')
+                : label('tournament.groupCount.many', snapshot.groupCount + ' grupos', { count: snapshot.groupCount })),
           }),
         ]) : null,
         C.button({

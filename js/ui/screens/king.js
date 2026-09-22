@@ -72,7 +72,7 @@
           },
         }),
         C.button({
-          label: label('workspace.results.heading', 'Ver resultados'),
+          label: label('nav.goToResults', 'Ver resultados'),
           variant: 'ghost',
           onClick: function () { ctx.navigate('results'); },
         }),
@@ -188,7 +188,7 @@
           title: label('king.none', 'No hay partida de King'),
           text: label('king.noneText', 'Genera los equipos y elige King of the Court.'),
           actions: [C.button({
-            label: label('workspace.nav.teams', 'Ir a Equipos'),
+            label: label('nav.goToTeams', 'Ir a Equipos'),
             onClick: function () { ctx.navigate('teams'); },
           })],
         })];

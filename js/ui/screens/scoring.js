@@ -153,10 +153,10 @@
       tie: label('tournament.error.scoreDraw',
         'Empate: las reglas rechazan un resultado terminado sin ganador. Puedes dejarlo en vivo.'),
       overTarget: label('tournament.format.error.pointsTarget',
-        'El set es a ' + (rules && rules.pointsTo) + ' puntos'),
+        'El set es a ' + (rules && rules.pointsTo) + ' puntos', { points: rules && rules.pointsTo }),
       notFinished: label('tournament.error.notFinished',
-        'Todavía no llega a ' + (rules && rules.pointsTo) + ' puntos'),
-      tooHigh: label('tournament.error.tooHigh', 'Máximo ' + scoreInput.MAX),
+        'Todavía no llega a ' + (rules && rules.pointsTo) + ' puntos', { points: rules && rules.pointsTo }),
+      tooHigh: label('tournament.error.tooHigh', 'Máximo ' + scoreInput.MAX, { max: scoreInput.MAX }),
       invalidScore: label('tournament.error.scoreNotInt', 'Marcador no válido'),
     };
     return texts[reason] || '';

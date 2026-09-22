@@ -17,13 +17,16 @@
  * so a version bump is a full, atomic invalidation.
  */
 
-var CACHE_VERSION = 'bv-2.0.0';
+/** The single source of truth for the release. scripts/bump-version.js rewrites
+ * this line together with every `?v=` in index.html, so the cache name and the
+ * URLs the page asks for can never drift apart. */
+var ASSET_VERSION = '2.0.0';
+var CACHE_VERSION = 'bv-' + ASSET_VERSION;
 
 /** Firebase SDKs are deliberately NOT precached: they are large, versioned by
  * the CDN, and a stale copy is worse than a slow one. They fall through to the
  * network and the app already degrades gracefully when they fail to load. */
-var PRECACHE = [
-  './index.html',
+var VERSIONED = [
   './css/design-tokens.css',
   './css/reset.css',
   './css/app-shell.css',
@@ -58,6 +61,10 @@ var PRECACHE = [
   './js/ui/screens/collaboration.js',
   './js/app-orchestrator.js',
 ];
+
+var PRECACHE = ['./index.html'].concat(VERSIONED.map(function (path) {
+  return path + '?v=' + ASSET_VERSION;
+}));
 
 self.addEventListener('install', function (event) {
   event.waitUntil(

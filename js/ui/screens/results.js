@@ -28,15 +28,22 @@
 
   /* --- Table ------------------------------------------------------------ */
 
+  // Abbreviations are translated: PJ/G/P read as nothing in English. Widths are
+  // sized for the longest of either language at 320px, where seven numeric
+  // columns share the row.
   var COLUMNS = [
-    { key: 'played', label: 'PJ', width: 22 },
-    { key: 'won', label: 'G', width: 20 },
-    { key: 'lost', label: 'P', width: 20 },
-    { key: 'diff', label: 'DIF', width: 30 },
-    { key: 'setsFor', label: 'PF', width: 24 },
-    { key: 'setsAgainst', label: 'PC', width: 24 },
-    { key: 'points', label: 'PTS', width: 30 },
+    { key: 'played', labelKey: 'standings.col.played', fallback: 'PJ', width: 22 },
+    { key: 'won', labelKey: 'standings.col.won', fallback: 'G', width: 20 },
+    { key: 'lost', labelKey: 'standings.col.lost', fallback: 'P', width: 20 },
+    { key: 'diff', labelKey: 'standings.col.diff', fallback: 'DIF', width: 30 },
+    { key: 'setsFor', labelKey: 'standings.col.setsFor', fallback: 'PF', width: 24 },
+    { key: 'setsAgainst', labelKey: 'standings.col.setsAgainst', fallback: 'PC', width: 24 },
+    { key: 'points', labelKey: 'standings.col.points', fallback: 'PTS', width: 30 },
   ];
+
+  function columnLabel(column) {
+    return label(column.labelKey, column.fallback);
+  }
   var MEDAL_GLYPH = { gold: '🥇', silver: '🥈', bronze: '🥉' };
 
   function headerRow() {
@@ -47,7 +54,7 @@
       return el('span', {
         class: ['table__cell', column.key === 'points' && 'is-points'],
         style: { width: column.width + 'px' },
-        text: column.label,
+        text: columnLabel(column),
       });
     })));
   }
@@ -86,7 +93,12 @@
   }
 
   function tieBlock(tournament, block, rows) {
-    var columnName = { diff: 'DIF', setsFor: 'PF' }[block.decidedBy] || '';
+    // The caption names a column, so it has to name the same string the header
+    // shows — in whichever language that is.
+    var columnName = {
+      diff: label('standings.col.diff', 'DIF'),
+      setsFor: label('standings.col.setsFor', 'PF'),
+    }[block.decidedBy] || '';
     var children = [
       el('div', { class: 'table__tie-caption' }, [
         IconRegistry.icon('equal', { size: 12 }),
@@ -118,7 +130,9 @@
           IconRegistry.icon('chevron-right', { size: 12 }),
           el('span', {
             text: sub.decidedBy === 'setsFor'
-              ? label('tournament.subTieBlock', 'Mismo DIF (' + (sub.value > 0 ? '+' + sub.value : sub.value) + ') · decide PF')
+              ? label('tournament.subTieBlock',
+                  'Mismo DIF (' + (sub.value > 0 ? '+' + sub.value : sub.value) + ') · decide PF',
+                  { diff: sub.value > 0 ? '+' + sub.value : sub.value, column: label('standings.col.setsFor', 'PF') })
               : label('tournament.tieUnresolved', 'Iguales en todo lo visible · decide el enfrentamiento directo'),
           }),
         ]),
@@ -195,7 +209,7 @@
           text: label('results.emptyText',
             'Cuando arranques un torneo verás aquí la tabla en vivo y, al terminar, el campeón.'),
           actions: [C.button({
-            label: label('workspace.results.emptyLink', 'Ir a Setup'),
+            label: label('workspace.results.emptyLink', 'Ir a Inicio'),
             onClick: function () { ctx.navigate('setup'); },
           })],
         })];
@@ -233,7 +247,9 @@
         body.push(C.panel({
           label: (tournament.groups.length > 1
             ? label('tournament.group', 'Grupo ' + group.id, { id: group.id }) + ' · '
-            : '') + label('tournament.standingsFinal', day.complete ? 'Clasificación final' : 'Clasificación en vivo'),
+            : '') + (day.complete
+              ? label('tournament.standingsFinal', 'Clasificación final')
+              : label('tournament.standingsLive', 'Clasificación en vivo')),
           flush: true,
         }, [table(tournament, view)]));
       });
@@ -245,7 +261,8 @@
           icon: 'info',
           tone: 'warn',
           text: label('results.provisional',
-            'Posiciones provisionales: quedan ' + (day.progress.total - day.progress.played) + ' partidos por jugar'),
+            'Posiciones provisionales: quedan ' + (day.progress.total - day.progress.played) + ' partidos por jugar',
+            { count: day.progress.total - day.progress.played }),
         }));
       }
 

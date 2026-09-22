@@ -187,17 +187,46 @@
     ].filter(Boolean);
   }
 
+  /** Slot descriptors (`slot:A1`, `winner:k-sf-2`) are how the format engine
+   * writes a pairing before the teams exist. They reached the bracket verbatim,
+   * so an unresolved match read "winner:k-sf-1" — engine vocabulary on a screen
+   * meant for players. They are parsed here and said in words instead. */
+  var SLOT_TOKEN = /^slot:([A-Z])(\d+)$/;
+  var WINNER_TOKEN = /^winner:k-([a-z][a-z0-9]{0,11})-(\d+)$/;
+
+  function slotLabel(token) {
+    var slot = SLOT_TOKEN.exec(token || '');
+    if (slot) {
+      return label('bracket.slot.group', slot[2] + 'º del grupo ' + slot[1],
+        { rank: slot[2], group: slot[1] });
+    }
+    var winner = WINNER_TOKEN.exec(token || '');
+    if (winner) {
+      var stage = label('bracket.stage.' + winner[1], winner[1].toUpperCase());
+      return label('bracket.slot.winner', 'Ganador de ' + stage + winner[2],
+        { stage: stage, n: winner[2] });
+    }
+    return token;
+  }
+
   /* --- Grupos (C3) ------------------------------------------------------ */
 
+  // Abbreviations are translated: PJ/G/P read as nothing in English. Widths are
+  // sized for the longest of either language at 320px, where seven numeric
+  // columns share the row.
   var COLUMNS = [
-    { key: 'played', label: 'PJ', width: 22 },
-    { key: 'won', label: 'G', width: 20 },
-    { key: 'lost', label: 'P', width: 20 },
-    { key: 'diff', label: 'DIF', width: 30 },
-    { key: 'setsFor', label: 'PF', width: 24 },
-    { key: 'setsAgainst', label: 'PC', width: 24 },
-    { key: 'points', label: 'PTS', width: 30 },
+    { key: 'played', labelKey: 'standings.col.played', fallback: 'PJ', width: 22 },
+    { key: 'won', labelKey: 'standings.col.won', fallback: 'G', width: 20 },
+    { key: 'lost', labelKey: 'standings.col.lost', fallback: 'P', width: 20 },
+    { key: 'diff', labelKey: 'standings.col.diff', fallback: 'DIF', width: 30 },
+    { key: 'setsFor', labelKey: 'standings.col.setsFor', fallback: 'PF', width: 24 },
+    { key: 'setsAgainst', labelKey: 'standings.col.setsAgainst', fallback: 'PC', width: 24 },
+    { key: 'points', labelKey: 'standings.col.points', fallback: 'PTS', width: 30 },
   ];
+
+  function columnLabel(column) {
+    return label(column.labelKey, column.fallback);
+  }
 
   function headerRow() {
     return el('div', { class: 'table__row table__row--head' }, [
@@ -207,7 +236,7 @@
       return el('span', {
         class: ['table__cell', column.key === 'points' && 'is-points'],
         style: { width: column.width + 'px' },
-        text: column.label,
+        text: columnLabel(column),
       });
     })));
   }
@@ -269,7 +298,12 @@
   }
 
   function tieBlockNode(tournament, block, rows) {
-    var columnName = { diff: 'DIF', setsFor: 'PF' }[block.decidedBy] || '';
+    // The caption names a column, so it has to name the same string the header
+    // shows — in whichever language that is.
+    var columnName = {
+      diff: label('standings.col.diff', 'DIF'),
+      setsFor: label('standings.col.setsFor', 'PF'),
+    }[block.decidedBy] || '';
     var children = [
       el('div', { class: 'table__tie-caption' }, [
         IconRegistry.icon('equal', { size: 12 }),
@@ -296,14 +330,15 @@
         subRows.push(rows[index]);
         index += 1;
       }
-      var subColumn = { setsFor: 'PF' }[sub.decidedBy];
+      var subColumn = { setsFor: label('standings.col.setsFor', 'PF') }[sub.decidedBy];
       children.push(el('div', { class: 'table__tie table__tie--sub' }, [
         el('div', { class: 'table__tie-caption' }, [
           IconRegistry.icon('chevron-right', { size: 12 }),
           el('span', {
             text: subColumn
               ? label('tournament.subTieBlock',
-                  'Mismo DIF (' + (sub.value > 0 ? '+' + sub.value : sub.value) + ') · decide ' + subColumn)
+                  'Mismo DIF (' + (sub.value > 0 ? '+' + sub.value : sub.value) + ') · decide ' + subColumn,
+                  { diff: sub.value > 0 ? '+' + sub.value : sub.value, column: subColumn })
               : label('tournament.tieUnresolved',
                   'Iguales en todo lo visible · decide el enfrentamiento directo'),
           }),
@@ -393,7 +428,7 @@
               return el('div', { class: ['bracket__slot', isWinner && 'is-winner', !resolved && 'is-placeholder'] }, [
                 el('span', {
                   class: 'bracket__team',
-                  text: resolved ? teamName(tournament, slot.id) : label('tournament.slot.' + slot.id, slot.id),
+                  text: resolved ? teamName(tournament, slot.id) : slotLabel(slot.id),
                 }),
                 el('span', { class: 'bracket__score', text: slot.score == null ? '—' : String(slot.score) }),
               ]);
@@ -439,7 +474,7 @@
           title: label('tournament.none', 'Todavía no hay torneo'),
           text: label('tournament.noneText', 'Genera los equipos y elige cómo quieren jugar.'),
           actions: [C.button({
-            label: label('workspace.nav.teams', 'Ir a Equipos'),
+            label: label('nav.goToTeams', 'Ir a Equipos'),
             onClick: function () { ctx.navigate('teams'); },
           })],
         })];

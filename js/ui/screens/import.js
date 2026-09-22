@@ -70,6 +70,7 @@
       mixedDelimiter: 'Separador distinto al del resto',
       playerLimitExceeded: 'Superarías el máximo de ' + (issue.params.maxPlayers || '') + ' jugadores',
       emptyBatch: 'No hay nada que importar',
+      ambiguousM: '«M» se interpretó como mujer, según el idioma',
     };
     return label(key, fallbacks[issue.code] || issue.code, issue.params);
   }
@@ -125,7 +126,9 @@
       meta.push(row.player.gender === 'male' ? label('form.genderMale', 'Hombre')
         : row.player.gender === 'female' ? label('form.genderFemale', 'Mujer')
         : label('form.genderUnspecified', 'Sin género'));
-      meta.push(row.player.level ? 'N' + row.player.level : label('import.noLevel', 'sin nivel'));
+      meta.push(row.player.level
+        ? label('players.levelShort', 'N' + row.player.level, { level: row.player.level })
+        : label('import.noLevel', 'sin nivel'));
     }
 
     var children = [
