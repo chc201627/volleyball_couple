@@ -1,14 +1,5 @@
-/** Scoring — canvas boards C2, C2b, C5 and the celebration in M2.
- *
- * A dedicated screen with no tab bar: while you are scoring you are not
- * navigating, and a nav bar under your thumb during a rally is an invitation to
- * lose the match you are in.
- *
- * The number is a field. The rule that makes that safe rather than fiddly lives
- * in score-input.js: + and − operate on what is typed, leaving the field empty
- * reverts instead of committing a zero, and a drawn finished result is refused
- * before the save rather than after, because the Firebase rules reject it.
- */
+/** Scoring — boards C2, C2b, C5 and the celebration in M2. No tab bar under your
+ * thumb during a rally, and the number is a field that score-input.js makes safe. */
 (function () {
   'use strict';
 
@@ -22,11 +13,6 @@
   var conflict = null;
   var celebration = null;
 
-  function label(key, fallback, params) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key, params);
-    return value === key ? fallback : value;
-  }
 
   function reset() {
     draft = { matchId: null, raw1: null, raw2: null };
@@ -75,7 +61,7 @@
         pattern: '[0-9]*',
         maxlength: 2,
         value: raw,
-        'aria-label': label('tournament.scoreFor', 'Puntos de') + ' ' + teamName,
+        'aria-label': translate('tournament.scoreFor', 'Puntos de') + ' ' + teamName,
       },
       on: {
         input: function (event) {
@@ -104,13 +90,13 @@
 
     var minus = el('button', {
       class: 'scoring__step',
-      attrs: { type: 'button', 'aria-label': label('tournament.decrement', 'Restar punto') },
+      attrs: { type: 'button', 'aria-label': translate('tournament.decrement', 'Restar punto') },
       on: { click: function () { stepBy(-1); } },
     }, [IconRegistry.icon('minus', { size: 22 })]);
 
     var plus = el('button', {
       class: ['scoring__step', 'scoring__step--add', isWinning && 'is-winning'],
-      attrs: { type: 'button', 'aria-label': label('tournament.increment', 'Sumar punto') },
+      attrs: { type: 'button', 'aria-label': translate('tournament.increment', 'Sumar punto') },
       on: { click: function () { stepBy(1); } },
     }, [IconRegistry.icon('plus', { size: 22 })]);
 
@@ -150,14 +136,14 @@
 
   function reasonText(reason, rules) {
     var texts = {
-      tie: label('tournament.error.scoreDraw',
+      tie: translate('tournament.error.scoreDraw',
         'Empate: las reglas rechazan un resultado terminado sin ganador. Puedes dejarlo en vivo.'),
-      overTarget: label('tournament.format.error.pointsTarget',
+      overTarget: translate('tournament.format.error.pointsTarget',
         'El set es a ' + (rules && rules.pointsTo) + ' puntos', { points: rules && rules.pointsTo }),
-      notFinished: label('tournament.error.notFinished',
+      notFinished: translate('tournament.error.notFinished',
         'Todavía no llega a ' + (rules && rules.pointsTo) + ' puntos', { points: rules && rules.pointsTo }),
-      tooHigh: label('tournament.error.tooHigh', 'Máximo ' + scoreInput.MAX, { max: scoreInput.MAX }),
-      invalidScore: label('tournament.error.scoreNotInt', 'Marcador no válido'),
+      tooHigh: translate('tournament.error.tooHigh', 'Máximo ' + scoreInput.MAX, { max: scoreInput.MAX }),
+      invalidScore: translate('tournament.error.scoreNotInt', 'Marcador no válido'),
     };
     return texts[reason] || '';
   }
@@ -167,20 +153,19 @@
   function syncStrip() {
     if (!sync) return null;
     var map = {
-      saving: { icon: 'history', tone: 'warn', text: label('tournament.sync.saving', 'Guardando…') },
-      synced: { icon: 'circle-check', tone: 'ok', text: label('tournament.sync.synced', 'Guardado') },
-      offline: { icon: 'info', tone: 'warn', text: label('tournament.sync.offline', 'Sin conexión — se guardará al volver') },
-      denied: { icon: 'lock', tone: 'error', text: label('tournament.sync.denied', 'Ya no tienes permiso para anotar') },
-      invalid: { icon: 'circle-alert', tone: 'error', text: label('tournament.sync.invalid', 'El servidor rechazó el resultado') },
+      saving: { icon: 'history', tone: 'warn', text: translate('tournament.sync.saving', 'Guardando…') },
+      synced: { icon: 'circle-check', tone: 'ok', text: translate('tournament.sync.synced', 'Guardado') },
+      offline: { icon: 'info', tone: 'warn', text: translate('tournament.sync.offline', 'Sin conexión — se guardará al volver') },
+      denied: { icon: 'lock', tone: 'error', text: translate('tournament.sync.denied', 'Ya no tienes permiso para anotar') },
+      invalid: { icon: 'circle-alert', tone: 'error', text: translate('tournament.sync.invalid', 'El servidor rechazó el resultado') },
     };
     var state = map[sync];
     if (!state) return null;
     return C.statusStrip({ icon: state.icon, tone: state.tone, text: state.text });
   }
 
-  /** The conflict card never overwrites silently. Both values are on screen and
-   * the choice is explicit, which is the whole point of the revision check in
-   * the rules: the last confirmed result must survive a race. */
+  /** The conflict card never overwrites silently: both values are on screen and the
+   * choice is explicit, so the last confirmed result survives a race. */
   function conflictCard(ctx, match) {
     if (!conflict) return null;
     var mine = { score1: currentValue(match, 1), score2: currentValue(match, 2) };
@@ -204,16 +189,16 @@
         IconRegistry.icon('triangle-alert', { size: 18, class: 'scoring__conflict-icon' }),
         el('p', {
           class: 'scoring__conflict-title',
-          text: label('tournament.conflict.title', 'Alguien anotó antes que tú'),
+          text: translate('tournament.conflict.title', 'Alguien anotó antes que tú'),
         }),
       ]),
       el('p', {
         class: 'scoring__conflict-body',
-        text: label('tournament.conflict.body',
+        text: translate('tournament.conflict.body',
           'Otro dispositivo guardó este partido mientras anotabas. Elige qué resultado queda.'),
       }),
       choice({
-        who: conflict.authorLabel || label('tournament.conflict.theirs', 'Guardado por otro dispositivo'),
+        who: conflict.authorLabel || translate('tournament.conflict.theirs', 'Guardado por otro dispositivo'),
         score: conflict.score1 + ' – ' + conflict.score2,
         active: true,
         onClick: function () {
@@ -223,7 +208,7 @@
         },
       }),
       choice({
-        who: label('tournament.conflict.mine', 'Tu versión'),
+        who: translate('tournament.conflict.mine', 'Tu versión'),
         score: mine.score1 + ' – ' + mine.score2,
         active: false,
         onClick: function () {
@@ -273,16 +258,14 @@
         var winnerName = celebration ? teamNameFor(ctx, match, celebration.side) : '';
         reset();
         ctx.closeOverlay();
-        if (winnerName) ctx.toast({ title: label('tournament.won', 'Ganó') + ' ' + winnerName, sub: score1 + ' – ' + score2 });
+        if (winnerName) ctx.toast({ title: translate('tournament.won', 'Ganó') + ' ' + winnerName, sub: score1 + ' – ' + score2 });
       }, 900);
     });
   }
 
   function teamNameFor(ctx, match, side) {
     var tournament = ctx.appState.get().tournament;
-    var teamId = side === 1 ? match.team1Id : match.team2Id;
-    var team = (tournament.teams || []).filter(function (item) { return item.id === teamId; })[0];
-    return team ? team.name : teamId;
+    return TournamentText.teamName(tournament, side === 1 ? match.team1Id : match.team2Id);
   }
 
   /* --- Screen ----------------------------------------------------------- */
@@ -291,7 +274,7 @@
     render: function (ctx) {
       var match = currentMatch(ctx);
       if (!match) {
-        return C.sheet({ title: label('tournament.noMatch', 'Partido no encontrado'), onDismiss: ctx.closeOverlay }, []);
+        return C.sheet({ title: translate('tournament.noMatch', 'Partido no encontrado'), onDismiss: ctx.closeOverlay }, []);
       }
       ensureDraft(match);
 
@@ -309,8 +292,8 @@
           el('span', {
             class: 'scoring__target',
             text: rules.pointsTo
-              ? label('tournament.setTo', 'Set a ' + rules.pointsTo + ' puntos', { points: rules.pointsTo })
-              : label('tournament.noTarget', 'Sin límite de puntos'),
+              ? translate('tournament.setTo', 'Set a ' + rules.pointsTo + ' puntos', { points: rules.pointsTo })
+              : translate('tournament.noTarget', 'Sin límite de puntos'),
           }),
           lastAction ? el('button', {
             class: 'scoring__undo',
@@ -326,19 +309,19 @@
             },
           }, [
             IconRegistry.icon('rotate-ccw', { size: 14 }),
-            el('span', { text: label('tournament.undoStep', 'Deshacer') + ' ' + (lastAction.delta > 0 ? '+1' : '−1') }),
+            el('span', { text: translate('tournament.undoStep', 'Deshacer') + ' ' + (lastAction.delta > 0 ? '+1' : '−1') }),
           ]) : null,
         ]),
         el('p', { class: 'scoring__hint' }, [
           IconRegistry.icon('pencil', { size: 13 }),
-          el('span', { text: label('tournament.editHint', 'Toca el número para escribirlo con el teclado') }),
+          el('span', { text: translate('tournament.editHint', 'Toca el número para escribirlo con el teclado') }),
         ]),
         syncStrip(),
         conflictCard(ctx, match),
       ].filter(Boolean);
 
       var saveButton = C.button({
-        label: label('tournament.saveResult', 'Guardar resultado'),
+        label: translate('tournament.saveResult', 'Guardar resultado'),
         disabled: !check.ok || sync === 'saving',
         onClick: function () { save(ctx, false); },
       });
@@ -351,13 +334,13 @@
 
       return el('div', { class: 'overlay-screen anim-screen-in' }, [
         C.subBar({
-          title: label('tournament.scoreTitle', 'Anotar'),
+          title: translate('tournament.scoreTitle', 'Anotar'),
           sub: teamNameFor(ctx, match, 1) + ' vs ' + teamNameFor(ctx, match, 2),
           close: true,
           onBack: function () { reset(); ctx.closeOverlay(); },
           sync: sync === 'saving'
-            ? { tone: 'warn', label: label('tournament.sync.saving', 'Guardando…'), pulsing: true }
-            : { tone: 'ok', label: label('tournament.sync.saved', 'Guardado') },
+            ? { tone: 'warn', label: translate('tournament.sync.saving', 'Guardando…'), pulsing: true }
+            : { tone: 'ok', label: translate('tournament.sync.saved', 'Guardado') },
         }),
         el('div', { class: 'overlay-screen__body scoring' }, body),
         actionBar,

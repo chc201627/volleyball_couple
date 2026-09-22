@@ -1,18 +1,5 @@
-/** The v2 component library.
- *
- * One-to-one with the `01 · Components` shelf of the design canvas. Screens
- * compose from these and never assemble markup of their own — that is the rule
- * that keeps four near-identical segmented controls from reappearing the way
- * they did in v1 (match-type, pairing-toggle, tournament-setup, format-setup
- * were four implementations of one idea).
- *
- * Every component returns a DOM node. No framework, no template strings, no
- * innerHTML: text always lands through textContent.
- *
- * Class names are prefixed `c-` so the v2 sheet cannot collide with the v1
- * stylesheet while both entry points coexist, and so the eventual cleanup is a
- * single grep.
- */
+/** The component library, one-to-one with the canvas `01 · Components` shelf.
+ * Screens compose from these and assemble no markup of their own. */
 /* exported UIComponents */
 var UIComponents;
 (function () {
@@ -29,9 +16,8 @@ var UIComponents;
 
   /* --- Buttons ---------------------------------------------------------- */
 
-  /** variant: primary (the one lime action per screen) | ghost | danger | muted
-   *  Anything interactive is a real <button>, so keyboard and screen readers
-   *  work without aria patching. */
+  /** variant: primary (one lime action per screen) | ghost | danger | muted.
+   * Always a real <button>, so keyboard and screen readers need no patching. */
   function button(options) {
     options = options || {};
     var children = [];
@@ -105,9 +91,8 @@ var UIComponents;
 
   /* --- Chrome ----------------------------------------------------------- */
 
-  /** 56px bar. Replaces the v1 header, which spent the first ~170px of a
-   * 320px-wide screen on a wrapping title, a subtitle and a language switcher
-   * that overlapped the title at every breakpoint. */
+  /** 56px bar, replacing a v1 header that spent the first 170px of a 320px screen
+   * on a wrapping title and an overlapping language switcher. */
   function appBar(options) {
     options = options || {};
     var trailing = el('div', { class: 'c-app-bar__trailing' });
@@ -122,9 +107,8 @@ var UIComponents;
     ]);
   }
 
-  /** Stacked screens (scoring, history, access) get a back affordance instead
-   * of a tab-bar destination — that separation is what stops the tab bar from
-   * growing every time a flow is added. */
+  /** Stacked screens get a way back instead of a tab-bar destination: that is what
+   * stops the tab bar growing every time a flow is added. */
   function subBar(options) {
     options = options || {};
     var titles = [el('p', { class: 'c-sub-bar__title', text: options.title })];
@@ -165,9 +149,8 @@ var UIComponents;
     }, [el('span', { text: lang.code })]);
   }
 
-  /** Four destinations, always visible, always the same order. Unavailable
-   * ones are shown locked rather than hidden: a nav that changes length is a
-   * nav people stop trusting. */
+  /** Four destinations, always the same order. Unavailable ones are locked rather
+   * than hidden: a nav that changes length stops being trusted. */
   function tabBar(options) {
     options = options || {};
     return el('nav', {
@@ -195,9 +178,8 @@ var UIComponents;
       }, [
         el('span', { class: 'c-tab__glyph' }, [
           icon(locked ? 'lock' : item.icon, { size: 20 }),
-          // A waiting scorer has to be visible from any destination, not only
-          // from the one that can act on it. The count is also in the label so
-          // it is not colour and position alone (REQ-UX-72).
+          // Visible from any destination, not only the one that can act on it. The
+          // count is in the label too, never colour alone (REQ-UX-72).
           item.badge ? el('span', { class: 'c-tab__badge', text: String(item.badge) }) : null,
         ]),
         el('span', { class: 'c-tab__label', text: item.label }),
@@ -205,11 +187,8 @@ var UIComponents;
     }));
   }
 
-  /** The same four destinations as the tab bar, laid out for the app bar. From
-   * 600px up the fixed bottom bar is dropped and this takes over, which is
-   * where v1's sticky nav overlapped content most visibly. Both are rendered;
-   * CSS decides which one is on screen, so there is one source of truth for
-   * what is locked and what is active. */
+  /** The same destinations, laid out for the app bar and taking over from 600px.
+   * Both are rendered and CSS picks one, so locked and active cannot disagree. */
   function navRail(options) {
     options = options || {};
     return el('nav', {
@@ -297,13 +276,17 @@ var UIComponents;
     ]);
   }
 
-  /** An overflow menu anchored under the app bar (board H1).
-   *
-   * Not a sheet: a sheet is for a decision that deserves the whole bottom of
-   * the screen, and this is a list of places to go. It is dismissed by the
-   * scrim, each row is a full-width target, and anything destructive is put
-   * below a divider rather than sitting a thumb's width from "Share".
-   */
+  /** One element per layout column. Sections placed straight into the grid
+   * share implicit rows across columns, which misaligns their tops. */
+  function column(name, children) {
+    return el('div', {
+      class: 'app__col',
+      attrs: { 'data-col': name },
+    }, (children || []).filter(Boolean));
+  }
+
+  /** The overflow menu under the app bar (board H1). Not a sheet: a sheet is for a
+   * decision, this is a list of places to go. Destructive rows sit below a divider. */
   function menu(options, items) {
     options = options || {};
     var rows = [];
@@ -497,6 +480,7 @@ var UIComponents;
     panel: panel,
     sheet: sheet,
     menu: menu,
+    column: column,
     emptyState: emptyState,
     statusStrip: statusStrip,
     progressBar: progressBar,

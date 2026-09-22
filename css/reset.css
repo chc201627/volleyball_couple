@@ -1,7 +1,7 @@
 /* ============================================
    Reset — v2.0.0
    Normalisation only. Anything that positions the application lives in
-   app-shell.css; anything that styles a widget lives in ui-components.css.
+   app-shell.css; a widget is styled in components.css, a screen in screens.css.
    ============================================ */
 
 *,

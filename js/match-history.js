@@ -1,36 +1,13 @@
-/** Change history presentation — pure, DOM-free.
- *
- * The repository hands over a flat list of entries, newest first, each one a
- * frozen snapshot of what a match's result was at a given revision. That list
- * answers "what happened" but not the three questions a person actually asks
- * when they open the history:
- *
- *   what changed   a row showing only "9 – 7" says nothing. The change is the
- *                  pair: 9 – 8 became 9 – 7. The previous value is not in the
- *                  entry, it is the entry one revision below for the same
- *                  match, so the diff is derived here rather than in a screen.
- *   when           grouped by day, because "14:32" without a day is a riddle
- *                  once a tournament crosses midnight.
- *   who            the author label is copied into every entry on purpose (the
- *                  live one is unreadable for a spectator), and the viewer's
- *                  own edits and the organiser's are named as such.
- *
- * Sessions created before the history existed have no `resultHistory` node at
- * all. That past cannot be invented, so `legacyHistoryView()` builds what the
- * results themselves still carry — one last change per match — and says so.
- *
- * Everything takes `now` rather than reading the clock, so a test can place an
- * entry on either side of midnight and get a stable answer.
- */
+/** Turns the repository's flat entry list into what a person asks: what changed,
+ * when, and who. Pure and DOM-free, and `now` is always passed in. */
 /* exported matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS */
 var matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS;
 
 (function () {
   'use strict';
 
-  /** 'created', 'edited' and 'conflictResolved' are different events that share
-   * one node. Separating them is the point of the filter: a correction and a
-   * resolved race are not the same news. */
+  /** Three different events share one node, and the filter is what separates them:
+   * a correction and a resolved race are not the same news. */
   var FILTERS = ['all', 'created', 'edited', 'conflictResolved'];
 
   function startOfDay(timestamp) {
@@ -39,9 +16,8 @@ var matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS;
     return date.getTime();
   }
 
-  /** Whole calendar days between two instants, in local time. Subtracting
-   * milliseconds and dividing would be wrong across a daylight-saving change,
-   * which is a real afternoon on a court in March. */
+  /** Whole calendar days apart, in local time: dividing milliseconds would be
+   * wrong across a daylight-saving change. */
   function dayOffset(timestamp, now) {
     if (timestamp == null) return null;
     var days = Math.round((startOfDay(now) - startOfDay(timestamp)) / 86400000);
@@ -65,10 +41,8 @@ var matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS;
     return entry.score1 + ' – ' + entry.score2;
   }
 
-  /** Who to credit. The viewer comes first: "you" is more useful than your own
-   * device label. The owner is named as the organiser because that is the one
-   * distinction that changes what a reader can infer — an organiser could also
-   * have changed the format or the access list; a scorer could not. */
+  /** Who to credit. "You" beats your own device label, and the organiser is named
+   * because only they could also have changed the format or the access list. */
   function authorOf(entry, options) {
     var uid = entry && entry.updatedBy;
     var label = entry && entry.authorLabel;
@@ -81,9 +55,8 @@ var matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS;
     };
   }
 
-  /** How to say when. Anything from the last hour today reads better as "4 min
-   * ago"; older than that, the clock time is what people compare against their
-   * own memory of the afternoon. */
+  /** Anything from the last hour reads better as "4 min ago"; older than that, the
+   * clock time is what people compare against their memory of the afternoon. */
   function timeOf(timestamp, now) {
     if (timestamp == null) return { timestamp: null, unknown: true, dayOffset: null, minutesAgo: null, clock: null };
     var minutesAgo = Math.max(0, Math.floor((now - timestamp) / 60000));
@@ -98,10 +71,8 @@ var matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS;
     };
   }
 
-  /** The previous revision of the same match, which is what the new value is a
-   * change FROM. Entries arrive newest first and may be sparse (a revision can
-   * be missing if a write was rejected), so the lookup is by position within
-   * the match's own ascending list rather than by `revision - 1`. */
+  /** What each value is a change FROM. Revisions can be sparse, so this looks up
+   * the entry below it in the match's own order, not `revision - 1`. */
   function previousByEntry(entries) {
     var byMatch = {};
     entries.forEach(function (entry) {
@@ -148,12 +119,8 @@ var matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS;
     };
   }
 
-  /** The whole history (board H2): filtered, grouped by day, newest first.
-   *
-   * `total` and `matchCount` describe the WHOLE history, not the filtered
-   * slice — the header is a statement about the tournament, and a count that
-   * moved every time a filter changed would read as data appearing and
-   * vanishing. `shown` and `hidden` describe the slice. */
+  /** The whole history (board H2): filtered, grouped by day, newest first. `total`
+   * describes the tournament and `shown`/`hidden` the filtered slice. */
   matchHistoryView = function (entries, options) {
     var opts = normalise(options);
     var all = (entries || []).filter(function (entry) { return entry && entry.matchId; });
@@ -211,10 +178,8 @@ var matchHistoryView, matchTimelineView, legacyHistoryView, HISTORY_FILTERS;
     };
   };
 
-  /** Sessions that predate the history (board H5, case B). `results` keeps the
-   * last writer and time for each match, and that is all there is: one row per
-   * played match, no diff, and the caller says out loud that the rest is gone
-   * rather than showing a suspiciously short list. */
+  /** Sessions older than the history (board H5, case B): `results` kept the last
+   * writer and time, so one row per played match and no diff. */
   legacyHistoryView = function (matches, options) {
     var opts = normalise(options);
     var rows = (matches || []).filter(function (match) {

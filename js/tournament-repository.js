@@ -31,9 +31,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     });
     return Object.keys(byId).map(function (id) { return byId[id]; });
   }
-  /** Format node under `structure/format` never stores `pairs` (D3) — knockout pairings
-   * live on the generated match nodes, not the persisted format. Empty `customRules` is
-   * OMITTED, never written as an empty string, null, or undefined. */
+  /** `pairs` is never persisted (D3): knockout pairings live on the match nodes. Empty
+   * `customRules` is omitted, never written as '' or null. */
   function encodeFormat(format) {
     if (!format) return null;
     var stagesById = {};
@@ -50,23 +49,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     }
     return encoded;
   }
-  /** Mirrors encodeFormat's shape (stagesById kept as an id-keyed map, matching every
-   * tournament-format.js consumer: resolveFormat/rulesForMatch/isValidToken all do keyed
-   * `stagesById[id]` lookups, never array indexing).
-   *
-   * HOTFIX (v1.8.1): `pairs` is intentionally never persisted (D3), but
-   * `isValidToken()`'s `winner:` branch reads `srcStage.pairs.length` to bound-check the
-   * ordinal, and `validateFormat()` requires every knockout stage to carry `pairs`. Both
-   * ran against the decoded (post-Firebase-sync) format with `pairs` permanently
-   * `undefined`, so every `winner:k-<stage>-<n>` token failed validation and
-   * `resolveFormat()` marked every stage after the first knockout stage `invalid` for any
-   * tournament that had round-tripped through a shared session. Knockout match team1Id/
-   * team2Id are never mutated after creation (generateStageMatches writes the slot-descriptor
-   * tokens once; resolveFormat only ever computes a projection, it never writes back onto the
-   * match), so the original `pairs` for a stage can always be rebuilt by reading those tokens
-   * back off that stage's decoded match nodes, ordered by the ordinal encoded in the match id
-   * (`k-<stageId>-<n>`). This restores the engine invariant "a runtime format always carries
-   * pairs" without persisting pairs to Firebase or touching firebase-rules.json. */
+  /** Rebuilds each stage's `pairs` from its match ids: they are never persisted, and
+   * without them every `winner:` token failed after a round trip (v1.8.1). */
   function rehydratePairs(stageId, matches) {
     var prefix = 'k-' + stageId + '-';
     return (matches || [])
@@ -198,19 +182,15 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     return liveOrFinished && validScores &&
       (command.status !== 'finished' || command.score1 !== command.score2);
   }
-  /** `created` on the first result for a match, `conflictResolved` when the command is
-   * the user's answer to a losing race, `edited` otherwise. The distinction is what lets
-   * the history separate "someone scored this" from "someone corrected it". */
+  /** `created`, `conflictResolved` or `edited`: the distinction is what lets the history
+   * separate "someone scored this" from "someone corrected it". */
   function historyAction(current, command) {
     if (!current) return 'created';
     if (command && command.afterConflict) return 'conflictResolved';
     return 'edited';
   }
-  /** Author label is DENORMALIZED into every entry on purpose: the readable label lives
-   * under `tournamentAccess/{sid}/members/{uid}/label`, whose .read is the owner or that
-   * uid alone, so a spectator resolving authorship live would only ever see UIDs. Copying
-   * it is also the truthful thing — the history is an immutable snapshot and the name at
-   * the time of the edit is the correct one to show. */
+  /** The author label is copied into every entry: a spectator cannot read the member
+   * list, and an immutable snapshot should hold the name as it was then. */
   function historyEntry(command, revision, uid, authorLabel, action, timestamp) {
     return {
       score1: command.score1,
@@ -223,9 +203,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
       action: action,
     };
   }
-  /** Flattens `{matchId: {revision: entry}}` into a newest-first list. Sorting on the
-   * stored `revision` rather than the key keeps the order right even if a client ever
-   * wrote an entry under a mismatched key. */
+  /** Flattens `{matchId: {revision: entry}}` newest first, sorting on the stored
+   * `revision` rather than the key. */
   function decodeHistory(raw) {
     var entries = [];
     Object.keys(raw || {}).forEach(function (matchId) {
@@ -373,9 +352,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
           updatedBy: runtime.uid,
           updatedAt: timestamp,
         };
-        // Result and history entry land together, mirroring the single multi-path
-        // update the Firebase adapter performs — a history with holes would be worse
-        // than no history at all.
+        // Result and history land together, as the Firebase adapter does: a history
+        // with holes is worse than no history.
         session.results[command.matchId] = result;
         session.resultHistory = session.resultHistory || {};
         session.resultHistory[command.matchId] = session.resultHistory[command.matchId] || {};
@@ -384,9 +362,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
           historyAction(current, command), timestamp
         );
         notify(sessionId);
-        // Same shape the Firebase adapter returns, `updatedAt` included: see the contract
-        // note on its saveResult. Keeping the two adapters identical is what stops a
-        // browser harness from passing on a field production never hands back.
+        // The same shape the Firebase adapter returns, so a harness cannot pass on a
+        // field production never hands back.
         return Promise.resolve({ status: 'synced', result: { score1: result.score1, score2: result.score2, status: result.status, revision: revision, updatedBy: runtime.uid } });
       },
       removeSession: function (sessionId) {
@@ -441,9 +418,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         role: owner ? 'owner' : (status === 'approved' ? 'scorer' : 'spectator'),
         accessStatus: status,
         requests: owner ? (requests || {}) : null,
-        // Both uids travel with the snapshot so the history can say "you" and
-        // "the organiser" without a second lookup — and without a spectator
-        // needing read access to the member list, which they do not have.
+        // Both uids travel with the snapshot so the history can say "you" and "the
+        // organiser" without reading the member list, which a spectator cannot.
         ownerUid: raw.ownerUid || null,
         viewerUid: uid || null,
       });
@@ -451,15 +427,13 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
 
     function watchSession(sessionId, onSnapshot) {
       var raw = null, access = null, requests = null, ownRef = null, membersRef = null;
-      // Whether the session node has answered at all. Until it has, there is
-      // nothing truthful to say: emitting null early would flash "this
-      // tournament is gone" over a session that is merely still loading.
+      // Whether the session node has answered at all: emitting null early would flash
+      // "this tournament is gone" over one that is still loading.
       var loaded = false;
       var sessionRef = db.ref('tournaments/' + sessionId);
       var connectedRef = db.ref('.info/connected');
-      /** A session that answered with nothing is reported as nothing. Staying
-       * silent instead left a dead link showing whatever tournament happened to
-       * be in local storage, as if it were the shared one. */
+      /** A session that answered with nothing is reported as nothing: staying silent
+       * left a dead link showing whatever was in local storage. */
       function emit() {
         if (!loaded) return;
         onSnapshot(raw ? joinedSnapshot(raw, access, requests) : null);
@@ -497,9 +471,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
       });
       return function () { sessionRef.off(); connectedRef.off(); if (ownRef) ownRef.off(); if (membersRef) membersRef.off(); stopAuth(); };
     }
-    /** Cache first; the reads below only run when a save happens without an active
-     * subscription. Both paths are readable by the writer: `ownerLabel` is public and a
-     * member can always read its own entry. */
+    /** Cache first; the reads below only run for a save with no active subscription.
+     * Both paths are readable by the writer. */
     function resolveAuthorLabel(sessionId, user) {
       var cached = authorship[sessionId] || {};
       if (cached.ownerUid === user.uid) return Promise.resolve(cached.ownerLabel || 'Organizador');
@@ -550,19 +523,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
           }).then(function () { return { status: 'synced' }; });
         }).catch(classify);
       },
-      /** Multi-path update rather than a transaction: a transaction cannot atomically
-       * touch a sibling node, so result and history could drift apart. Concurrency safety
-       * is NOT lost — the rules already pin `revision` to stored + 1, so a device that
-       * loses the race is rejected instead of overwriting.
-       *
-       * CONTRACT: `result` carries everything the client knows at write time and
-       * deliberately OMITS `updatedAt`. The rules require `updatedAt === now` (server
-       * clock), so the value is a `.sv` sentinel here and only exists once the server
-       * resolves it. It arrives through `watchSession` on the decoded match, which is
-       * where its only consumer reads it (tournament-day-selectors.js sorts recently-finished by
-       * it). Reading it back would cost an extra round trip on the most
-       * latency-sensitive action in the app, courtside, to hand back a value nobody
-       * asks for synchronously. */
+      /** Multi-path update, not a transaction: a transaction cannot touch a sibling
+       * node atomically, and the rules already pin `revision` to stored + 1. */
       saveResult: function (sessionId, command) {
         if (!validResult(command)) return Promise.resolve({ status: 'invalid' });
         if (!connected) return Promise.resolve({ status: 'offline' });
@@ -584,9 +546,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
               // watchSession. No consumer reads it off this return value.
               return { status: 'synced', result: { score1: result.score1, score2: result.score2, status: result.status, revision: revision, updatedBy: user.uid } };
             }, function (error) {
-              // Losing the race and lacking permission both surface as the same rejection,
-              // so re-read the stored revision to tell them apart. The results node is
-              // world-readable, so this read works even for a revoked scorer.
+              // A lost race and a lost permission are the same rejection, so re-read the
+              // stored revision to tell them apart.
               return db.ref(base + 'results/' + command.matchId).once('value').then(function (snap) {
                 var stored = snap.val();
                 if ((stored ? stored.revision : 0) !== command.expectedRevision) {

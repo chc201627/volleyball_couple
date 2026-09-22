@@ -1,14 +1,5 @@
-/** Configure tournament — canvas boards A5 and A6.
- *
- * v1 offered groups and format as two rows of unlabelled buttons ("A", "A–B",
- * "Classic", "Groups Only") with no way to know what any of them meant or what
- * they would produce. Here each preset is an option with its description and
- * its precondition, and below them is what it actually generates: how many
- * matches, and roughly how long that takes.
- *
- * The format editor (A6) shares this screen rather than living apart, because
- * customising is a continuation of choosing, not a separate errand.
- */
+/** Configure tournament — boards A5 and A6. Each preset carries its description and
+ * precondition, and below them is what it generates: matches, and how long. */
 (function () {
   'use strict';
 
@@ -18,15 +9,9 @@
   var showEditor = false;
   var customRules = '';
 
-  function label(key, fallback, params) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key, params);
-    return value === key ? fallback : value;
-  }
 
-  // Titles and descriptions are keys, not literals: this is the screen that
-  // explains the tournament, and an explanation in the wrong language explains
-  // nothing.
+  // Titles and descriptions are keys, not literals: an explanation in the wrong
+  // language explains nothing.
   var PRESETS = [
     { id: 'classic', titleKey: 'format.preset.classic.title', titleFallback: 'Clásico',
       descKey: 'format.preset.classic.desc', descFallback: 'Todos contra todos y final entre los dos primeros.' },
@@ -39,9 +24,8 @@
       requiresKey: 'format.preset.crossover.requires', requiresFallback: '2 grupos de 4+' },
   ];
 
-  /** Groups are built here only to ask the format engine whether a preset is
-   * possible, and to count the matches it would generate. Nothing is persisted
-   * until the tournament actually starts. */
+  /** Groups built only to ask the engine whether a preset is possible and to count
+   * its matches. Nothing is persisted until the tournament starts. */
   function previewGroups(teams, groupCount) {
     var groups = [];
     for (var i = 0; i < groupCount; i++) {
@@ -60,9 +44,8 @@
     }
   }
 
-  /** Round-robin inside each group, plus one match per knockout pair. Enough to
-   * answer "is this an afternoon or a whole day?", which is the only reason the
-   * number is on screen. */
+  /** Round robin per group plus one match per knockout pair: enough to answer "an
+   * afternoon or a whole day?", which is why the number is on screen. */
   function matchCounts(groups, format) {
     var groupMatches = groups.reduce(function (total, group) {
       var n = group.teams.length;
@@ -87,9 +70,9 @@
   function formatDuration(minutes) {
     var hours = Math.floor(minutes / 60);
     var rest = minutes % 60;
-    if (!hours) return rest + ' ' + label('common.minutesShort', 'min');
-    return hours + ' ' + label('common.hoursShort', 'h') +
-      (rest ? ' ' + rest + ' ' + label('common.minutesShort', 'min') : '');
+    if (!hours) return rest + ' ' + translate('common.minutesShort', 'min');
+    return hours + ' ' + translate('common.hoursShort', 'h') +
+      (rest ? ' ' + rest + ' ' + translate('common.minutesShort', 'min') : '');
   }
 
   /* --- Sections --------------------------------------------------------- */
@@ -105,9 +88,9 @@
         disabled: !enough,
       };
     });
-    return C.panel({ label: label('tournament.groupsLabel', 'Grupos') }, [
+    return C.panel({ label: translate('tournament.groupsLabel', 'Grupos') }, [
       C.toggleGroup({
-        label: label('tournament.groupsLabel', 'Grupos'),
+        label: translate('tournament.groupsLabel', 'Grupos'),
         options: options,
         onSelect: function (count) { ctx.appState.setConfig({ groupCount: count }); },
       }),
@@ -117,12 +100,12 @@
   function optionRow(ctx, preset, active, available) {
     var titleRow = [el('p', {
       class: 'config__option-title',
-      text: label(preset.titleKey, preset.titleFallback),
+      text: translate(preset.titleKey, preset.titleFallback),
     })];
     if (preset.requiresKey) {
       titleRow.push(el('span', {
         class: 'c-chip c-chip--warn',
-        text: label(preset.requiresKey, preset.requiresFallback),
+        text: translate(preset.requiresKey, preset.requiresFallback),
       }));
     }
     return el('button', {
@@ -137,7 +120,7 @@
     }, [
       el('div', { class: 'config__option-text' }, [
         el('div', { class: 'config__option-title-row' }, titleRow),
-        el('p', { class: 'config__option-desc', text: label(preset.descKey, preset.descFallback) }),
+        el('p', { class: 'config__option-desc', text: translate(preset.descKey, preset.descFallback) }),
       ]),
       IconRegistry.icon(active ? 'circle-check' : 'circle', { size: 20, class: 'config__option-check' }),
     ]);
@@ -146,26 +129,26 @@
   function summarySection(groups, format) {
     var counts = matchCounts(groups, format);
     var lines = [
-      { icon: 'users', text: label('format.summary.groupMatches',
+      { icon: 'users', text: translate('format.summary.groupMatches',
           counts.group + ' partidos en la fase de grupos', { count: counts.group }) },
     ];
     if (counts.knockout) {
       lines.push({
         icon: 'trophy',
         text: counts.knockout === 1
-          ? label('format.summary.singleFinal', 'Final a un partido')
-          : label('format.summary.knockoutMatches',
+          ? translate('format.summary.singleFinal', 'Final a un partido')
+          : translate('format.summary.knockoutMatches',
               counts.knockout + ' partidos de eliminatoria', { count: counts.knockout }),
       });
     }
     lines.push({
       icon: 'history',
-      text: label('format.summary.duration',
+      text: translate('format.summary.duration',
         'Unas ' + formatDuration(estimateMinutes(counts.total)) + ' con 2 canchas (aprox.)',
         { duration: formatDuration(estimateMinutes(counts.total)) }),
     });
 
-    return C.panel({ label: label('tournament.summaryLabel', 'Lo que sale') },
+    return C.panel({ label: translate('tournament.summaryLabel', 'Lo que sale') },
       lines.map(function (line) {
         return el('div', { class: 'config__summary-line' }, [
           IconRegistry.icon(line.icon, { size: 16 }),
@@ -185,14 +168,14 @@
 
     var children = stages.map(function (stage) {
       var stageLabel = stage.kind === 'roundRobin'
-        ? label('format.stage.groups', 'Etapa ' + stage.order + ' · Grupos', { order: stage.order })
-        : label('format.stage.knockout', 'Etapa ' + stage.order + ' · Eliminatoria', { order: stage.order });
+        ? translate('format.stage.groups', 'Etapa ' + stage.order + ' · Grupos', { order: stage.order })
+        : translate('format.stage.knockout', 'Etapa ' + stage.order + ' · Eliminatoria', { order: stage.order });
       return C.panel({ label: stageLabel }, [
-        fieldRow(label('format.field.pointsTo', 'Puntos por set'), String(stage.pointsTo), locked),
-        fieldRow(label('format.field.overtime', 'Prórroga'),
-          stage.overtime ? label('common.yes', 'Sí') : label('common.no', 'No'), locked),
+        fieldRow(translate('format.field.pointsTo', 'Puntos por set'), String(stage.pointsTo), locked),
+        fieldRow(translate('format.field.overtime', 'Prórroga'),
+          stage.overtime ? translate('common.yes', 'Sí') : translate('common.no', 'No'), locked),
         stage.kind === 'knockout'
-          ? fieldRow(label('format.field.pairs', 'Cruces'), String((stage.pairs || []).length), locked)
+          ? fieldRow(translate('format.field.pairs', 'Cruces'), String((stage.pairs || []).length), locked)
           : null,
       ].filter(Boolean));
     });
@@ -201,7 +184,7 @@
       children.push(C.statusStrip({
         icon: 'info',
         tone: 'neutral',
-        text: label('tournament.format.classicNote',
+        text: translate('tournament.format.classicNote',
           'El formato Clásico no tiene etapas configurables: todos contra todos y final.'),
       }));
     }
@@ -212,7 +195,7 @@
         rows: 3,
         maxlength: 500,
         placeholder: 'Sets a 9 puntos. Cambio de cancha cada 5.',
-        'aria-label': label('tournament.format.customRules', 'Reglas de la casa'),
+        'aria-label': translate('tournament.format.customRules', 'Reglas de la casa'),
         disabled: locked,
       },
       on: { input: function (event) { customRules = event.target.value; ctx.rerender(); } },
@@ -220,7 +203,7 @@
     rules.value = customRules;
 
     children.push(C.panel({
-      label: label('tournament.format.customRules', 'Reglas de la casa'),
+      label: translate('tournament.format.customRules', 'Reglas de la casa'),
       meta: customRules.length + ' / 500',
     }, [rules]));
 
@@ -229,15 +212,15 @@
       icon: validation.valid ? 'circle-check' : 'circle-alert',
       tone: validation.valid ? 'ok' : 'error',
       text: validation.valid
-        ? label('tournament.format.valid', 'Formato válido')
-        : validation.errors.map(function (code) { return label(code, code); }).join(' · '),
+        ? translate('tournament.format.valid', 'Formato válido')
+        : validation.errors.map(function (code) { return translate(code, code); }).join(' · '),
     }));
 
     if (locked) {
       children.push(C.statusStrip({
         icon: 'lock',
         tone: 'warn',
-        text: label('workspace.setup.formatLocked.note', 'Bloqueado — reinicia el torneo para cambiar el formato'),
+        text: translate('workspace.setup.formatLocked.note', 'Bloqueado — reinicia el torneo para cambiar el formato'),
       }));
     }
 
@@ -265,7 +248,7 @@
 
       var body = [
         groupsSection(ctx, snapshot, teams.length),
-        C.panel({ label: label('tournament.format.presetLabel', 'Formato') },
+        C.panel({ label: translate('tournament.format.presetLabel', 'Formato') },
           PRESETS.map(function (preset) {
             return optionRow(ctx, preset, snapshot.formatPreset === preset.id, presetAvailable(preset.id, groups));
           })),
@@ -276,18 +259,17 @@
           on: { click: function () { showEditor = !showEditor; ctx.rerender(); } },
         }, [
           IconRegistry.icon(showEditor ? 'chevron-up' : 'chevron-down', { size: 16 }),
-          el('span', { text: showEditor ? label('tournament.format.hideEditor', 'Ocultar detalle') : label('tournament.format.customize', 'Personalizar formato') }),
+          el('span', { text: showEditor ? translate('tournament.format.hideEditor', 'Ocultar detalle') : translate('tournament.format.customize', 'Personalizar formato') }),
         ]),
         editorSection(ctx, format, groups, locked),
       ].filter(Boolean);
 
       body.push(el('div', { class: 'app__action-bar' }, [
         C.button({
-          label: label('tournament.start', 'Empezar torneo'),
+          label: translate('tournament.start', 'Empezar torneo'),
           onClick: function () {
-            // Starting the tournament belongs to slice E; until then this
-            // closes and leaves the configuration saved, which is honest
-            // rather than pretending to start something that has no screen.
+            // Closes and leaves the configuration saved, rather than pretending to
+            // start something whose screen arrives in a later slice.
             ctx.closeOverlay();
           },
         }),
@@ -295,8 +277,8 @@
 
       return el('div', { class: 'overlay-screen anim-screen-in' }, [
         C.subBar({
-          title: label('tournament.configTitle', 'Configurar torneo'),
-          sub: teams.length + ' ' + label('workspace.summary.teamsWord', 'parejas') + ' · ' + snapshot.teamSize + 'vs' + snapshot.teamSize,
+          title: translate('tournament.configTitle', 'Configurar torneo'),
+          sub: teams.length + ' ' + translate('workspace.summary.teamsWord', 'parejas') + ' · ' + snapshot.teamSize + 'vs' + snapshot.teamSize,
           onBack: function () { ctx.closeOverlay(); },
         }),
         el('div', { class: 'overlay-screen__body' }, body),

@@ -1,50 +1,24 @@
-/** Setup screen — canvas boards A1 (empty) and A2 (with players).
- *
- * The two boards are one screen with two states, not two screens: the empty
- * state is what this looks like before anyone has been added.
- *
- * What changed from v1, and why:
- *
- * - The 170px header is gone. The app bar carries the count, so the first
- *   thing on screen is the thing you came to do.
- * - Adding a player was three stacked selects and a submit button, roughly
- *   360px of form. It is now one row plus two rows of 44px toggles, meant for
- *   typing standing up on a court.
- * - The readiness checklist listed six items, five of them almost always
- *   green, taking half a screen to say "fine". It is now a progress bar that
- *   names only what blocks, with the fix next to it.
- */
+/** Setup — boards A1 (empty) and A2 (with players): one screen with two states.
+ * Adding is one row and two rows of 44px toggles, meant for typing on a court. */
 (function () {
   'use strict';
 
   var el = DomHelpers.el;
   var C = UIComponents;
 
-  /** Draft of the add-player form. Kept on the module rather than in app state
-   * because a half-typed name is not application state — it must not persist,
-   * sync, or invalidate the generated teams. */
+  /** Draft of the add-player form, kept here rather than in app state: a half-typed
+   * name must not persist, sync, or invalidate the generated teams. */
   var draft = { name: '', gender: 'female', level: null };
   var search = '';
   var COLLAPSED_ROSTER = 6;
   var showAllPlayers = false;
-  /** The empty state offers two paths rather than showing the form straight
-   * away; picking "add one" reveals it. Without this the button focused a
-   * field that the empty state had not rendered, so it did nothing. */
+  /** The empty state offers two paths and reveals the form on the first. Without
+   * the flag the button focused a field the empty state had not rendered. */
   var addFormOpen = false;
 
-  /** t() with a fallback, so a key that has not been translated yet renders
-   * readable Spanish instead of leaking the key onto the screen. Params are
-   * forwarded: several keys carry {count} / {name} placeholders that render
-   * literally if you forget them. */
-  function label(key, fallback, params) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key, params);
-    return value === key ? fallback : value;
-  }
 
-  /** The configuration that used to be three labelled rows of buttons taking
-   * a third of the Setup screen. Each chip states the current value and opens
-   * the place to change it; nothing is a mystery abbreviation. */
+  /** Each chip states the current value and opens where to change it, in place of
+   * the three labelled rows of buttons that took a third of the screen. */
   function contextChips(ctx) {
     var config = ctx.appState.get();
     var sizes = [2, 3, 4];
@@ -59,8 +33,8 @@
       },
       {
         label: config.pairingMode === 'manual'
-          ? label('pairing.modeManual', 'Manual')
-          : label('pairing.modeRandom', 'Aleatorio'),
+          ? translate('pairing.modeManual', 'Manual')
+          : translate('pairing.modeRandom', 'Aleatorio'),
         active: config.pairingMode === 'manual',
         onClick: function () {
           var manual = config.pairingMode !== 'manual';
@@ -73,7 +47,7 @@
     ];
     if (config.teams) {
       chips.push({
-        label: label('tournament.configShort', 'Torneo'),
+        label: translate('tournament.configShort', 'Torneo'),
         active: false,
         onClick: function () { ctx.openOverlay('tournamentConfig'); },
       });
@@ -88,11 +62,11 @@
   function emptyState(ctx) {
     return C.emptyState({
       icon: 'users',
-      title: label('setup.empty.title', '¿Quién juega hoy?'),
-      text: label('setup.empty.text', 'Añade jugadores uno a uno o pega la lista completa del grupo.'),
+      title: translate('setup.empty.title', '¿Quién juega hoy?'),
+      text: translate('setup.empty.text', 'Añade jugadores uno a uno o pega la lista completa del grupo.'),
       actions: [
         C.button({
-          label: label('setup.empty.add', 'Añadir jugador'),
+          label: translate('setup.empty.add', 'Añadir jugador'),
           onClick: function () {
             addFormOpen = true;
             ctx.rerender();
@@ -101,7 +75,7 @@
           },
         }),
         C.button({
-          label: label('import.pasteMode', 'Pegar lista'),
+          label: translate('import.pasteMode', 'Pegar lista'),
           variant: 'ghost',
           icon: 'plus',
           onClick: function () { ctx.openOverlay('import'); },
@@ -115,9 +89,9 @@
   function quickAdd(ctx) {
     var nameField = C.input({
       id: 'setup-name',
-      label: label('form.nameLabel', 'Nombre del jugador'),
+      label: translate('form.nameLabel', 'Nombre del jugador'),
       hideLabel: true,
-      placeholder: label('form.namePlaceholder', 'Nombre del jugador'),
+      placeholder: translate('form.namePlaceholder', 'Nombre del jugador'),
       value: draft.name,
       maxLength: 50,
       onInput: function (event) { draft.name = event.target.value; refreshAddButton(); },
@@ -126,7 +100,7 @@
 
     var addButton = C.iconButton({
       icon: 'plus',
-      label: label('form.submit', 'Añadir jugador'),
+      label: translate('form.submit', 'Añadir jugador'),
       onClick: function () { submit(ctx); },
     });
     addButton.classList.add('setup__add');
@@ -135,27 +109,27 @@
     function refreshAddButton() { addButton.disabled = !draft.name.trim(); }
 
     var genders = [
-      { id: 'male', label: label('form.genderMale', 'Hombre') },
-      { id: 'female', label: label('form.genderFemale', 'Mujer') },
-      { id: 'unspecified', label: label('form.genderUnspecified', 'Sin género') },
+      { id: 'male', label: translate('form.genderMale', 'Hombre') },
+      { id: 'female', label: translate('form.genderFemale', 'Mujer') },
+      { id: 'unspecified', label: translate('form.genderUnspecified', 'Sin género') },
     ];
     var levels = [
-      { id: 1, label: label('form.level1', 'Nivel 1') },
-      { id: 2, label: label('form.level2', 'Nivel 2') },
-      { id: 3, label: label('form.level3', 'Nivel 3') },
+      { id: 1, label: translate('form.level1', 'Nivel 1') },
+      { id: 2, label: translate('form.level2', 'Nivel 2') },
+      { id: 3, label: translate('form.level3', 'Nivel 3') },
     ];
 
-    return C.panel({ label: label('form.heading', 'Añadir jugador') }, [
+    return C.panel({ label: translate('form.heading', 'Añadir jugador') }, [
       el('div', { class: 'setup__name-row' }, [nameField, addButton]),
       C.toggleGroup({
-        label: label('form.genderLabel', 'Género'),
+        label: translate('form.genderLabel', 'Género'),
         options: genders.map(function (item) {
           return { id: item.id, label: item.label, active: draft.gender === item.id };
         }),
         onSelect: function (id) { draft.gender = id; ctx.rerender(); },
       }),
       C.toggleGroup({
-        label: label('form.levelLabel', 'Nivel'),
+        label: translate('form.levelLabel', 'Nivel'),
         options: levels.map(function (item) {
           return { id: item.id, label: item.label, active: draft.level === item.id };
         }),
@@ -169,7 +143,7 @@
         on: { click: function () { ctx.openOverlay('import'); } },
       }, [
         IconRegistry.icon('plus', { size: 15 }),
-        el('span', { text: label('import.pasteMode', 'Pegar lista completa') }),
+        el('span', { text: translate('import.pasteMode', 'Pegar lista completa') }),
       ]),
     ]);
   }
@@ -178,9 +152,8 @@
     if (!draft.name.trim()) return;
     ctx.appState.addPlayer({ name: draft.name, gender: draft.gender, level: draft.level });
     draft.name = '';
-    // Gender and level deliberately persist between entries: rosters are
-    // typically added in runs, and re-picking the same two chips for every
-    // player is the kind of friction that makes people give up halfway.
+    // Gender and level persist between entries: rosters are added in runs, and
+    // re-picking two chips per player is what makes people give up halfway.
     ctx.rerender();
     var field = document.getElementById('setup-name');
     if (field) field.focus();
@@ -190,10 +163,10 @@
 
   function playerRow(ctx, player) {
     var meta = [];
-    if (player.gender === 'male') meta.push(label('form.genderMale', 'Hombre'));
-    else if (player.gender === 'female') meta.push(label('form.genderFemale', 'Mujer'));
+    if (player.gender === 'male') meta.push(translate('form.genderMale', 'Hombre'));
+    else if (player.gender === 'female') meta.push(translate('form.genderFemale', 'Mujer'));
     // "N1" is an abbreviation of "Nivel 1" and says nothing in English.
-    if (player.level) meta.push(label('players.levelShort', 'N' + player.level, { level: player.level }));
+    if (player.level) meta.push(translate('players.levelShort', 'N' + player.level, { level: player.level }));
 
     var row = el('div', { class: 'setup__player' }, [
       el('div', { class: 'setup__player-identity' }, [
@@ -203,12 +176,11 @@
       C.iconButton({
         icon: 'x',
         tone: 'muted',
-        label: label('players.remove', 'Quitar ' + player.name, { name: player.name }),
+        label: translate('players.remove', 'Quitar ' + player.name, { name: player.name }),
         size: 18,
         onClick: function () {
-          // The removal is committed by the state module first and animated
-          // after. v1 waited on animationend to commit, so a stylesheet that
-          // failed to load meant the player was never removed.
+          // Committed first, animated after: v1 waited on animationend, so a
+          // stylesheet that failed to load meant the player was never removed.
           DomHelpers.removeAnimated(row, 'anim-list-out', 140, function () {
             ctx.appState.removePlayer(player.id);
           });
@@ -228,13 +200,13 @@
       : filtered.slice(0, COLLAPSED_ROSTER);
 
     var head = el('div', { class: 'c-panel__head' }, [
-      C.overline(label('players.heading', 'Jugadores (' + players.length + ')', { count: players.length })),
+      C.overline(translate('players.heading', 'Jugadores (' + players.length + ')', { count: players.length })),
       el('div', { class: 'setup__roster-tools' }, [
         C.iconButton({
           icon: 'search',
           tone: 'muted',
           size: 18,
-          label: label('setup.search', 'Buscar jugador'),
+          label: translate('setup.search', 'Buscar jugador'),
           onClick: function () {
             var field = document.getElementById('setup-search');
             if (field) { field.classList.toggle('is-open'); field.focus(); }
@@ -245,9 +217,9 @@
 
     var searchField = C.input({
       id: 'setup-search',
-      label: label('setup.search', 'Buscar jugador'),
+      label: translate('setup.search', 'Buscar jugador'),
       hideLabel: true,
-      placeholder: label('setup.search', 'Buscar jugador'),
+      placeholder: translate('setup.search', 'Buscar jugador'),
       value: search,
       onInput: function (event) { search = event.target.value; ctx.rerender(); },
     });
@@ -259,7 +231,7 @@
     if (!filtered.length) {
       children.push(el('p', {
         class: 'setup__roster-empty',
-        text: label('setup.noMatches', 'Ningún jugador coincide con la búsqueda'),
+        text: translate('setup.noMatches', 'Ningún jugador coincide con la búsqueda'),
       }));
     } else {
       children.push(C.list({}, visible.map(function (player) { return playerRow(ctx, player); })));
@@ -268,7 +240,7 @@
           class: 'c-panel__action setup__see-all',
           attrs: { type: 'button' },
           on: { click: function () { showAllPlayers = true; ctx.rerender(); } },
-        }, [el('span', { text: label('setup.seeAll', 'Ver los ' + filtered.length, { count: filtered.length }) })]));
+        }, [el('span', { text: translate('setup.seeAll', 'Ver los ' + filtered.length, { count: filtered.length }) })]));
       }
     }
 
@@ -285,19 +257,19 @@
     var blockers = items.filter(function (item) { return !item.ok; });
 
     var head = el('div', { class: 'c-panel__head' }, [
-      C.overline(label('workspace.checklist.heading', 'Listo para empezar')),
+      C.overline(translate('workspace.checklist.heading', 'Listo para empezar')),
       el('span', { class: 'setup__readiness-count', text: ready + ' / ' + items.length }),
     ]);
 
-    var children = [head, C.progressBar({ value: ready, total: items.length, label: label('workspace.checklist.heading', 'Listo para empezar') })];
+    var children = [head, C.progressBar({ value: ready, total: items.length, label: translate('workspace.checklist.heading', 'Listo para empezar') })];
 
     blockers.forEach(function (item) {
       children.push(C.statusStrip({
         icon: item.blocking ? 'circle-alert' : 'info',
         tone: item.blocking ? 'error' : 'warn',
-        text: label('workspace.readiness.' + item.key, item.key),
+        text: translate('workspace.readiness.' + item.key, item.key),
         action: item.key === 'teamsGenerated' && ctx.canGenerate ? {
-          label: label('actions.generate', 'Generar'),
+          label: translate('actions.generate', 'Generar'),
           onClick: function () { ctx.generateTeams(); },
         } : null,
       }));
@@ -313,7 +285,7 @@
     var enabled = action.enabled !== false;
     var children = [
       C.button({
-        label: label(action.labelKey, label('actions.generate', 'Generar equipos')),
+        label: translate(action.labelKey, translate('actions.generate', 'Generar equipos')),
         disabled: !enabled,
         onClick: function () { ctx.runPrimaryAction(action); },
       }),
@@ -321,7 +293,7 @@
     if (!enabled && action.blockedReasonKey) {
       children.push(el('p', { class: 'setup__hint' }, [
         IconRegistry.icon('info', { size: 14 }),
-        el('span', { text: label(action.blockedReasonKey, '') }),
+        el('span', { text: translate(action.blockedReasonKey, '') }),
       ]));
     }
     return el('div', { class: 'app__action-bar' }, children);
@@ -329,20 +301,8 @@
 
   /* --- Screen ----------------------------------------------------------- */
 
-  /** Which column a section belongs to once there is room for two (board G2).
-   * Entering players is the work, so it takes the wide column; the settings,
-   * the readiness checklist and the action that follows from them are context,
-   * and they sit together on the side where the primary action stays in view
-   * without a bar pinned to the bottom of the screen. */
-  /** One element per column, so each side flows on its own instead of sharing
-   * grid rows with the other. */
-  function column(name, children) {
-    return el('div', {
-      class: 'app__col',
-      attrs: { 'data-col': name },
-    }, (children || []).filter(Boolean));
-  }
-
+  /** Board G2: entering players is the work and takes the wide column; settings,
+   * readiness and the action that follows from them are context. */
   UIScreens.setup = {
     render: function (ctx) {
       var snapshot = ctx.appState.get();
@@ -362,12 +322,10 @@
 
       side.push(actionBar(ctx, ctx.view));
 
-      // On a phone there is one column, and its order is the order of the work:
-      // what you are set up for, then adding, then who is in, then what is
-      // missing, then the action. Only once there are two does the split into
-      // work and context mean anything.
+      // One column on a phone, in the order of the work. The split into work and
+      // context only means something once there are two.
       if (ctx.layout === 'compact') return side.slice(0, 1).concat(main, side.slice(1));
-      return [column('main', main), column('side', side)];
+      return [C.column('main', main), C.column('side', side)];
     },
   };
 })();

@@ -1,17 +1,5 @@
-/** Teams screen and mode fork — canvas boards B1, B2 and B3.
- *
- * The couple card of v1 was ~130px tall for two names and a tag; with eleven
- * couples you scrolled past the whole thing to reach the button. Here a couple
- * is one row, so the list is the screen rather than a preamble to it.
- *
- * WHERE THE ORGANISER NAME IS ASKED
- * ---------------------------------
- * In the mode fork's Tournament card, not in the configuration screen. Two
- * reasons: it is the first moment the app knows a tournament is being created,
- * and King of the Court never creates a Firebase session — so asking there
- * would collect a name that nothing would ever use. It is optional and
- * remembered, so it is typed once ever and falls back to "Organizador".
- */
+/** Teams and the mode fork — boards B1, B2 and B3. A couple is one row, and the
+ * organiser name is asked in the fork, where a tournament is first known of. */
 (function () {
   'use strict';
 
@@ -24,19 +12,14 @@
   var kingTarget = 5;
   var ownerDraft = null;
 
-  function label(key, fallback, params) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key, params);
-    return value === key ? fallback : value;
-  }
 
   /* --- Couples ---------------------------------------------------------- */
 
   function couplesPanel(ctx, snapshot) {
     var teams = snapshot.teams || [];
     return C.panel({
-      label: label('results.heading', 'Parejas') + ' · ' + teams.length,
-      action: { label: label('actions.regenerate', 'Regenerar'), onClick: function () { ctx.generateTeams(); } },
+      label: translate('results.heading', 'Parejas') + ' · ' + teams.length,
+      action: { label: translate('actions.regenerate', 'Regenerar'), onClick: function () { ctx.generateTeams(); } },
     }, [
       C.list({}, teams.map(function (team, index) {
         return C.coupleRow({
@@ -45,8 +28,8 @@
           player2: team.player2 ? team.player2.name : '',
           type: team.type === 'mixed' ? 'mixed' : 'same',
           typeLabel: team.type === 'mixed'
-            ? label('results.typeMixed', 'Mixta')
-            : label('results.typeSame', 'Mismo género'),
+            ? translate('results.typeMixed', 'Mixta')
+            : translate('results.typeSame', 'Mismo género'),
         });
       })),
     ]);
@@ -60,9 +43,9 @@
     return C.statusStrip({
       icon: 'triangle-alert',
       tone: 'warn',
-      text: names + ' ' + label('unmatched.text', 'se queda sin pareja'),
+      text: names + ' ' + translate('unmatched.text', 'se queda sin pareja'),
       action: {
-        label: label('teams.addPlayer', 'Añadir'),
+        label: translate('teams.addPlayer', 'Añadir'),
         onClick: function () { ctx.navigate('setup'); },
       },
     });
@@ -76,37 +59,37 @@
         on: { click: function () { optionsOpen = true; ctx.rerender(); } },
       }, [
         IconRegistry.icon('chevron-down', { size: 16 }),
-        el('span', { text: label('workspace.teams.moreOptions', 'Más opciones') }),
+        el('span', { text: translate('workspace.teams.moreOptions', 'Más opciones') }),
       ]);
     }
 
     var options = [
       {
         icon: 'shuffle',
-        title: label('actions.regenerate', 'Regenerar parejas'),
-        desc: label('teams.regenerateDesc', 'Vuelve a repartir al azar'),
+        title: translate('actions.regenerate', 'Regenerar parejas'),
+        desc: translate('teams.regenerateDesc', 'Vuelve a repartir al azar'),
         onClick: function () { ctx.generateTeams(); },
       },
       {
         icon: 'pencil',
-        title: label('workspace.teams.editPairs', 'Editar parejas a mano'),
-        desc: label('teams.editDesc', 'Fija quién juega con quién'),
+        title: translate('workspace.teams.editPairs', 'Editar parejas a mano'),
+        desc: translate('teams.editDesc', 'Fija quién juega con quién'),
         onClick: function () { ctx.openOverlay('manualPairing'); },
       },
       {
         icon: 'x',
-        title: label('actions.clearAll', 'Vaciar jugadores'),
-        desc: label('teams.clearDesc', 'Borra el plantel y empieza de cero'),
+        title: translate('actions.clearAll', 'Vaciar jugadores'),
+        desc: translate('teams.clearDesc', 'Borra el plantel y empieza de cero'),
         danger: true,
         onClick: function () {
-          if (!window.confirm(label('actions.confirmClear', '¿Seguro que quieres borrar todos los jugadores?'))) return;
+          if (!window.confirm(translate('actions.confirmClear', '¿Seguro que quieres borrar todos los jugadores?'))) return;
           ctx.appState.clearPlayers();
           ctx.navigate('setup');
         },
       },
     ];
 
-    return C.panel({ label: label('workspace.teams.moreOptions', 'Más opciones') },
+    return C.panel({ label: translate('workspace.teams.moreOptions', 'Más opciones') },
       options.map(function (option) {
         return el('button', {
           class: ['teams__option', option.danger && 'is-danger'],
@@ -136,7 +119,7 @@
 
       body.push(el('div', { class: 'app__action-bar' }, [
         C.button({
-          label: label('tournament.start', 'Empezar torneo'),
+          label: translate('tournament.start', 'Empezar torneo'),
           onClick: function () { forkMode = 'tournament'; ctx.openOverlay('modeFork'); },
         }),
         el('button', {
@@ -145,7 +128,7 @@
           on: { click: function () { forkMode = 'king'; ctx.openOverlay('modeFork'); } },
         }, [
           IconRegistry.icon('crown', { size: 15 }),
-          el('span', { text: label('teams.orKing', 'o jugar King of the Court') }),
+          el('span', { text: translate('teams.orKing', 'o jugar King of the Court') }),
         ]),
       ]));
 
@@ -182,8 +165,8 @@
     if (ownerDraft === null) ownerDraft = snapshot.ownerLabel || '';
     var field = C.input({
       id: 'fork-owner',
-      label: label('tournament.ownerLabel', '¿Quién organiza?'),
-      placeholder: label('tournament.ownerPlaceholder', 'Tu nombre (opcional)'),
+      label: translate('tournament.ownerLabel', '¿Quién organiza?'),
+      placeholder: translate('tournament.ownerPlaceholder', 'Tu nombre (opcional)'),
       value: ownerDraft,
       maxLength: 50,
       onInput: function (event) { ownerDraft = event.target.value; },
@@ -195,7 +178,7 @@
       field,
       el('p', {
         class: 'fork__hint',
-        text: label('tournament.ownerHint',
+        text: translate('tournament.ownerHint',
           'Aparecerá en el historial de cambios. Si lo dejas vacío, dirá "Organizador".'),
       }),
     ]);
@@ -208,20 +191,20 @@
     }
     return el('div', { class: 'fork__settings' }, [
       el('div', { class: 'fork__setting' }, [
-        C.overline(label('king.winConditionLabel', 'Gana por')),
+        C.overline(translate('king.winConditionLabel', 'Gana por')),
         stop(C.toggleGroup({
-          label: label('king.winConditionLabel', 'Gana por'),
+          label: translate('king.winConditionLabel', 'Gana por'),
           options: [
-            { id: 'consecutive', label: label('king.condConsecutive', 'Seguidas'), active: kingCondition === 'consecutive' },
-            { id: 'total', label: label('king.condTotal', 'Totales'), active: kingCondition === 'total' },
+            { id: 'consecutive', label: translate('king.condConsecutive', 'Seguidas'), active: kingCondition === 'consecutive' },
+            { id: 'total', label: translate('king.condTotal', 'Totales'), active: kingCondition === 'total' },
           ],
           onSelect: function (id) { kingCondition = id; ctx.rerender(); },
         })),
       ]),
       el('div', { class: 'fork__setting' }, [
-        C.overline(label('king.targetLabel', 'Victorias para ganar')),
+        C.overline(translate('king.targetLabel', 'Victorias para ganar')),
         stop(C.toggleGroup({
-          label: label('king.targetLabel', 'Victorias para ganar'),
+          label: translate('king.targetLabel', 'Victorias para ganar'),
           options: [5, 7, 10].map(function (value) {
             return { id: value, label: String(value), active: kingTarget === value };
           }),
@@ -237,21 +220,21 @@
       var isTournament = forkMode === 'tournament';
 
       return C.sheet({
-        title: label('workspace.teams.forkHeading', '¿Cómo quieren jugar?'),
+        title: translate('workspace.teams.forkHeading', '¿Cómo quieren jugar?'),
         onDismiss: function () { ctx.closeOverlay(); },
       }, [
         modeCard(ctx, {
           icon: 'trophy',
-          title: label('workspace.teams.forkTournament', 'Torneo'),
-          desc: label('teams.forkTournamentDesc', 'Grupos, tabla y final. Todos juegan lo mismo.'),
+          title: translate('workspace.teams.forkTournament', 'Torneo'),
+          desc: translate('teams.forkTournamentDesc', 'Grupos, tabla y final. Todos juegan lo mismo.'),
           active: isTournament,
           onClick: function () { forkMode = 'tournament'; ctx.rerender(); },
           extra: [ownerField(ctx, snapshot)],
         }),
         modeCard(ctx, {
           icon: 'crown',
-          title: label('workspace.teams.forkKing', 'King of the Court'),
-          desc: label('teams.forkKingDesc', 'El que gana se queda en la cancha. Cola de retadores.'),
+          title: translate('workspace.teams.forkKing', 'King of the Court'),
+          desc: translate('teams.forkKingDesc', 'El que gana se queda en la cancha. Cola de retadores.'),
           active: !isTournament,
           onClick: function () { forkMode = 'king'; ctx.rerender(); },
           extra: [kingSettings(ctx)],
@@ -263,16 +246,16 @@
         }, [
           IconRegistry.icon('chevron-right', { size: 15 }),
           el('span', {
-            text: label('tournament.configureFirst', 'Ajustar grupos y formato') + ' · ' +
+            text: translate('tournament.configureFirst', 'Ajustar grupos y formato') + ' · ' +
               (snapshot.groupCount === 1
-                ? label('tournament.groupCount.one', '1 grupo')
-                : label('tournament.groupCount.many', snapshot.groupCount + ' grupos', { count: snapshot.groupCount })),
+                ? translate('tournament.groupCount.one', '1 grupo')
+                : translate('tournament.groupCount.many', snapshot.groupCount + ' grupos', { count: snapshot.groupCount })),
           }),
         ]) : null,
         C.button({
           label: isTournament
-            ? label('tournament.start', 'Empezar torneo')
-            : label('king.start', 'Empezar King of the Court'),
+            ? translate('tournament.start', 'Empezar torneo')
+            : translate('king.start', 'Empezar King of the Court'),
           onClick: function () {
             if (isTournament) ctx.startTournament({ ownerLabel: ownerDraft });
             else ctx.startKing({ winCondition: kingCondition, target: kingTarget });

@@ -1,13 +1,5 @@
-/** Pair by hand — canvas board A4.
- *
- * v1 asked you to pick two people from two chained <select> dropdowns and press
- * Pair. The names were already on screen in the roster; the dropdowns were a
- * second, worse copy of that list. Here you tap the people themselves.
- *
- * Fixed pairs sit above the pool so it is obvious what is already decided, and
- * the count says how many will still be drawn at random — the thing v1 buried
- * in a hint paragraph.
- */
+/** Pair by hand — board A4: you tap the people themselves. Fixed pairs sit above
+ * the pool, and the count says how many are still drawn at random. */
 (function () {
   'use strict';
 
@@ -16,11 +8,6 @@
 
   var selected = [];
 
-  function label(key, fallback, params) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key, params);
-    return value === key ? fallback : value;
-  }
 
   function playerById(ctx, id) {
     return ctx.appState.get().players.filter(function (player) { return player.id === id; })[0];
@@ -35,7 +22,7 @@
 
   function fixedPairs(ctx, pairs) {
     if (!pairs.length) return null;
-    return C.panel({ label: label('pairing.fixed', 'Parejas fijadas') + ' · ' + pairs.length }, [
+    return C.panel({ label: translate('pairing.fixed', 'Parejas fijadas') + ' · ' + pairs.length }, [
       C.list({}, pairs.map(function (pair, index) {
         return el('div', { class: 'pairing__fixed' }, [
           el('div', { class: 'pairing__fixed-left' }, [
@@ -49,7 +36,7 @@
             icon: 'x',
             tone: 'muted',
             size: 18,
-            label: label('pairing.unfix', 'Deshacer pareja'),
+            label: translate('pairing.unfix', 'Deshacer pareja'),
             onClick: function () {
               var next = pairs.slice();
               next.splice(index, 1);
@@ -92,10 +79,10 @@
     }
 
     return C.panel({
-      label: label('pairing.unpaired', 'Sin emparejar') + ' · ' + available.length,
-      action: { label: label('pairing.tapTwo', 'Toca ' + teamSize, { n: teamSize }), onClick: null },
+      label: translate('pairing.unpaired', 'Sin emparejar') + ' · ' + available.length,
+      action: { label: translate('pairing.tapTwo', 'Toca ' + teamSize, { n: teamSize }), onClick: null },
     }, rows.length ? rows : [
-      el('p', { class: 'pairing__empty', text: label('pairing.allPaired', 'Ya están todos emparejados') }),
+      el('p', { class: 'pairing__empty', text: translate('pairing.allPaired', 'Ya están todos emparejados') }),
     ]);
   }
 
@@ -121,7 +108,7 @@
         C.statusStrip({
           icon: 'info',
           tone: 'neutral',
-          text: label('pairing.manualHint',
+          text: translate('pairing.manualHint',
             'Las ' + remaining + ' parejas restantes se generan al azar', { count: remaining }),
         }),
       ].filter(Boolean);
@@ -129,10 +116,10 @@
       body.push(el('div', { class: 'app__action-bar' }, [
         C.button({
           label: selected.length === teamSize
-            ? label('pairing.fixSelected',
+            ? translate('pairing.fixSelected',
                 'Fijar ' + selected.map(function (id) { return nameOf(ctx, id); }).join(' & '),
                 { names: selected.map(function (id) { return nameOf(ctx, id); }).join(' & ') })
-            : label('pairing.pickMore', 'Elige ' + teamSize + ' jugadores', { n: teamSize }),
+            : translate('pairing.pickMore', 'Elige ' + teamSize + ' jugadores', { n: teamSize }),
           disabled: selected.length !== teamSize,
           onClick: function () {
             ctx.appState.setManualPairs(pairs.concat([selected.slice()]));
@@ -141,7 +128,7 @@
           },
         }),
         C.button({
-          label: label('pairing.done', 'Listo'),
+          label: translate('pairing.done', 'Listo'),
           variant: 'ghost',
           onClick: function () { selected = []; ctx.closeOverlay(); },
         }),
@@ -149,8 +136,8 @@
 
       return el('div', { class: 'overlay-screen anim-screen-in' }, [
         C.subBar({
-          title: label('pairing.manualTitle', 'Emparejar a mano'),
-          sub: pairs.length + ' ' + label('pairing.ofFixed', 'parejas fijadas'),
+          title: translate('pairing.manualTitle', 'Emparejar a mano'),
+          sub: pairs.length + ' ' + translate('pairing.ofFixed', 'parejas fijadas'),
           onBack: function () { selected = []; ctx.closeOverlay(); },
         }),
         el('div', { class: 'overlay-screen__body' }, body),

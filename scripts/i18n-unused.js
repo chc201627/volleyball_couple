@@ -5,7 +5,7 @@
  *   node scripts/i18n-unused.js            # report
  *   node scripts/i18n-unused.js --strict   # exit 1 if anything is wrong
  *
- * Four things go wrong with a flat dictionary and a `label(key, fallback)`
+ * Four things go wrong with a flat dictionary and a `translate(key, fallback)`
  * helper, and none of them are visible by reading the code:
  *
  *   missing      a key the screens ask for that no dictionary has. The fallback
@@ -19,8 +19,8 @@
  *                rotation of the redesign, telling live keys from dead ones by
  *                eye is not possible.
  *
- * Dynamic keys (`label('x.' + id, ...)`) cannot be resolved statically, so a
- * key matching a used prefix is never reported as an orphan.
+ * Dynamic keys (`translate('x.' + id, ...)`) cannot be resolved statically, so
+ * a key matching a used prefix is never reported as an orphan.
  */
 'use strict';
 
@@ -103,7 +103,7 @@ function usage(files) {
     while ((match = literal.exec(src))) {
       (keys[match[2]] = keys[match[2]] || []).push(relative);
     }
-    var asked = /\b(?:label|t)\(\s*(['"])([A-Za-z0-9._]+)\1\s*[,)]/g;
+    var asked = /\b(?:translate|t)\(\s*(['"])([A-Za-z0-9._]+)\1\s*[,)]/g;
     while ((match = asked.exec(src))) {
       (requested[match[2]] = requested[match[2]] || []).push(relative);
     }
@@ -122,7 +122,7 @@ function unsubstituted(files, es) {
   var problems = [];
   files.forEach(function (file) {
     var src = fs.readFileSync(file, 'utf8');
-    var pattern = /\b(?:label|t)\(\s*(['"])([A-Za-z0-9._]+)\1/g;
+    var pattern = /\b(?:translate|t)\(\s*(['"])([A-Za-z0-9._]+)\1/g;
     var match;
     while ((match = pattern.exec(src))) {
       var value = es[match[2]];

@@ -1,15 +1,5 @@
-/** Application orchestrator.
- *
- * Deliberately thin: it owns routing state, mounts the chrome, and hands the
- * active destination to a screen module. It does NOT build markup — that is
- * components.js and the screen modules. v1's app.js grew to 3,685 lines
- * precisely because it did both.
- *
- * Screens register themselves into `UIScreens` (js/ui/screen-registry.js) and
- * arrive one slice at a time; anything not yet registered renders a
- * placeholder rather than a blank page, so the chain stays inspectable while
- * it is being built.
- */
+/** Application orchestrator: routing state, the chrome, and handing the active
+ * destination to a screen module. It builds no markup of its own. */
 (function () {
   'use strict';
 
@@ -23,9 +13,8 @@
     { id: 'results', icon: 'list-ordered', labelKey: 'workspace.nav.results' },
   ];
 
-  /** Routing state only. The roster, configuration and generated teams live in
-   * AppState, which owns their persistence; mixing the two is how v1's app.js
-   * ended up as one 3,685-line object. */
+  /** Routing state only. The roster, configuration and teams live in AppState,
+   * which owns their persistence. */
   var state = {
     currentView: null,
     currentSubView: null,
@@ -33,9 +22,8 @@
     overlayMatchId: null,
     overlayMatchRevisions: 0,
     lang: 'es',
-    // 'compact' | 'medium' | 'wide'. Not a styling concern: at 960 the
-    // tournament screen shows a standings table that does not exist at all on
-    // a phone, so the screen has to know the width, not just be styled by it.
+    // 'compact' | 'medium' | 'wide'. Not styling: at 960 the tournament screen
+    // builds a table that does not exist on a phone, so a screen has to know.
     layout: 'compact',
   };
 
@@ -44,26 +32,13 @@
   var sessionId = null;
   var unsubscribeSession = null;
   var unsubscribeHistory = null;
-  // The change history, newest first, as the repository reports it. Kept beside
-  // the session rather than in AppState: it is a view of the session, not of
-  // this device's tournament, and nothing about it survives a reload. Named in
-  // full because `history` is the browser's own global, used just below.
+  // Newest first, as the repository reports it. Beside the session rather than in
+  // AppState, and named in full because `history` is the browser's own global.
   var historyEntries = [];
   // What the session last said we were, so a role change can be announced
   // rather than only re-rendered.
   var lastRole = null;
   var nodes = {};
-
-  /** How many devices are waiting to be let in. Only the owner is told: the
-   * request list is not readable by anyone else, so for a scorer it is always
-   * zero rather than unknown. */
-  function pendingRequestCount() {
-    var session = appState.get().session;
-    if (!session || !session.requests) return 0;
-    return Object.keys(session.requests).filter(function (uid) {
-      return session.requests[uid].status === 'pending';
-    }).length;
-  }
 
   function workspaceInput() {
     var snapshot = appState.get();
@@ -83,7 +58,7 @@
       hasBracket: !!(snapshot.tournament && snapshot.tournament.format),
       complete: isComplete(snapshot),
       hasNextMatch: false,
-      pendingRequestCount: pendingRequestCount(),
+      pendingRequestCount: SessionAccess.pendingCount(appState.get().session),
       firebaseConnected: session ? session.connection !== 'offline' : undefined,
       // Same test v1's initFirebase() applies, so both entry points agree on
       // whether a session is even possible.
@@ -98,12 +73,10 @@
     };
   }
 
-  /** The contextual primary action the view machine resolved, performed. It
-   * navigates as a side effect rather than only moving the user there, which
-   * is what REQ-UX-04 asks of the single centre action. */
-  /** Completion drives the default destination and the Results copy, so it is
-   * read from the same selectors the screens use rather than tracked
-   * separately. A King round is complete when it has a winner. */
+  /** The contextual primary action, performed: it acts and navigates, rather
+   * than only moving there (REQ-UX-04). */
+  /** Read from the same selectors the screens use, so completion cannot be
+   * tracked separately and drift. A King round is complete once it has a winner. */
   function isComplete(snapshot) {
     if (snapshot.king) return !!snapshot.king.winner;
     if (!snapshot.tournament) return false;
@@ -141,10 +114,8 @@
     if (result.ok) navigate('teams');
   }
 
-  /** Creating the tournament and landing on the day it is played are one
-   * action, not two. A tournament is played in a single afternoon: leaving
-   * someone on a confirmation screen after they pressed Start is a step that
-   * exists only in the code's model of the world, not the user's. */
+  /** Creating the tournament and landing on the day it is played are one action:
+   * a confirmation screen after Start exists only in the code's model. */
   function startTournament(options) {
     var result = appState.startTournament(options || {});
     if (!result.ok) return result;
@@ -163,15 +134,10 @@
     return result;
   }
 
-  /** Published on start, exactly as v1 did: the share link exists from the
-   * first second rather than waiting for someone to remember to press Share.
-   * Failure is silent by design — the tournament is already playable locally,
-   * and blocking the court on a network error would be worse than a link that
-   * can be created later. */
-  /** Local write first, network second. The court does not wait for a phone to
-   * find signal: the result is applied and persisted immediately, and the
-   * server's answer only decides which state strip the screen shows afterwards.
-   * Without a session there is nothing to publish and the save is simply done. */
+  /** The link exists from the first second rather than waiting for a Share tap.
+   * Failure is silent: the tournament is already playable locally. */
+  /** Local write first, network second: the court does not wait for signal, and
+   * the server's answer only decides which state strip is shown afterwards. */
   function saveResult(command) {
     var applied = appState.applyResult(command.matchId, command.score1, command.score2, command.status);
     if (!applied.ok) return Promise.resolve({ status: 'invalid' });
@@ -203,10 +169,8 @@
     toast.timer = setTimeout(function () { DomHelpers.clear(nodes.toast); }, 3200);
   }
 
-  /** A shared link is the whole collaboration model: open it, and the session
-   * decides what you are allowed to do. The role comes from the repository
-   * rather than from anything this client claims, so a spectator cannot talk
-   * itself into scoring. */
+  /** The role comes from the repository, never from what this client claims —
+   * which is what stops a spectator talking itself into scoring. */
   function subscribeToSession(id) {
     if (!repository || !id) return;
     if (unsubscribeSession) unsubscribeSession();
@@ -225,11 +189,8 @@
     });
   }
 
-  /** A permission that changes has to be said out loud. Granting access closes
-   * the request overlay on its own — the role gate stops allowing it — and a
-   * revocation makes the scoring buttons vanish; either one, unannounced,
-   * leaves someone staring at a screen that silently became a different one.
-   * The first snapshot is not a change, so it says nothing. */
+  /** A permission that changes has to be said out loud: either direction
+   * silently rearranges the screen. The first snapshot is not a change. */
   function announceRoleChange(role) {
     if (!role) return;
     var previous = lastRole;
@@ -237,29 +198,27 @@
     if (!previous || previous === role) return;
     if (previous === 'spectator' && role === 'scorer') {
       toast({
-        title: label('access.toast.approved', 'Ya puedes anotar'),
-        sub: label('access.toast.approvedSub', 'El organizador te dio acceso a este torneo'),
+        title: translate('access.toast.approved', 'Ya puedes anotar'),
+        sub: translate('access.toast.approvedSub', 'El organizador te dio acceso a este torneo'),
       });
     } else if (previous === 'scorer' && role === 'spectator') {
       toast({
-        title: label('access.toast.revoked', 'Se te quitó el acceso'),
-        sub: label('access.toast.revokedSub', 'Sigues viendo el torneo en solo lectura'),
+        title: translate('access.toast.revoked', 'Se te quitó el acceso'),
+        sub: translate('access.toast.revokedSub', 'Sigues viendo el torneo en solo lectura'),
       });
     }
   }
 
-  /** The way out of a session that is gone: drop the link and fall back to
-   * whatever this device has locally. The link cannot be repaired from here,
-   * and the tournament in storage is still intact. */
+  /** The way out of a dead session: drop the link and fall back to what this
+   * device holds locally, which is still intact. */
   function leaveSession() {
     if (unsubscribeSession) { unsubscribeSession(); unsubscribeSession = null; }
     if (unsubscribeHistory) { unsubscribeHistory(); unsubscribeHistory = null; }
     historyEntries = [];
     sessionId = null;
     lastRole = null;
-    // Only the hash identifies the session, so only the hash is dropped: the
-    // query string is whatever the visitor arrived with and is not ours to
-    // discard.
+    // Only the hash identifies the session, so only the hash is dropped: the query
+    // string is whatever the visitor arrived with.
     history.replaceState(null, '', window.location.pathname + window.location.search);
     appState.clearSession();
     navigate('setup');
@@ -287,11 +246,8 @@
     return repository.setAccess(sessionId, memberId, status).catch(function () { return { status: 'offline' }; });
   }
 
-  /** Starting over. The session is deleted rather than emptied: a reset is not
-   * an edit of the tournament, it is the end of it, and a link that survived
-   * would point at something nobody is playing. Failing to reach Firebase does
-   * not block it — the local tournament is this device's, and the session will
-   * be unreachable anyway once nobody writes to it. */
+  /** The session is deleted rather than emptied: a reset ends the tournament, and
+   * a surviving link would point at something nobody is playing. */
   function resetTournament() {
     if (repository && sessionId && repository.removeSession) {
       repository.removeSession(sessionId).catch(function () { /* the local reset stands */ });
@@ -356,12 +312,6 @@
     render();
   }
 
-  function label(key, fallback) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key);
-    return value === key ? fallback : value;
-  }
-
   /** One list of destinations feeds both navigations, so "what is locked" and
    * "what is active" can never disagree between breakpoints. */
   function destinationItems(view) {
@@ -370,10 +320,10 @@
       return {
         id: destination.id,
         icon: destination.icon,
-        label: label(destination.labelKey, destination.id),
+        label: translate(destination.labelKey, destination.id),
         locked: !navItem || navItem.enabled === false,
         badge: navItem ? navItem.badge : null,
-        lockReason: navItem && navItem.lockReasonKey ? label(navItem.lockReasonKey, '') : null,
+        lockReason: navItem && navItem.lockReasonKey ? translate(navItem.lockReasonKey, '') : null,
       };
     });
   }
@@ -381,25 +331,24 @@
   function renderChrome(view) {
     var items = destinationItems(view);
 
-    // Everything that is not the match in front of you lives in one menu, and
-    // only where it applies: on any other destination it would open onto
-    // actions about a tournament that is not on screen.
+    // One menu for everything that is not the match in front of you, and only on
+    // the destination those actions belong to.
     var menuAction = view.view === 'tournament' && appState.get().tournament ? [{
       icon: 'ellipsis-vertical',
       tone: 'muted',
-      label: label('history.menuLabel', 'Opciones del torneo'),
-      badge: pendingRequestCount() > 0,
+      label: translate('history.menuLabel', 'Opciones del torneo'),
+      badge: SessionAccess.pendingCount(appState.get().session) > 0,
       onClick: function () { openOverlay('tournamentMenu'); },
     }] : [];
 
     DomHelpers.mount(nodes.bar, C.appBar({
-      title: label('workspace.nav.' + view.view, view.view),
+      title: translate('workspace.nav.' + view.view, view.view),
       // Shown from 600px up, where the fixed tab bar is dropped.
       nav: { active: view.view, items: items, onSelect: navigate },
       actions: menuAction,
       lang: {
         code: state.lang.toUpperCase(),
-        label: label('app.toggleLanguage', 'Cambiar idioma'),
+        label: translate('app.toggleLanguage', 'Cambiar idioma'),
         onClick: toggleLanguage,
       },
     }));
@@ -411,9 +360,8 @@
     }));
   }
 
-  /** Everything a screen is allowed to reach. Screens get state and intents,
-   * never the shell's internals — that boundary is what lets a screen be read
-   * on its own. */
+  /** Everything a screen may reach: state and intents, never the shell's
+   * internals. That boundary is what lets a screen be read on its own. */
   function screenContext(view) {
     return {
       view: view,
@@ -442,10 +390,8 @@
     };
   }
 
-  /** The Tournament destination holds whichever mode is actually being played.
-   * King of the Court is not a fifth tab: it is what "Torneo" means when the
-   * group chose it, and routing it here is what stops startKing() landing on a
-   * screen that only knows how to render tournaments. */
+  /** The Tournament destination holds whichever mode is being played: King of the
+   * Court is not a fifth tab, it is what "Torneo" means when it was chosen. */
   function screenIdFor(view) {
     if (view.view !== 'tournament') return view.view;
     var snapshot = appState.get();
@@ -460,13 +406,12 @@
     } else {
       DomHelpers.mount(nodes.main, C.emptyState({
         icon: 'info',
-        title: label('workspace.nav.' + view.view, view.view),
-        text: label('app.screenPending', 'Pantalla pendiente en esta fase de la reconstrucción.'),
+        title: translate('workspace.nav.' + view.view, view.view),
+        text: translate('app.screenPending', 'Pantalla pendiente en esta fase de la reconstrucción.'),
       }));
     }
-    // A screen opts into columns by tagging its sections with data-col; the
-    // media queries decide whether the width can honour it. Read back from the
-    // DOM the screen just produced, so there is no second place to keep in sync.
+    // Read back from the DOM the screen just produced, so which screens have
+    // columns is not a second list to keep in sync.
     nodes.main.classList.toggle('app__main--split',
       !!nodes.main.querySelector(':scope > [data-col]'));
     nodes.main.classList.toggle('app__main--triple',
@@ -485,7 +430,7 @@
       DomHelpers.mount(nodes.overlay, C.sheet({ title: view.overlay, onDismiss: closeOverlay }, [
         el('p', {
           class: 'c-sheet__sub',
-          text: label('app.screenPending', 'Pantalla pendiente en esta fase de la reconstrucción.'),
+          text: translate('app.screenPending', 'Pantalla pendiente en esta fase de la reconstrucción.'),
         }),
       ]));
     }
@@ -500,9 +445,8 @@
     renderOverlay(view);
   }
 
-  /** Same availability test v1's initFirebase() applied. A missing or
-   * placeholder config is not an error: the app runs local-only, which is the
-   * mode most people use it in. */
+  /** A missing or placeholder config is not an error: the app runs local-only,
+   * which is how most people use it. */
   function createRepository() {
     if (typeof firebase === 'undefined' || typeof FIREBASE_CONFIG === 'undefined' ||
         FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY' ||
@@ -530,9 +474,8 @@
     }
   }
 
-  /** The three widths the design is drawn at. Watched rather than measured, so
-   * nothing runs on scroll or resize — the callback fires only when a boundary
-   * is actually crossed. */
+  /** The widths the design is drawn at, watched rather than measured: nothing
+   * runs on scroll or resize, only when a boundary is crossed. */
   var LAYOUT_STEPS = [
     { id: 'wide', query: '(min-width: 960px)' },
     { id: 'medium', query: '(min-width: 600px)' },
@@ -560,11 +503,8 @@
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:') return;
-    // Never on a development host. The worker serves assets cache-first keyed on
-    // `?v=`, which is exactly right for a release and exactly wrong while the
-    // files change under a version that does not: every edit came back stale
-    // until the cache was cleared by hand. Registering it here buys nothing —
-    // an offline shell is for a beach, not for localhost.
+    // Never on a development host: cache-first on `?v=` is right for a release and
+    // wrong while files change under a version that does not.
     if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
       navigator.serviceWorker.getRegistrations().then(function (registrations) {
         registrations.forEach(function (registration) { registration.unregister(); });

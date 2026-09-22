@@ -1,17 +1,5 @@
-/** Change history — canvas boards H1, H2, H3 and H5.
- *
- * Three views over one question: who changed what, and when.
- *
- * H1 is the overflow menu that finally gives the tournament screen a place to
- * put everything that is not the match in front of you. Share, scorers and
- * reset were three loose buttons; they live here now, and the history joins
- * them with its own count.
- *
- * H2 and H3 are the history itself — the whole tournament, and one match. Both
- * read their rows from match-history.js, which decides what a change IS (the
- * value it replaced, the day it belongs to, who to credit). This file decides
- * only how it looks.
- */
+/** Change history — boards H1 (the menu), H2 (everything), H3 (one match) and H5.
+ * What a change IS comes from match-history.js; this decides how it looks. */
 (function () {
   'use strict';
 
@@ -20,63 +8,48 @@
 
   var activeFilter = 'all';
 
-  function label(key, fallback, params) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key, params);
-    return value === key ? fallback : value;
-  }
 
   /* --- Shared pieces ---------------------------------------------------- */
 
   function matchTitle(tournament, matchId) {
-    var match = ((tournament && tournament.matches) || []).filter(function (item) {
-      return item.id === matchId;
-    })[0];
-    if (!match) return label('history.unknownMatch', 'Partido');
-    function teamName(teamId) {
-      var team = ((tournament && tournament.teams) || []).filter(function (item) {
-        return item.id === teamId;
-      })[0];
-      return team ? team.name : teamId;
-    }
-    return teamName(match.team1Id) + '  vs  ' + teamName(match.team2Id);
+    return TournamentText.matchTitleById(tournament, matchId,
+      translate('history.unknownMatch', 'Partido'));
   }
 
-  /** "Tú (organizador)" · "Pipe — Organizador" · "Caro · iPhone". The organiser
-   * is named as such because it is the one thing that changes what a reader can
-   * infer from the entry. */
+  /** "Tú (organizador)" · "Pipe — Organizador" · "Caro · iPhone": the organiser is
+   * named because it changes what a reader can infer from the entry. */
   function authorText(author) {
-    if (!author) return label('history.unknownAuthor', 'anotador desconocido');
+    if (!author) return translate('history.unknownAuthor', 'anotador desconocido');
     if (author.isYou) {
       return author.isOwner
-        ? label('history.youOrganiser', 'Tú (organizador)')
-        : label('history.you', 'Tú');
+        ? translate('history.youOrganiser', 'Tú (organizador)')
+        : translate('history.you', 'Tú');
     }
     if (author.unknown || !author.label) {
       return author.isOwner
-        ? label('access.organiser', 'Organizador')
-        : label('history.unknownAuthor', 'anotador desconocido');
+        ? translate('access.organiser', 'Organizador')
+        : translate('history.unknownAuthor', 'anotador desconocido');
     }
     return author.isOwner
-      ? label('history.ownerSuffix', author.label + ' — Organizador', { name: author.label })
+      ? translate('history.ownerSuffix', author.label + ' — Organizador', { name: author.label })
       : author.label;
   }
 
   function timeText(at) {
-    if (!at || at.unknown) return label('history.unknownTime', 'sin hora');
+    if (!at || at.unknown) return translate('history.unknownTime', 'sin hora');
     if (at.relative) {
       return at.minutesAgo < 1
-        ? label('history.justNow', 'hace un momento')
-        : label('history.minutesAgo', 'hace ' + at.minutesAgo + ' min', { count: at.minutesAgo });
+        ? translate('history.justNow', 'hace un momento')
+        : translate('history.minutesAgo', 'hace ' + at.minutesAgo + ' min', { count: at.minutesAgo });
     }
     return at.clock;
   }
 
   function actionText(action) {
-    if (action === 'created') return label('history.action.created', 'Resultado registrado');
-    if (action === 'conflictResolved') return label('history.action.conflictResolved', 'Conflicto resuelto');
-    if (action === 'unknown') return label('history.action.unknown', 'Último cambio');
-    return label('history.action.edited', 'Corrección');
+    if (action === 'created') return translate('history.action.created', 'Resultado registrado');
+    if (action === 'conflictResolved') return translate('history.action.conflictResolved', 'Conflicto resuelto');
+    if (action === 'unknown') return translate('history.action.unknown', 'Último cambio');
+    return translate('history.action.edited', 'Corrección');
   }
 
   /** The diff, read without opening anything: the value that was there, struck
@@ -95,9 +68,9 @@
   }
 
   function dayHeading(group) {
-    if (group.key === 'unknown') return label('history.dayUnknown', 'Sin fecha');
-    if (group.dayOffset === 0) return label('history.today', 'Hoy');
-    if (group.dayOffset === 1) return label('history.yesterday', 'Ayer');
+    if (group.key === 'unknown') return translate('history.dayUnknown', 'Sin fecha');
+    if (group.dayOffset === 0) return translate('history.today', 'Hoy');
+    if (group.dayOffset === 1) return translate('history.yesterday', 'Ayer');
     return new Date(group.rows[0].at.timestamp).toLocaleDateString(
       typeof getLanguage === 'function' ? getLanguage() : 'es',
       { weekday: 'long', day: 'numeric', month: 'long' }
@@ -117,10 +90,8 @@
     }, [
       el('div', { class: 'history__head' }, [
         el('p', { class: 'history__match', text: matchTitle(tournament, row.matchId) }),
-        // No tag for a new result or a correction: the diff already says which
-        // it is — one value, or one replacing another. A resolved conflict is
-        // the exception, because "somebody else's result was overwritten" is
-        // not something two numbers can show.
+        // The diff already says whether it is new or a correction. A resolved
+        // conflict is the exception: two numbers cannot show an overwrite.
         row.action === 'conflictResolved' ? el('span', {
           class: 'history__action history__action--conflictResolved',
           text: actionText(row.action),
@@ -140,17 +111,13 @@
     render: function (ctx) {
       var snapshot = ctx.appState.get();
       var session = snapshot.session;
-      var owner = !session || session.role === 'owner';
-      var pending = session && session.requests
-        ? Object.keys(session.requests).filter(function (uid) {
-            return session.requests[uid].status === 'pending';
-          }).length
-        : 0;
+      var owner = SessionAccess.isOwner(session);
+      var pending = SessionAccess.pendingCount(session);
       var history = ctx.history || [];
 
       var items = [{
         icon: 'history',
-        label: label('history.fullTitle', 'Historial de cambios'),
+        label: translate('history.fullTitle', 'Historial de cambios'),
         count: history.length || null,
         onClick: function () { ctx.openOverlay('history'); },
       }];
@@ -158,7 +125,7 @@
       if (owner) {
         items.push({
           icon: 'users',
-          label: label('scorers.title', 'Anotadores'),
+          label: translate('scorers.title', 'Anotadores'),
           count: pending || null,
           onClick: function () { ctx.openOverlay('scorers'); },
         });
@@ -166,7 +133,7 @@
 
       items.push({
         icon: 'share-2',
-        label: label('day.share', 'Compartir'),
+        label: translate('day.share', 'Compartir'),
         onClick: function () { ctx.openOverlay('share'); },
       });
 
@@ -177,9 +144,9 @@
         items.push({
           icon: 'rotate-ccw',
           tone: 'danger',
-          label: label('tournament.reset', 'Reiniciar torneo'),
+          label: translate('tournament.reset', 'Reiniciar torneo'),
           onClick: function () {
-            if (!window.confirm(label('tournament.confirmReset',
+            if (!window.confirm(translate('tournament.confirmReset',
               '¿Seguro que quieres reiniciar el torneo? Se borran los resultados y el link deja de funcionar.'))) return;
             ctx.resetTournament();
           },
@@ -187,7 +154,7 @@
       }
 
       return C.menu({
-        label: label('history.menuLabel', 'Opciones del torneo'),
+        label: translate('history.menuLabel', 'Opciones del torneo'),
         onDismiss: function () { ctx.closeOverlay(); },
       }, items);
     },
@@ -208,8 +175,8 @@
       if (!session) {
         body.push(C.emptyState({
           icon: 'history',
-          title: label('history.localTitle', 'Este torneo es solo tuyo'),
-          text: label('history.localText',
+          title: translate('history.localTitle', 'Este torneo es solo tuyo'),
+          text: translate('history.localText',
             'El historial guarda quién cambió cada resultado, y eso solo existe cuando compartes el torneo.'),
         }));
         return shell(ctx, body, null);
@@ -219,17 +186,15 @@
         body.push(C.statusStrip({
           icon: 'triangle-alert',
           tone: 'warn',
-          text: label('history.offline', 'Sin conexión — puede faltar lo más reciente'),
+          text: translate('history.offline', 'Sin conexión — puede faltar lo más reciente'),
         }));
       }
 
-      // A session created before the history existed has no record to show. Its
-      // past cannot be invented, so what little `results` still carries is shown
-      // and the gap is stated (board H5, case B).
+      // A session older than the history has no record to show: what `results`
+      // still carries is shown, and the gap is stated (board H5, case B).
       if (session.legacy || (!entries.length && hasResults(tournament))) {
-        // The uids are still passed: `results` kept who wrote last, so a row the
-        // organiser wrote can say so. Only the readable label was never stored,
-        // and that is the part reported as unknown.
+        // The uids are still passed: `results` kept who wrote last. Only the
+        // readable label was never stored, and that is what reads as unknown.
         var legacy = legacyHistoryView(tournament ? tournament.matches : [], {
           now: Date.now(),
           ownerUid: session.ownerUid || null,
@@ -238,13 +203,13 @@
         body.push(C.statusStrip({
           icon: 'info',
           tone: 'neutral',
-          text: label('history.legacy',
+          text: translate('history.legacy',
             'Este torneo empezó antes del historial. Solo se conserva el último cambio de cada partido.'),
         }));
         body.push(el('div', { class: 'history__group' }, legacy.rows.map(function (row) {
           return historyRow(ctx, tournament, row, {});
         })));
-        return shell(ctx, body, legacy.total + ' ' + label('history.records', 'registros'));
+        return shell(ctx, body, legacy.total + ' ' + translate('history.records', 'registros'));
       }
 
       var view = matchHistoryView(entries, {
@@ -257,8 +222,8 @@
       if (view.empty) {
         body.push(C.emptyState({
           icon: 'history',
-          title: label('history.emptyTitle', 'Aún no hay cambios'),
-          text: label('history.emptyText',
+          title: translate('history.emptyTitle', 'Aún no hay cambios'),
+          text: translate('history.emptyText',
             'Cuando alguien registre o corrija un resultado, aparecerá aquí con su nombre y la hora.'),
         }));
         return shell(ctx, body, null);
@@ -267,10 +232,10 @@
       body.push(el('div', { class: 'history__filters' }, view.filters.map(function (id) {
         return C.pill({
           label: {
-            all: label('history.filter.all', 'Todo'),
-            created: label('history.filter.created', 'Nuevos'),
-            edited: label('history.filter.edited', 'Ediciones'),
-            conflictResolved: label('history.filter.conflictResolved', 'Conflictos'),
+            all: translate('history.filter.all', 'Todo'),
+            created: translate('history.filter.created', 'Nuevos'),
+            edited: translate('history.filter.edited', 'Ediciones'),
+            conflictResolved: translate('history.filter.conflictResolved', 'Conflictos'),
           }[id],
           active: view.filter === id,
           onClick: function () { activeFilter = id; ctx.rerender(); },
@@ -281,7 +246,7 @@
         body.push(C.statusStrip({
           icon: 'info',
           tone: 'neutral',
-          text: label('history.noneOfThisKind', 'No hay registros de este tipo'),
+          text: translate('history.noneOfThisKind', 'No hay registros de este tipo'),
         }));
       }
 
@@ -291,7 +256,7 @@
             C.overline(dayHeading(group)),
             el('span', {
               class: 'history__day-count',
-              text: group.count + ' ' + label('history.records', 'registros'),
+              text: group.count + ' ' + translate('history.records', 'registros'),
             }),
           ]),
         ].concat(group.rows.map(function (row) {
@@ -304,8 +269,8 @@
       });
 
       return shell(ctx, body,
-        view.total + ' ' + label('history.records', 'registros') + ' · ' +
-        view.matchCount + ' ' + label('results.matches', 'partidos'));
+        view.total + ' ' + translate('history.records', 'registros') + ' · ' +
+        view.matchCount + ' ' + translate('results.matches', 'partidos'));
     },
   };
 
@@ -318,7 +283,7 @@
   function shell(ctx, body, sub) {
     return el('div', { class: 'overlay-screen anim-screen-in' }, [
       C.subBar({
-        title: label('history.fullTitle', 'Historial de cambios'),
+        title: translate('history.fullTitle', 'Historial de cambios'),
         sub: sub,
         onBack: function () { ctx.closeOverlay(); },
       }),
@@ -345,33 +310,33 @@
       if (view.empty) {
         body.push(C.emptyState({
           icon: 'history',
-          title: label('history.matchEmptyTitle', 'Sin cambios registrados'),
-          text: label('history.matchEmptyText',
+          title: translate('history.matchEmptyTitle', 'Sin cambios registrados'),
+          text: translate('history.matchEmptyText',
             'Este resultado se guardó antes de que existiera el historial, o el torneo no está compartido.'),
         }));
       } else {
         // The result that stands, first and largest: whoever opens this is
         // usually checking what the score IS, not how it got there.
         body.push(C.panel({
-          label: label('history.current', 'Resultado actual'),
-          meta: label('history.revision', 'rev ' + view.current.revision, { n: view.current.revision }),
+          label: translate('history.current', 'Resultado actual'),
+          meta: translate('history.revision', 'rev ' + view.current.revision, { n: view.current.revision }),
         }, [
           // The teams are already under the title; repeating them here would
           // make the panel restate its own heading.
           el('p', { class: 'history__current-score', text: view.current.score || '—' }),
           el('p', {
             class: 'history__meta',
-            text: label('history.savedBy', 'Guardado por', {}) + ' ' +
+            text: translate('history.savedBy', 'Guardado por', {}) + ' ' +
               authorText(view.current.author) + ' · ' + timeText(view.current.at),
           }),
         ]));
 
         body.push(el('section', { class: 'history__timeline' }, [
           el('div', { class: 'history__day' }, [
-            C.overline(label('history.timeline', 'Línea de tiempo')),
+            C.overline(translate('history.timeline', 'Línea de tiempo')),
             el('span', {
               class: 'history__day-count',
-              text: view.total + ' ' + label('history.records', 'registros'),
+              text: view.total + ' ' + translate('history.records', 'registros'),
             }),
           ]),
         ].concat(view.rows.map(function (row) {
@@ -379,7 +344,7 @@
             el('div', { class: 'history__head' }, [
               el('span', {
                 class: 'history__revision',
-                text: label('history.revision', 'rev ' + row.revision, { n: row.revision }),
+                text: translate('history.revision', 'rev ' + row.revision, { n: row.revision }),
               }),
               el('span', {
                 class: ['history__action', 'history__action--' + row.action],
@@ -392,7 +357,7 @@
               class: 'history__meta',
               text: authorText(row.author) +
                 (row.action === 'conflictResolved'
-                  ? ' · ' + label('history.conflictKept', 'se quedó esta versión')
+                  ? ' · ' + translate('history.conflictKept', 'se quedó esta versión')
                   : ''),
             }),
           ]);
@@ -401,7 +366,7 @@
 
       return el('div', { class: 'overlay-screen anim-screen-in' }, [
         C.subBar({
-          title: label('history.matchTitle', 'Historial del partido'),
+          title: translate('history.matchTitle', 'Historial del partido'),
           sub: matchTitle(tournament, matchId),
           onBack: function () { ctx.closeOverlay(); },
         }),

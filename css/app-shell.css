@@ -50,6 +50,17 @@
 
 .app__overlay:empty { display: none; }
 
+/* Where a toast appears. What it looks like is the c-toast component. */
+.app__toast {
+  position: fixed;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(var(--tab-bar-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  pointer-events: none;
+}
+.app__toast:empty { display: none; }
+
 /* --- Breakpoints ---
    From 600px the navigation moves into the app bar and the fixed tab bar is
    dropped entirely, which is where v1's sticky nav overlapped content most
@@ -61,6 +72,7 @@
     padding: var(--space-5) var(--space-5) var(--space-6);
   }
   .app__tab-bar { display: none; }
+  .app__toast { left: auto; right: var(--space-5); width: min(360px, 100%); bottom: var(--space-5); }
   .app__action-bar {
     position: static;
     padding-inline: 0;

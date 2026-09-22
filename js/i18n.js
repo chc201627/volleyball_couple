@@ -6,9 +6,9 @@
  */
 
 /* global */
-/* exported t, setLanguage, getLanguage */
+/* exported t, translate, setLanguage, getLanguage */
 
-var t, setLanguage, getLanguage;
+var t, translate, setLanguage, getLanguage;
 
 (function () {
   'use strict';
@@ -952,6 +952,14 @@ var t, setLanguage, getLanguage;
       });
     }
     return str;
+  };
+
+  /** t() with the caller's own wording as the fallback, which is what every
+   * screen wants: the redesign's copy reads at the call site, translated. */
+  translate = function (key, fallback, params) {
+    if (typeof t !== 'function') return fallback;
+    var value = t(key, params);
+    return value === key ? fallback : value;
   };
 
   /**

@@ -1,27 +1,12 @@
-/** Inline SVG icon registry.
- *
- * WHY HAND-DRAWN, AND WHAT SHOULD REPLACE IT
- * ------------------------------------------
- * The canvas specifies Lucide icons. Lucide is MIT licensed and vendoring the
- * ~40 glyphs the redesign uses is the right end state: consistent optical
- * weight, properly drawn pictorial glyphs (trophy, crown, shuffle), and no
- * runtime dependency. That is a deliberate call to make, not something to slip
- * in, so this file ships a small set drawn to the same construction rules
- * (24x24 box, 1.75 stroke, round caps and joins, no fills) and the registry is
- * the only thing any caller touches. Swapping to a vendored set is a
- * single-file change with no call-site churn.
- *
- * The set grows per slice: slice B carries only what the shell and the base
- * components need. Pictorial glyphs are the ones most worth replacing first.
- */
+/** Inline SVG icons drawn to Lucide's construction rules (24x24, 1.75 stroke, round
+ * caps, no fills). Vendoring Lucide later is a single-file change. */
 /* exported IconRegistry */
 var IconRegistry;
 (function () {
   'use strict';
 
-  /* Each entry is a list of path `d` strings, or {c: [cx, cy, r]} for circles.
-     Keeping them as data rather than markup means `icon()` controls every
-     presentational attribute in one place. */
+  /* Path `d` strings, or {c: [cx, cy, r]} for circles. Data rather than markup, so
+     `icon()` controls every presentational attribute in one place. */
   var PATHS = {
     plus: ['M12 5v14', 'M5 12h14'],
     minus: ['M5 12h14'],

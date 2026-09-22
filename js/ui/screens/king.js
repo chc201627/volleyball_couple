@@ -1,18 +1,5 @@
-/** King of the Court — canvas boards E1 and E2.
- *
- * Local only, as in v1: King never creates a Firebase session, so there is no
- * sharing, no scorers and no history here. That is a deliberate difference
- * from the tournament, not an omission.
- *
- * Two things changed from v1:
- *
- * - Wins are shown as progress towards the target, not as a bare counter.
- *   "3" tells you nothing; three filled dots out of five tells you the round
- *   is nearly over.
- * - The two rally buttons differ in shape, not only in colour. v1 put a green
- *   button directly above an amber one, which is the worst possible pairing
- *   outdoors and for the most common form of colour blindness.
- */
+/** King of the Court — boards E1 and E2. Local only, so no sharing, scorers or
+ * history; the two rally buttons differ in shape, not only in colour. */
 (function () {
   'use strict';
 
@@ -21,25 +8,20 @@
 
   var logOpen = false;
 
-  function label(key, fallback, params) {
-    if (typeof t !== 'function') return fallback;
-    var value = t(key, params);
-    return value === key ? fallback : value;
-  }
 
   /* --- Champion (E2) ---------------------------------------------------- */
 
   function champion(ctx, king) {
     var stats = [
-      { key: label('king.rallies', 'Rallies jugados'), value: String(king.rallyLog.length) },
+      { key: translate('king.rallies', 'Rallies jugados'), value: String(king.rallyLog.length) },
       {
-        key: label('king.challengers', 'Retadores que pasaron'),
+        key: translate('king.challengers', 'Retadores que pasaron'),
         // The log records challengerTeamId per rally; distinct ids is how many
         // pairs actually stepped on court, which is not the same as the roster.
         value: String(new Set(king.rallyLog.map(function (entry) { return entry.challengerTeamId; })).size),
       },
       {
-        key: label('king.bestStreak', 'Racha más larga'),
+        key: translate('king.bestStreak', 'Racha más larga'),
         value: String(king.rallyLog.reduce(function (best, entry) {
           return Math.max(best, entry.kingWinsAfter || 0);
         }, 0)),
@@ -49,16 +31,16 @@
     return [
       el('section', { class: 'king__champion' }, [
         IconRegistry.icon('crown', { size: 52, class: 'king__champion-icon' }),
-        C.overline(label('king.winnerTitle', 'Campeones de la cancha'), 'accent'),
+        C.overline(translate('king.winnerTitle', 'Campeones de la cancha'), 'accent'),
         el('p', { class: 'king__champion-name', text: king.winner.name }),
         el('p', {
           class: 'king__champion-how',
           text: king.targetWins + ' ' + (king.winCondition === 'consecutive'
-            ? label('king.winsConsecutive', 'victorias seguidas')
-            : label('king.winsTotal', 'victorias totales')),
+            ? translate('king.winsConsecutive', 'victorias seguidas')
+            : translate('king.winsTotal', 'victorias totales')),
         }),
       ]),
-      C.panel({ label: label('king.roundLabel', 'La ronda') }, stats.map(function (stat) {
+      C.panel({ label: translate('king.roundLabel', 'La ronda') }, stats.map(function (stat) {
         return el('div', { class: 'king__stat' }, [
           el('p', { class: 'king__stat-key', text: stat.key }),
           el('p', { class: 'king__stat-value', text: stat.value }),
@@ -66,13 +48,13 @@
       })),
       el('div', { class: 'app__action-bar' }, [
         C.button({
-          label: label('king.another', 'Otra ronda'),
+          label: translate('king.another', 'Otra ronda'),
           onClick: function () {
             ctx.appState.startKing({ winCondition: king.winCondition, target: king.targetWins });
           },
         }),
         C.button({
-          label: label('nav.goToResults', 'Ver resultados'),
+          label: translate('nav.goToResults', 'Ver resultados'),
           variant: 'ghost',
           onClick: function () { ctx.navigate('results'); },
         }),
@@ -92,15 +74,15 @@
 
     return el('section', { class: 'king__throne' }, [
       IconRegistry.icon('crown', { size: 32, class: 'king__throne-icon' }),
-      C.overline(label('king.roleKing', 'Rey'), 'accent'),
+      C.overline(translate('king.roleKing', 'Rey'), 'accent'),
       el('p', { class: 'king__team', text: king.king.name }),
       el('div', { class: 'king__dots' }, dots),
       el('p', {
         class: 'king__wins',
-        text: achieved + ' ' + label('king.of', 'de') + ' ' + target + ' ' +
+        text: achieved + ' ' + translate('king.of', 'de') + ' ' + target + ' ' +
           (king.winCondition === 'consecutive'
-            ? label('king.winsConsecutive', 'victorias seguidas')
-            : label('king.winsTotal', 'victorias totales')),
+            ? translate('king.winsConsecutive', 'victorias seguidas')
+            : translate('king.winsTotal', 'victorias totales')),
       }),
     ]);
   }
@@ -108,7 +90,7 @@
   function challenger(king) {
     var next = king.queue[0];
     return el('section', { class: 'king__challenger' }, [
-      C.overline(label('king.roleChallenger', 'Reta')),
+      C.overline(translate('king.roleChallenger', 'Reta')),
       el('p', { class: 'king__team', text: next ? next.name : '—' }),
     ]);
   }
@@ -116,7 +98,7 @@
   function rallyActions(ctx, king) {
     return el('div', { class: 'king__actions' }, [
       C.button({
-        label: label('king.kingWins', 'Punto para el rey'),
+        label: translate('king.kingWins', 'Punto para el rey'),
         onClick: function () { ctx.appState.setKing(recordRally(king, 'king')); },
       }),
       // Outlined rather than a second solid colour: the pair must be
@@ -125,14 +107,14 @@
         class: 'king__challenger-btn',
         attrs: { type: 'button' },
         on: { click: function () { ctx.appState.setKing(recordRally(king, 'challenger')); } },
-      }, [el('span', { text: label('king.challengerWins', 'Punto para el retador') })]),
+      }, [el('span', { text: translate('king.challengerWins', 'Punto para el retador') })]),
     ]);
   }
 
   function queuePanel(king) {
     if (!king.queue.length) return null;
     var upcoming = king.queue.slice(0, 3);
-    return C.panel({ label: label('king.queueHeading', 'Cola') + ' · ' + king.queue.length },
+    return C.panel({ label: translate('king.queueHeading', 'Cola') + ' · ' + king.queue.length },
       upcoming.map(function (team, index) {
         return el('div', { class: 'king__queue-row' }, [
           el('span', { class: 'king__queue-index', text: String(index + 1) }),
@@ -141,7 +123,7 @@
       }).concat(king.queue.length > upcoming.length ? [
         el('p', {
           class: 'king__queue-more',
-          text: '… ' + (king.queue.length - upcoming.length) + ' ' + label('king.more', 'más'),
+          text: '… ' + (king.queue.length - upcoming.length) + ' ' + translate('king.more', 'más'),
         }),
       ] : []));
   }
@@ -155,12 +137,12 @@
         on: { click: function () { logOpen = true; ctx.rerender(); } },
       }, [
         IconRegistry.icon('history', { size: 16 }),
-        el('span', { text: label('king.logHeading', 'Historial de rallies') + ' · ' + king.rallyLog.length }),
+        el('span', { text: translate('king.logHeading', 'Historial de rallies') + ' · ' + king.rallyLog.length }),
       ]);
     }
     return C.panel({
-      label: label('king.logHeading', 'Historial de rallies'),
-      action: { label: label('king.hideLog', 'Ocultar'), onClick: function () { logOpen = false; ctx.rerender(); } },
+      label: translate('king.logHeading', 'Historial de rallies'),
+      action: { label: translate('king.hideLog', 'Ocultar'), onClick: function () { logOpen = false; ctx.rerender(); } },
     }, king.rallyLog.slice().reverse().slice(0, 10).map(function (entry) {
       // The log stores team ids and a side, never names: resolve them here so a
       // restored game from storage still reads correctly.
@@ -172,8 +154,8 @@
           class: 'king__log-text',
           text: (winner ? winner.name : winnerId) + ' · ' +
             (entry.winnerSide === 'king'
-              ? label('king.keptThrone', 'mantuvo el trono')
-              : label('king.tookThrone', 'tomó el trono')),
+              ? translate('king.keptThrone', 'mantuvo el trono')
+              : translate('king.tookThrone', 'tomó el trono')),
         }),
       ]);
     }));
@@ -185,10 +167,10 @@
       if (!king) {
         return [C.emptyState({
           icon: 'crown',
-          title: label('king.none', 'No hay partida de King'),
-          text: label('king.noneText', 'Genera los equipos y elige King of the Court.'),
+          title: translate('king.none', 'No hay partida de King'),
+          text: translate('king.noneText', 'Genera los equipos y elige King of the Court.'),
           actions: [C.button({
-            label: label('nav.goToTeams', 'Ir a Equipos'),
+            label: translate('nav.goToTeams', 'Ir a Equipos'),
             onClick: function () { ctx.navigate('teams'); },
           })],
         })];
@@ -204,11 +186,11 @@
         queuePanel(king),
         logPanel(ctx, king),
         C.button({
-          label: label('king.reset', 'Reiniciar King'),
+          label: translate('king.reset', 'Reiniciar King'),
           variant: 'danger',
           icon: 'rotate-ccw',
           onClick: function () {
-            if (!window.confirm(label('king.confirmReset', '¿Seguro que quieres reiniciar la partida?'))) return;
+            if (!window.confirm(translate('king.confirmReset', '¿Seguro que quieres reiniciar la partida?'))) return;
             ctx.appState.resetKing();
             ctx.navigate('teams');
           },

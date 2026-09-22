@@ -1,0 +1,714 @@
+/* ============================================
+   Components — v2.0.0
+   Styles for js/ui/ui-components.js, one block per component.
+   ============================================ */
+
+/* --- Overline --- */
+.c-overline {
+  font-size: var(--font-overline);
+  font-weight: 700;
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.c-overline--accent { color: var(--accent); }
+.c-overline--warn { color: var(--state-warn); }
+.c-overline--error { color: var(--state-error); }
+
+/* --- Button ---
+   Exactly one `--primary` per screen. Everything else is ghost or danger:
+   that is the rule that gives the lime its meaning back. */
+.c-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-control);
+  font-size: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+.c-button--block { width: 100%; }
+.c-button--primary {
+  min-height: var(--touch-score);
+  border-radius: var(--radius-cta);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--font-h2);
+}
+.c-button--primary:hover:not(:disabled) { background: var(--accent-dim); }
+.c-button--ghost { background: var(--surface-1); color: var(--text-1); }
+.c-button--ghost:hover:not(:disabled) { background: var(--surface-2); }
+.c-button--danger { background: var(--surface-1); color: var(--state-error); }
+.c-button--muted { background: var(--surface-2); color: var(--text-2); }
+.c-button--sm {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: var(--space-2);
+  font-size: var(--font-meta);
+}
+.c-button:disabled {
+  background: var(--surface-2);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.c-icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border-radius: var(--radius-control);
+  color: var(--text-1);
+  cursor: pointer;
+}
+.c-icon-button:hover:not(:disabled) { background: var(--surface-2); }
+.c-icon-button--danger { color: var(--state-error); }
+.c-icon-button--muted { color: var(--text-2); }
+.c-icon-button:disabled { color: var(--text-3); cursor: not-allowed; }
+/* Marks "this changed" without demanding a tap — used on the per-match
+   history entrypoint when a result has more than one revision. */
+.c-icon-button__badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+/* --- Pill --- */
+.c-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--font-meta);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.c-pill.is-active {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+
+/* --- Toggle ---
+   The one segmented control. v1 had four near-identical implementations of
+   this (match type, pairing mode, group count, format preset). */
+.c-toggle-group {
+  display: flex;
+  gap: var(--space-2);
+}
+.c-toggle {
+  display: inline-flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.c-toggle.is-active {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+.c-toggle:disabled { color: var(--text-3); cursor: not-allowed; }
+
+/* --- App bar --- */
+.c-app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: var(--app-bar-height);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  background: var(--surface-1);
+}
+.c-app-bar__title {
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c-app-bar__trailing,
+.c-sub-bar__trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.c-app-bar__meta {
+  font-size: var(--font-meta);
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/* --- Sub bar --- */
+.c-sub-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--app-bar-height);
+  padding: 0 var(--space-2);
+  background: var(--surface-1);
+}
+.c-sub-bar__leading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.c-sub-bar__titles { min-width: 0; }
+.c-sub-bar__title {
+  font-size: var(--font-h2);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c-sub-bar__sub {
+  font-size: var(--font-caption);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Sync chip --- */
+.c-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  font-size: var(--font-caption);
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.c-sync__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--text-3);
+}
+.c-sync--ok .c-sync__dot { background: var(--state-ok); }
+.c-sync--warn .c-sync__dot { background: var(--state-warn); }
+.c-sync--error .c-sync__dot { background: var(--state-error); }
+.c-sync--info .c-sync__dot { background: var(--state-info); }
+
+.c-lang {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: var(--space-2);
+  background: var(--surface-2);
+  font-size: var(--font-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* --- Tab bar --- */
+.c-tab-bar {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  height: var(--tab-bar-height);
+  padding: 0 var(--space-2);
+}
+.c-tab {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-2) 2px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.c-tab__label {
+  font-size: var(--font-overline);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.c-tab.is-active { color: var(--accent); }
+.c-tab.is-active .c-tab__label { font-weight: 700; }
+.c-tab.is-locked { color: #4a4a4a; cursor: default; }
+
+/* --- Sub tabs --- */
+.c-sub-tabs {
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 2px solid var(--hairline);
+}
+.c-sub-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2) var(--space-2);
+  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.c-sub-tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* --- Panel --- */
+.c-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+}
+.c-panel--flush { padding: var(--space-4) var(--space-3); }
+.c-panel--accent {
+  background: var(--overlay-accent-12);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.c-panel--plain { background: transparent; padding: 0; }
+.c-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.c-panel__action {
+  font-size: var(--font-caption);
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+.c-panel__meta {
+  font-size: var(--font-caption);
+  color: var(--text-3);
+}
+
+/* --- Sheet --- */
+.c-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  background: var(--scrim);
+}
+.c-sheet {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sheet);
+}
+.c-sheet__grabber {
+  width: 40px;
+  height: 4px;
+  margin: 0 auto var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--text-3);
+}
+.c-sheet__title { font-size: var(--font-h1); font-weight: 700; }
+.c-sheet__sub { font-size: var(--font-meta); color: var(--text-2); }
+@media (min-width: 600px) {
+  .c-scrim { align-items: center; justify-content: center; }
+  .c-sheet {
+    max-width: 480px;
+    border-radius: var(--radius-sheet);
+    padding-bottom: var(--space-5);
+  }
+}
+
+/* --- Empty state --- */
+.c-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  text-align: center;
+}
+.c-empty__icon { color: var(--text-3); }
+.c-empty__title { font-size: 19px; font-weight: 700; }
+.c-empty__text { font-size: 14px; color: var(--text-2); }
+.c-empty__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+/* --- Status strip --- */
+.c-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+}
+.c-status__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.c-status__icon { margin-top: 1px; color: var(--text-2); }
+.c-status__text {
+  font-size: var(--font-meta);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.c-status__action {
+  flex: none;
+  /* The way out of a state is an access/navigation control like any other, so
+     it clears the 44px bar rather than staying a 32px chip. */
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--space-2);
+  background: var(--surface-2);
+  font-size: var(--font-meta);
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+.c-status--ok { background: var(--overlay-ok-12); }
+.c-status--ok .c-status__icon { color: var(--state-ok); }
+.c-status--warn { background: var(--overlay-warn-12); }
+.c-status--warn .c-status__icon { color: var(--state-warn); }
+.c-status--error { background: var(--overlay-error-12); }
+.c-status--error .c-status__icon { color: var(--state-error); }
+.c-status--info { background: var(--overlay-info-12); }
+.c-status--info .c-status__icon { color: var(--state-info); }
+
+/* --- Progress --- */
+.c-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.c-progress__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+.c-progress__fill--warn { background: var(--state-warn); }
+
+/* --- Field --- */
+.c-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.c-field__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.c-input {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: var(--font-body);
+}
+.c-input::placeholder { color: var(--text-3); }
+
+/* --- Chip --- */
+.c-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  font-size: var(--font-overline);
+  font-weight: 700;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.c-chip--accent { background: var(--overlay-accent-12); color: var(--accent-dim); }
+.c-chip--same-gender { background: var(--same-gender-bg); color: var(--same-gender-fg); }
+.c-chip--male { background: var(--gender-male-bg); color: var(--gender-male-fg); }
+.c-chip--female { background: var(--gender-female-bg); color: var(--gender-female-fg); }
+.c-chip--level-1 { background: var(--level-1-bg); color: var(--level-1-fg); }
+.c-chip--level-2 { background: var(--level-2-bg); color: var(--level-2-fg); }
+.c-chip--level-3 { background: var(--level-3-bg); color: var(--level-3-fg); }
+
+/* --- Match row --- */
+.c-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 52px;
+  text-align: left;
+}
+.c-match.is-interactive { cursor: pointer; }
+.c-match__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.c-match__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--text-3);
+}
+.c-match__dot--live { background: var(--state-warn); }
+.c-match__dot--ok { background: var(--state-ok); }
+.c-match__teams {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.c-match__score {
+  flex: none;
+  font-size: var(--font-h2);
+  font-weight: 700;
+  color: var(--text-3);
+}
+.c-match__score--ok { color: var(--state-ok); }
+.c-match__score--warn { color: var(--state-warn); }
+.c-match__score--accent { color: var(--accent); }
+
+/* --- Couple row --- */
+.c-couple {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+}
+.c-couple__index {
+  flex: none;
+  width: 24px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-align: center;
+}
+.c-couple__names { min-width: 0; flex: 1 1 auto; }
+.c-couple__name {
+  font-size: var(--font-body);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* --- Person row --- */
+.c-person {
+  /* Wraps rather than squeezing: with two actions on the row, 320px left the
+     name column narrow enough to break a word in half ("Canc / ha 2"). The
+     avatar and name stay on the first line and the actions drop below. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+.c-person__avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.c-person__text { flex: 1 1 8rem; min-width: 0; }
+/* break-word, not anywhere: a long single token still has to break, but a
+   name with spaces in it wraps between words like text is supposed to. */
+.c-person__name { font-size: var(--font-body); font-weight: 600; overflow-wrap: break-word; }
+.c-person__meta { font-size: var(--font-caption); color: var(--text-3); }
+.c-person__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); flex: 0 1 auto; margin-left: auto; }
+
+/* --- List --- */
+.c-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.c-list--separated .c-list__item + .c-list__item {
+  border-top: 1px solid var(--hairline);
+}
+
+/* --- Nav rail ---
+   The app-bar navigation. Hidden below 600px, where the fixed tab bar is the
+   navigation instead. Both render from the same item list. */
+.c-nav-rail {
+  display: none;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.c-nav-rail__item {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--font-meta);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.c-nav-rail__item:hover:not(.is-locked) { color: var(--text-1); }
+.c-nav-rail__item.is-active {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+.c-nav-rail__item.is-locked { color: #4a4a4a; cursor: default; }
+
+@media (min-width: 600px) {
+  .c-nav-rail { display: flex; }
+  .c-app-bar {
+    height: 60px;
+    padding-inline: var(--space-5);
+    gap: var(--space-5);
+  }
+}
+
+/* --- Chips by meaning --- */
+.c-chip--ok { background: var(--overlay-ok-12); color: var(--state-ok); }
+.c-chip--error { background: var(--overlay-error-12); color: var(--state-error); }
+.c-chip--warn { background: var(--overlay-warn-12); color: var(--state-warn); }
+
+/* --- Toast --- */
+.c-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--overlay-accent-12);
+  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sheet);
+  backdrop-filter: blur(12px);
+}
+.c-toast__icon { color: var(--accent); }
+.c-toast__title { font-size: var(--font-body); font-weight: 700; }
+.c-toast__sub { font-size: var(--font-caption); color: var(--text-2); }
+
+/* The pending-request badge. Sits on the glyph rather than the label so the
+   tab keeps its fixed height at 320px, where four tabs share the row. */
+.c-tab__glyph { position: relative; display: inline-flex; }
+.c-tab__badge,
+.c-nav-rail__badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--state-warn);
+  color: #10140a;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+.c-tab__badge { position: absolute; top: -5px; left: 11px; }
+.c-nav-rail__badge { margin-left: var(--space-1); display: inline-block; }
+
+/* ============================================
+   Overflow menu
+   ============================================ */
+   Overflow menu and change history
+   ============================================ */
+
+.c-scrim--top { align-items: flex-start; justify-content: flex-end; padding: calc(56px + var(--space-1)) var(--space-2) 0; }
+.c-menu {
+  width: 250px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+  border-radius: 14px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px #ffffff1f, var(--shadow-sheet);
+}
+.c-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  /* A menu row is a navigation control: full width, and never under 44px. */
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--text-1);
+  font-size: var(--font-body);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.c-menu__item:active { background: var(--surface-3, #ffffff14); }
+.c-menu__icon { flex: none; color: var(--text-3); }
+.c-menu__label { flex: 1 1 auto; min-width: 0; }
+.c-menu__count {
+  flex: none;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--overlay-accent-12, #c8ff001f);
+  color: var(--accent);
+  font-size: var(--font-caption);
+  font-weight: 700;
+  text-align: center;
+}
+.c-menu__item--danger { color: var(--state-error); }
+.c-menu__item--danger .c-menu__icon { color: var(--state-error); }
+.c-menu__divider { height: 1px; margin: var(--space-1) 0; background: var(--hairline); }

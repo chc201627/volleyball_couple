@@ -1,10 +1,5 @@
-/** DOM primitives for the v2 UI layer.
- *
- * Every screen builds its markup through `el()` rather than assembling HTML
- * strings, which is what keeps the product invariant "escape all user-provided
- * text" true by construction: text goes in through `textContent`, never through
- * `innerHTML`. `escapeHTML()` stays exported for the few places that still hand
- * a string to a template (share summaries, exported text). */
+/** DOM primitives. Screens build markup through `el()`, never HTML strings, which
+ * keeps "escape all user text" true by construction: text lands via textContent. */
 /* exported DomHelpers */
 var DomHelpers;
 (function () {
@@ -12,9 +7,8 @@ var DomHelpers;
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
 
-  /** Byte-identical to the v1 implementation it replaces (app.js:3669). It is
-   * relied on by REQ-VAL-06 duplicate names and by every rendered player name,
-   * so the behaviour is deliberately not "improved". */
+  /** Byte-identical to the v1 implementation it replaces: REQ-VAL-06 duplicate
+   * names depend on it, so the behaviour is deliberately not "improved". */
   function escapeHTML(str) {
     var div = document.createElement('div');
     div.textContent = str;
@@ -24,14 +18,12 @@ var DomHelpers;
   /**
    * el('div', { class: 'card', text: 'Hi', on: { click: fn } }, [child, child])
    *
-   * - `class`   string or array, falsy entries dropped
-   * - `text`    set via textContent — never parsed as markup
-   * - `html`    explicit opt-in for pre-escaped markup; avoid it
-   * - `attrs`   plain attributes, including aria-*
-   * - `data`    dataset entries
-   * - `on`      event listeners
-   * - `style`   inline styles, for values that are genuinely dynamic (a
-   *             progress width, a stagger delay) and nothing else
+   * @param {string} tag
+   * @param {{class?: (string|Array), text?: string, html?: string, attrs?: object,
+   *   data?: object, on?: object, style?: object}} [props] - `text` goes in through
+   *   textContent; `html` is an explicit opt-in for pre-escaped markup
+   * @param {Array|Element|string} [children]
+   * @returns {Element}
    */
   function el(tag, props, children) {
     var node = document.createElement(tag);
@@ -95,14 +87,8 @@ var DomHelpers;
     return node;
   }
 
-  /** What the person was typing in, so a re-render can give it back.
-   *
-   * A screen that filters as you type re-renders on every keystroke, and this
-   * layer replaces the whole subtree — which threw focus to <body>. On a phone
-   * that closes the keyboard after the first letter: the roster search was
-   * unusable and any new one would have been too. The field is found again by
-   * its id, which is the only identity that survives being rebuilt, and the
-   * caret is put back where it was. */
+  /** What the person was typing in, found again by id — the only identity that
+   * survives a rebuild. Without it, filtering as you type closes the keyboard. */
   function captureFocus(container) {
     var active = document.activeElement;
     if (!active || !active.id || !container.contains(active)) return null;
@@ -126,9 +112,8 @@ var DomHelpers;
     }
   }
 
-  /** Replaces a container's contents in one shot. The v2 shell renders the
-   * active screen only, so this is the normal way a destination changes —
-   * there is no hidden-toggling of sibling screens to keep in sync. */
+  /** Replaces a container's contents in one shot: the shell renders the active
+   * screen only, with no hidden siblings to keep in sync. */
   function mount(container, children) {
     var captured = captureFocus(container);
     clear(container);
@@ -142,11 +127,8 @@ var DomHelpers;
     return node;
   }
 
-  /** Removes a node after its exit animation, WITHOUT making the removal depend
-   * on the animation firing. The timeout is not a fallback for slow machines,
-   * it is the guarantee: if the stylesheet is missing, reduced-motion collapsed
-   * the duration, or the element is detached mid-flight, the node still goes.
-   * This is the shape of the v1.9.1 bug this layer exists to prevent. */
+  /** Removes a node after its exit animation without depending on it firing: the
+   * timeout is the guarantee, not a fallback. This was the v1.9.1 bug. */
   function removeAnimated(node, className, duration, done) {
     var finished = false;
     function finish() {

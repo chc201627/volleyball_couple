@@ -1,15 +1,5 @@
-/** Application state: the roster, the setup configuration, the generated teams
- * and their persistence.
- *
- * This is the half of v1's app.js that was worth keeping — state and storage,
- * with none of the rendering. It touches no DOM, so it is testable headless
- * like the domain modules around it.
- *
- * STORAGE COMPATIBILITY: the three localStorage keys are carried over from
- * v1.9.1 unchanged (`bv-players`, `bv-tournament`, `bv-king`). Anyone opening
- * the redesign on the phone they already used keeps their roster and their
- * running tournament. Changing the keys would have silently wiped both.
- */
+/** The roster, the configuration, the teams and their storage. No DOM, so it is
+ * testable headless. The v1.9.1 storage keys are kept: renaming wipes users. */
 /* exported AppState */
 var AppState;
 (function () {
@@ -25,9 +15,8 @@ var AppState;
   var VALID_LEVELS = [1, 2, 3];
   var VALID_GENDERS = ['male', 'female', 'unspecified'];
 
-  /** Storage can throw: Safari private mode, a full quota, a disabled origin.
-   * None of those may take the app down, so every access is guarded and a
-   * failure degrades to "this session is not persisted" rather than a crash. */
+  /** Storage throws in private mode, on a full quota, on a disabled origin. None
+   * of those may take the app down, so a failure means "not persisted". */
   function readJSON(key) {
     try {
       var raw = localStorage.getItem(key);
@@ -54,19 +43,16 @@ var AppState;
     return VALID_LEVELS.indexOf(Number(level)) !== -1;
   }
 
-  /** Product invariant carried over verbatim: ids are `Date.now() + Math.random()`.
-   * Kept because existing rosters in localStorage and in shared Firebase
-   * sessions already hold ids of this shape, and tournament matches key off
-   * them. */
+  /** Product invariant: ids are `Date.now() + Math.random()`. Stored rosters and
+   * shared sessions already hold this shape, and matches key off it. */
   function createPlayer(input) {
     var player = {
       id: Date.now() + Math.random(),
       name: String(input.name || '').trim(),
       gender: VALID_GENDERS.indexOf(input.gender) !== -1 ? input.gender : 'unspecified',
     };
-    // Level is optional and OMITTED when unset — never written as undefined or
-    // null. Firebase set() rejects undefined, and omission keeps the balancing
-    // pass's typeof check simple.
+    // Level is omitted when unset, never undefined or null: Firebase set()
+    // rejects undefined, and omission keeps the balancing pass simple.
     if (input.level != null && input.level !== '' && isValidLevel(input.level)) {
       player.level = Number(input.level);
     }
@@ -83,9 +69,8 @@ var AppState;
     return distinct.length > 1 ? 'mixed' : 'same';
   }
 
-  /** Both shapes on every team, so no consumer has to branch. `player1`/
-   * `player2` stay for the tournament and repository codecs, which already
-   * read them. */
+  /** Both shapes on every team so no consumer has to branch: `player1`/`player2`
+   * stay for the tournament and repository codecs. */
   function normaliseTeam(team) {
     var members = team.players || [team.player1, team.player2].filter(Boolean);
     return {
@@ -154,9 +139,8 @@ var AppState;
       writeJSON(KEYS.players, state.players);
     }
 
-    /** Any roster change invalidates the generated teams: a tournament built
-     * from a roster that has since changed is the kind of quiet inconsistency
-     * that only shows up mid-match. */
+    /** Any roster change invalidates the teams: a tournament built from a roster
+     * that has since changed only shows its inconsistency mid-match. */
     function mutateRoster(mutator) {
       mutator(state.players);
       state.teams = null;
@@ -184,9 +168,8 @@ var AppState;
       load: function () {
         var stored = readJSON(KEYS.players);
         if (Array.isArray(stored)) {
-          // Stored rosters predate this module and may carry levels outside
-          // 1|2|3 or a missing gender; normalise on the way in rather than
-          // letting every consumer re-check.
+          // Stored rosters predate this module: normalise on the way in rather
+          // than letting every consumer re-check.
           state.players = stored.filter(function (player) {
             return player && typeof player.name === 'string' && player.name.length > 0;
           }).map(function (player) {
@@ -203,9 +186,8 @@ var AppState;
         state.king = readJSON(KEYS.king);
         var storedLabel = readJSON(KEYS.ownerLabel);
         if (typeof storedLabel === 'string') state.ownerLabel = storedLabel;
-        // A restored tournament implies teams existed; without this the nav
-        // locks Teams and Tournament after a reload even though a real
-        // tournament is running.
+        // A restored tournament implies teams existed; without this the nav locks
+        // Teams and Tournament after a reload.
         if (state.tournament && state.tournament.teams && !state.teams) {
           state.teams = state.tournament.teams.map(normaliseTeam);
         }
@@ -276,8 +258,7 @@ var AppState;
           state.formatPreset = patch.formatPreset; changed = true;
         }
         // Changing the team size invalidates existing teams: 2v2 pairs are not
-        // 3v3 teams, and silently keeping them would start a tournament with
-        // the wrong shape.
+        // 3v3 teams.
         if (patch.teamSize && state.teams) { state.teams = null; state.unmatched = []; }
         if (changed) emit();
         return snapshot();
@@ -289,23 +270,15 @@ var AppState;
         return snapshot();
       },
 
-      /** Delegates to pairing.js, which stays the single implementation of the
-       * matching rules — including the same-gender swap pass that balances
-       * levels. This module only decides what to feed it and what to keep.
-       *
-       * Teams are normalised to carry BOTH `players` and `player1`/`player2`.
-       * pairing.js returns two different shapes (generateTeams gives `players`,
-       * generateCouples gives `player1`/`player2`) and v1 spread
-       * `team.players || [team.player1, team.player2]` across a dozen call
-       * sites to paper over it. Normalising once here removes that fork. */
+      /** pairing.js stays the single implementation of the matching rules; this
+       * decides what to feed it, and normalises the two shapes it returns. */
       generateTeams: function () {
         if (state.players.length < state.teamSize * 2) {
           return { ok: false, reason: 'notEnoughPlayers' };
         }
 
-        // Manually fixed pairs are honoured first, then the rest is filled at
-        // random from whoever is left — the behaviour v1 implemented inside its
-        // confirm handler.
+        // Manually fixed pairs first, then the rest filled at random from
+        // whoever is left.
         var fixed = [];
         var takenIds = {};
         if (state.pairingMode === 'manual' && state.manualPairs.length) {
@@ -332,15 +305,8 @@ var AppState;
 
       /* --- Tournament ---------------------------------------------------- */
 
-      /** Builds the tournament and, when a repository is available, publishes
-       * it in the same step. v1 did the same: the share link exists from the
-       * moment the tournament starts, not from the moment someone remembers to
-       * press Share. A tournament is played in one afternoon; asking people to
-       * publish it as a separate errand is how a session ends up local-only
-       * with three phones typing the same scores.
-       *
-       * `ownerLabel` is optional and falls back to "Organizador" in the
-       * history. It is stored so the next tournament pre-fills it. */
+      /** Builds the tournament and publishes it in the same step: a link that waits
+       * for a Share tap is how three phones end up typing the same scores. */
       startTournament: function (options) {
         options = options || {};
         if (!state.teams || state.teams.length < 2) return { ok: false, reason: 'notEnoughTeams' };
@@ -381,11 +347,8 @@ var AppState;
         return { ok: true, tournament: tournament, ownerLabel: state.ownerLabel };
       },
 
-      /** Applies a result locally and returns the command the repository needs
-       * to publish it. The local write happens first and unconditionally: the
-       * court does not wait for the network, and a save that only lands when
-       * the signal returns is still a save. The orchestrator publishes
-       * afterwards and reports back what the server said. */
+      /** Applies a result locally and returns the command to publish it. The local
+       * write is unconditional: the court does not wait for the network. */
       applyResult: function (matchId, score1, score2, status) {
         if (!state.tournament) return { ok: false, reason: 'noTournament' };
         var match = state.tournament.matches.filter(function (item) { return item.id === matchId; })[0];
@@ -424,9 +387,8 @@ var AppState;
         };
       },
 
-      /** Replaces the local copy with what the server actually holds. Used when
-       * a save loses a race: the conflict card offers both values and this is
-       * how the server's version is taken. */
+      /** Replaces the local copy with what the server holds: how the conflict card
+       * takes the other device's version. */
       adoptResult: function (matchId, result) {
         if (!state.tournament || !result) return { ok: false };
         var resultMap = {};
@@ -442,16 +404,8 @@ var AppState;
         return { ok: true };
       },
 
-      /** Takes over the tournament from a shared session.
-       *
-       * The remote copy wins outright rather than being merged: the session is
-       * the authority for a shared tournament, and a local edit that survived a
-       * merge would be a result nobody else can see. The local copy is still
-       * written to storage so the link keeps working with no signal.
-       *
-       * A legacy (schema v1) or unreadable session carries no tournament; the
-       * session state is recorded either way so the screens can explain it
-       * instead of rendering an empty destination. */
+      /** The remote copy wins outright: a local edit that survived a merge would be
+       * a result nobody else can see. An unreadable session still records why. */
       adoptSession: function (sessionId, snapshot) {
         if (!snapshot) {
           state.session = { id: sessionId, state: 'notFound', role: 'spectator', accessStatus: null, requests: null, connection: 'offline', legacy: false };

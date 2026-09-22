@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Session Access Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+  </style>
+</head>
+<body>
+  <h1>Session Access — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/session-access.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+      }
+    }
+
+    function heading(title) { results.innerHTML += `<h2>${title}</h2>`; }
+
+    const owner = { role: 'owner', requests: {} };
+    const scorer = { role: 'scorer', requests: null };
+    const spectator = { role: 'spectator', requests: null };
+
+    heading('A tournament nobody shared');
+    assert(SessionAccess.isLocalOnly(null), 'No session means the tournament is this phone\'s alone');
+    assert(SessionAccess.canScore(null), 'With no session there is nobody to ask: scoring is allowed');
+    assert(SessionAccess.isOwner(null), 'The only device is the owner of what it holds');
+    assert(!SessionAccess.isSpectator(null), 'Nobody is a spectator of their own tournament');
+    assert(SessionAccess.pendingCount(null) === 0, 'No session, no requests');
+
+    heading('Roles');
+    assert(SessionAccess.canScore(owner) && SessionAccess.canScore(scorer),
+      'The owner and an approved scorer may score');
+    assert(!SessionAccess.canScore(spectator), 'A spectator may not');
+    assert(SessionAccess.isOwner(owner) && !SessionAccess.isOwner(scorer),
+      'Only the owner is the owner');
+    assert(SessionAccess.isSpectator(spectator) && !SessionAccess.isSpectator(scorer),
+      'An approved scorer stopped being a spectator');
+
+    heading('The request list');
+    const busy = {
+      role: 'owner',
+      requests: {
+        u1: { status: 'pending', label: 'Cancha 2', requestedAt: 200 },
+        u2: { status: 'approved', label: 'Sofi', requestedAt: 100, decidedAt: 150 },
+        u3: { status: 'pending', label: 'Caro', requestedAt: 100 },
+        u4: { status: 'revoked', label: 'Alguien', requestedAt: 50 },
+      },
+    };
+    assert(SessionAccess.pendingCount(busy) === 2, 'Only pending members are counted as waiting');
+    assert(SessionAccess.pendingRequests(busy).map(m => m.uid).join() === 'u3,u1',
+      'Requests come back oldest first, so the longest wait is answered first');
+    assert(SessionAccess.pendingRequests(busy)[0].label === 'Caro',
+      'Each request carries the label it was made with');
+    assert(SessionAccess.approvedScorers(busy).map(m => m.uid).join() === 'u2',
+      'Approved members are their own list');
+    assert(SessionAccess.approvedScorers(busy)[0].decidedAt === 150,
+      'An approved member carries when it was decided');
+    assert(SessionAccess.pendingRequests({ role: 'scorer', requests: null }).length === 0,
+      'A scorer cannot read the list, so for them it is empty rather than unknown');
+    assert(SessionAccess.pendingRequests({ role: 'owner', requests: { u1: null } }).length === 0,
+      'A member entry that is not there is skipped instead of throwing');
+
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>
