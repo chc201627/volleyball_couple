@@ -66,4 +66,45 @@
     padding-inline: 0;
     background: none;
   }
+
+  /* Two columns (board G2). A screen opts in by tagging its sections with
+     data-col; anything untagged spans the full width, so a screen that never
+     asked for columns is unaffected and a section that belongs to neither side
+     — a banner, a warning — still reads across. `align-items: start` stops the
+     short column from stretching to match the tall one. */
+  .app__main--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    /* Both: `items` keeps a short column from stretching to the tall one's
+       height, `content` keeps the rows from being stretched to fill the screen
+       — which put 76px of nothing between the sub-tabs and the columns. */
+    align-items: start;
+    align-content: start;
+    gap: var(--space-4);
+  }
+  /* Each column flows on its own; the gap inside matches the gap between. */
+  .app__col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+  .app__main--split > * { grid-column: 1 / -1; }
+  .app__main--split > [data-col="main"] { grid-column: 1; }
+  .app__main--split > [data-col="side"] { grid-column: 2; }
+}
+
+@media (min-width: 960px) {
+  .app__main {
+    width: min(100%, 1180px);
+  }
+  /* Three columns (board G1): context, the match being played, and the table
+     that no longer needs a tab of its own at this width. */
+  .app__main--triple {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr) minmax(0, 1.1fr);
+  }
+  .app__main--triple > * { grid-column: 1 / -1; }
+  .app__main--triple > [data-col="side"] { grid-column: 1; }
+  .app__main--triple > [data-col="main"] { grid-column: 2; }
+  .app__main--triple > [data-col="extra"] { grid-column: 3; }
 }

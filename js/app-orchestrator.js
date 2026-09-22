@@ -33,6 +33,10 @@
     overlayMatchId: null,
     overlayMatchRevisions: 0,
     lang: 'es',
+    // 'compact' | 'medium' | 'wide'. Not a styling concern: at 960 the
+    // tournament screen shows a standings table that does not exist at all on
+    // a phone, so the screen has to know the width, not just be styled by it.
+    layout: 'compact',
   };
 
   var appState = AppState.create();
@@ -415,6 +419,7 @@
       view: view,
       state: state,
       appState: appState,
+      layout: state.layout,
       canGenerate: appState.get().players.length >= appState.get().teamSize * 2,
       navigate: navigate,
       selectSubView: selectSubView,
@@ -459,6 +464,13 @@
         text: label('app.screenPending', 'Pantalla pendiente en esta fase de la reconstrucción.'),
       }));
     }
+    // A screen opts into columns by tagging its sections with data-col; the
+    // media queries decide whether the width can honour it. Read back from the
+    // DOM the screen just produced, so there is no second place to keep in sync.
+    nodes.main.classList.toggle('app__main--split',
+      !!nodes.main.querySelector(':scope > [data-col]'));
+    nodes.main.classList.toggle('app__main--triple',
+      !!nodes.main.querySelector(':scope > [data-col="extra"]'));
     nodes.main.classList.remove('anim-screen-in');
     void nodes.main.offsetWidth; // restart the transition on every destination change
     nodes.main.classList.add('anim-screen-in');
@@ -518,6 +530,33 @@
     }
   }
 
+  /** The three widths the design is drawn at. Watched rather than measured, so
+   * nothing runs on scroll or resize — the callback fires only when a boundary
+   * is actually crossed. */
+  var LAYOUT_STEPS = [
+    { id: 'wide', query: '(min-width: 960px)' },
+    { id: 'medium', query: '(min-width: 600px)' },
+  ];
+
+  function watchLayout() {
+    if (typeof window.matchMedia !== 'function') return;
+    var lists = LAYOUT_STEPS.map(function (step) {
+      return { id: step.id, list: window.matchMedia(step.query) };
+    });
+    function resolve() {
+      var match = lists.filter(function (entry) { return entry.list.matches; })[0];
+      var next = match ? match.id : 'compact';
+      if (next === state.layout) return;
+      state.layout = next;
+      render();
+    }
+    lists.forEach(function (entry) {
+      if (typeof entry.list.addEventListener === 'function') entry.list.addEventListener('change', resolve);
+      else if (typeof entry.list.addListener === 'function') entry.list.addListener(resolve);
+    });
+    resolve();
+  }
+
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:') return;
@@ -556,6 +595,7 @@
     // A state change re-renders the active screen; screens never poke the DOM
     // of other screens, because no other screen is mounted.
     appState.subscribe(function () { render(); });
+    watchLayout();
     registerServiceWorker();
   }
 

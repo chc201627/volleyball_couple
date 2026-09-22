@@ -161,7 +161,114 @@
     }, shown.map(function (view) { return matchRowFor(ctx, tournament, view); }));
   }
 
-  function renderToday(ctx, tournament, day) {
+  /** One element per column, not one per section. Sections placed straight into
+   * the grid share implicit rows across columns, so the second panel of the
+   * left column pushed the right column's first panel down to meet it. */
+  function column(name, children) {
+    return el('div', {
+      class: 'app__col',
+      attrs: { 'data-col': name },
+    }, (children || []).filter(Boolean));
+  }
+
+  /** The standings table, in the shape the side column wants: no group picker
+   * above it (the left column carries that) and no legend (there is no room to
+   * read one sideways). Below 960 it is not built at all — Grupos is one tap
+   * away, and a table nobody can see is DOM a phone pays for. */
+  function standingsAside(ctx, tournament, standings) {
+    var groups = tournament.groups || [];
+    if (!groups.length) return null;
+    if (!selectedGroupId || !groups.some(function (group) { return group.id === selectedGroupId; })) {
+      selectedGroupId = groups[0].id;
+    }
+    var rows = standings.get ? (standings.get(selectedGroupId) || []) : [];
+    var view = standingsView(rows);
+    return C.panel({
+      label: label('tournament.standings', 'Clasificación'),
+      meta: groups.length > 1
+        ? label('tournament.group', 'Grupo ' + selectedGroupId, { id: selectedGroupId })
+        : null,
+      flush: true,
+    }, [el('div', { class: 'table' }, [headerRow()].concat(view.rows.map(function (row) {
+      // Plain rows: the tie captions explain a reading order, and explaining it
+      // in a 350px column beside a match in play is noise. The Grupos tab, one
+      // tap away, is where that table is read properly.
+      return standingsRow(tournament, row);
+    })))]);
+  }
+
+  /** The group picker, which on a phone lives inside the Grupos tab. At 960 it
+   * moves beside the table it controls, because both are on screen at once. */
+  function groupPicker(ctx, tournament) {
+    var groups = tournament.groups || [];
+    if (groups.length < 2) return null;
+    return C.panel({ label: label('tournament.groupsLabel', 'Grupos') }, [
+      el('div', { class: 'day__group-picker' }, groups.map(function (group) {
+        return C.pill({
+          label: label('tournament.group', 'Grupo ' + group.id, { id: group.id }),
+          active: group.id === selectedGroupId,
+          onClick: function () { selectedGroupId = group.id; ctx.rerender(); },
+        });
+      })),
+    ]);
+  }
+
+  /** What this tournament IS, stated once at a width that has room for it
+   * (board G1). On a phone it is on the Setup screen and nowhere else; here it
+   * saves a trip back to check whether the final is part of the format. */
+  function formatSummary(ctx, tournament) {
+    var preset = tournament.format && tournament.format.preset;
+    var pairs = (tournament.teams || []).length;
+    var teamSize = ctx.appState.get().teamSize;
+    var parts = [
+      preset
+        ? label('format.preset.' + preset + '.title', preset)
+        : label('format.preset.classic.title', 'Clásico'),
+      pairs + ' ' + label('workspace.summary.teamsWord', 'parejas'),
+      teamSize + 'vs' + teamSize,
+    ];
+    return C.panel({ label: label('tournament.format.presetLabel', 'Formato') }, [
+      el('p', { class: 'day__format-line', text: parts.join(' · ') }),
+    ]);
+  }
+
+  function renderToday(ctx, tournament, day, standings) {
+    // At 960 the spare width becomes columns instead of air (board G1): stage
+    // and groups on the left, the match being played in the middle, the table
+    // always in sight on the right.
+    if (ctx.layout === 'wide') {
+      return [
+        column('side', [
+          stageProgressPanel(day),
+          groupPicker(ctx, tournament),
+          formatSummary(ctx, tournament),
+        ]),
+        column('main', [
+          nextMatchCard(ctx, tournament, day),
+          matchSection(ctx, tournament, {
+            label: label('tournament.live', 'En vivo'),
+            tone: 'warn',
+            views: day.live,
+            limit: 3,
+            onSeeAll: function () { ctx.openOverlay('allMatches'); },
+          }),
+          matchSection(ctx, tournament, {
+            label: label('tournament.upNext', 'Próximos'),
+            views: day.pending,
+            limit: 5,
+            onSeeAll: function () { ctx.openOverlay('allMatches'); },
+          }),
+          matchSection(ctx, tournament, {
+            label: label('tournament.recentlyFinished', 'Recién terminados'),
+            views: day.recentlyFinished,
+            limit: 3,
+            onSeeAll: function () { ctx.openOverlay('allMatches'); },
+          }),
+        ]),
+        column('extra', [standingsAside(ctx, tournament, standings)]),
+      ];
+    }
+
     return [
       nextMatchCard(ctx, tournament, day),
       stageProgressPanel(day),
@@ -705,7 +812,7 @@
 
       if (subView === 'groups') body = body.concat(renderGroups(ctx, tournament, standings));
       else if (subView === 'bracket') body = body.concat(renderBracket(ctx, tournament, day, resolution));
-      else body = body.concat(renderToday(ctx, tournament, day));
+      else body = body.concat(renderToday(ctx, tournament, day, standings));
 
       return body;
     },

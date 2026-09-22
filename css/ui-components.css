@@ -1619,3 +1619,5 @@
 .matches__search-icon { flex: none; color: var(--text-3); }
 .matches__search .c-input { flex: 1 1 auto; min-width: 0; }
 .matches__count { font-size: var(--font-caption); color: var(--text-3); }
+
+.day__format-line { font-size: var(--font-meta); color: var(--text-2); line-height: 1.45; }

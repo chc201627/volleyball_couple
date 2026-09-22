@@ -329,24 +329,45 @@
 
   /* --- Screen ----------------------------------------------------------- */
 
+  /** Which column a section belongs to once there is room for two (board G2).
+   * Entering players is the work, so it takes the wide column; the settings,
+   * the readiness checklist and the action that follows from them are context,
+   * and they sit together on the side where the primary action stays in view
+   * without a bar pinned to the bottom of the screen. */
+  /** One element per column, so each side flows on its own instead of sharing
+   * grid rows with the other. */
+  function column(name, children) {
+    return el('div', {
+      class: 'app__col',
+      attrs: { 'data-col': name },
+    }, (children || []).filter(Boolean));
+  }
+
   UIScreens.setup = {
     render: function (ctx) {
       var snapshot = ctx.appState.get();
       var hasPlayers = snapshot.players.length > 0;
-      var body = [contextChips(ctx)];
+      var main = [];
+      var side = [contextChips(ctx)];
 
       if (!hasPlayers && !addFormOpen) {
-        body.push(emptyState(ctx));
+        main.push(emptyState(ctx));
       } else {
-        body.push(quickAdd(ctx));
+        main.push(quickAdd(ctx));
         if (hasPlayers) {
-          body.push(roster(ctx, snapshot.players));
-          body.push(readiness(ctx, ctx.view));
+          main.push(roster(ctx, snapshot.players));
+          side.push(readiness(ctx, ctx.view));
         }
       }
 
-      body.push(actionBar(ctx, ctx.view));
-      return body;
+      side.push(actionBar(ctx, ctx.view));
+
+      // On a phone there is one column, and its order is the order of the work:
+      // what you are set up for, then adding, then who is in, then what is
+      // missing, then the action. Only once there are two does the split into
+      // work and context mean anything.
+      if (ctx.layout === 'compact') return side.slice(0, 1).concat(main, side.slice(1));
+      return [column('main', main), column('side', side)];
     },
   };
 })();
