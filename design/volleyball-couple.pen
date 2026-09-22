@@ -24670,6 +24670,491 @@
                           "fontWeight": "normal"
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KAWVp",
+                      "name": "C6 · TORNEO · TODOS LOS PARTIDOS · column",
+                      "width": 390,
+                      "layout": "vertical",
+                      "gap": 14,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "IGzFT",
+                          "name": "Board Label",
+                          "fill": "$accent",
+                          "content": "C6 · TORNEO · TODOS LOS PARTIDOS",
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "700",
+                          "letterSpacing": 1.2
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Z7lQVL",
+                          "name": "C6 · TODOS LOS PARTIDOS",
+                          "clip": true,
+                          "width": 390,
+                          "fill": "$surface-0",
+                          "layout": "vertical",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "UG7VR",
+                              "name": "Sub Bar",
+                              "width": "fill_container",
+                              "height": 56,
+                              "fill": "$surface-1",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "Es1iR",
+                                  "name": "Leading",
+                                  "width": "fill_container",
+                                  "gap": 6,
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "H6LMLM",
+                                      "name": "Back",
+                                      "width": 44,
+                                      "height": 44,
+                                      "fill": "#00000000",
+                                      "cornerRadius": 10,
+                                      "justifyContent": "center",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "icon",
+                                          "id": "Ny4ln",
+                                          "name": "Icon",
+                                          "width": 22,
+                                          "height": 22,
+                                          "icon": "chevron-left",
+                                          "library": "lucide",
+                                          "fill": "$text-1"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "EXgkb",
+                                      "name": "Titles",
+                                      "layout": "vertical",
+                                      "gap": 1,
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "M4QgkJ",
+                                          "name": "Title",
+                                          "fill": "$text-1",
+                                          "content": "Todos los partidos",
+                                          "fontFamily": "$font",
+                                          "fontSize": 17,
+                                          "fontWeight": "700"
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "BYtSs",
+                                          "name": "Sub",
+                                          "fill": "$text-3",
+                                          "content": "36 de 55 jugados",
+                                          "fontFamily": "$font",
+                                          "fontSize": 12,
+                                          "fontWeight": "normal"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "wGZE1",
+                              "name": "Search Bar",
+                              "width": "fill_container",
+                              "fill": "$surface-0",
+                              "gap": 10,
+                              "padding": [
+                                12,
+                                16
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "mSpwV",
+                                  "name": "Icon",
+                                  "width": 16,
+                                  "height": 16,
+                                  "icon": "search",
+                                  "library": "lucide",
+                                  "fill": "$text-3"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "b2RdjX",
+                                  "name": "Field",
+                                  "width": "fill_container",
+                                  "height": 44,
+                                  "fill": "$surface-2",
+                                  "cornerRadius": 12,
+                                  "stroke": "$accent",
+                                  "strokeWidth": 1,
+                                  "padding": [
+                                    0,
+                                    12
+                                  ],
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "iLcIg",
+                                      "name": "Query",
+                                      "fill": "$text-1",
+                                      "content": "caro",
+                                      "fontFamily": "$font",
+                                      "fontSize": 15,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "ppYTF",
+                                  "name": "Clear",
+                                  "width": 44,
+                                  "height": 44,
+                                  "fill": "#00000000",
+                                  "cornerRadius": 10,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "id": "T3qyp",
+                                      "name": "Icon",
+                                      "width": 16,
+                                      "height": 16,
+                                      "icon": "x",
+                                      "library": "lucide",
+                                      "fill": "$text-3"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "c2kw0B",
+                              "name": "Body",
+                              "width": "fill_container",
+                              "fill": "$surface-0",
+                              "layout": "vertical",
+                              "gap": 14,
+                              "padding": [
+                                4,
+                                16,
+                                16,
+                                16
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "XgpUi",
+                                  "name": "Count",
+                                  "fill": "$text-3",
+                                  "content": "5 de 55 partidos",
+                                  "fontFamily": "$font",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "j7jEI",
+                                  "name": "RESULTADOS",
+                                  "width": "fill_container",
+                                  "fill": "$surface-1",
+                                  "cornerRadius": 16,
+                                  "layout": "vertical",
+                                  "gap": 4,
+                                  "padding": 16,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "hve0u",
+                                      "name": "Head",
+                                      "width": "fill_container",
+                                      "justifyContent": "space_between",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "szzSo",
+                                          "name": "Label",
+                                          "fill": "$text-2",
+                                          "content": "RESULTADOS",
+                                          "fontFamily": "$font",
+                                          "fontSize": 11,
+                                          "fontWeight": "700",
+                                          "letterSpacing": 1.4
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "wAQQH",
+                                      "name": "Match · Caro & Cami  vs  Lu & Sepúlveda",
+                                      "width": "fill_container",
+                                      "height": 52,
+                                      "gap": 10,
+                                      "justifyContent": "space_between",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "pqz0x",
+                                          "name": "Left",
+                                          "width": "fill_container",
+                                          "gap": 8,
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "aneCA",
+                                              "name": "Teams",
+                                              "fill": "$text-1",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Caro & Cami  vs  Lu & Sepúlveda",
+                                              "lineHeight": 1.3,
+                                              "fontFamily": "$font",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "ut1nz",
+                                          "name": "Right",
+                                          "fill": "$state-ok",
+                                          "content": "9 – 7",
+                                          "fontFamily": "$font",
+                                          "fontSize": 16,
+                                          "fontWeight": "700"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "WfNPD",
+                                      "name": "Match · Caro & Cami  vs  Alejandro & Bela",
+                                      "width": "fill_container",
+                                      "height": 52,
+                                      "gap": 10,
+                                      "justifyContent": "space_between",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "mtYqY",
+                                          "name": "Left",
+                                          "width": "fill_container",
+                                          "gap": 8,
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "wBZdY",
+                                              "name": "Teams",
+                                              "fill": "$text-1",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Caro & Cami  vs  Alejandro & Bela",
+                                              "lineHeight": 1.3,
+                                              "fontFamily": "$font",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "OCe7Y",
+                                          "name": "Right",
+                                          "fill": "$text-3",
+                                          "content": "—",
+                                          "fontFamily": "$font",
+                                          "fontSize": 16,
+                                          "fontWeight": "700"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "QVxuz",
+                                      "name": "Match · May & Carlos  vs  Caro & Cami",
+                                      "width": "fill_container",
+                                      "height": 52,
+                                      "gap": 10,
+                                      "justifyContent": "space_between",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "W4BxF",
+                                          "name": "Left",
+                                          "width": "fill_container",
+                                          "gap": 8,
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "D2XIh",
+                                              "name": "Teams",
+                                              "fill": "$text-1",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "May & Carlos  vs  Caro & Cami",
+                                              "lineHeight": 1.3,
+                                              "fontFamily": "$font",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "jH10n",
+                                          "name": "Right",
+                                          "fill": "$text-3",
+                                          "content": "—",
+                                          "fontFamily": "$font",
+                                          "fontSize": 16,
+                                          "fontWeight": "700"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "qpFiR",
+                                      "name": "Match · Caro & Cami  vs  Juanjo & Maca",
+                                      "width": "fill_container",
+                                      "height": 52,
+                                      "gap": 10,
+                                      "justifyContent": "space_between",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "LVIZ0",
+                                          "name": "Left",
+                                          "width": "fill_container",
+                                          "gap": 8,
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "Md7qc",
+                                              "name": "Teams",
+                                              "fill": "$text-1",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Caro & Cami  vs  Juanjo & Maca",
+                                              "lineHeight": 1.3,
+                                              "fontFamily": "$font",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "MBp6X",
+                                          "name": "Right",
+                                          "fill": "$state-warn",
+                                          "content": "4 – 3",
+                                          "fontFamily": "$font",
+                                          "fontSize": 16,
+                                          "fontWeight": "700"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "LV3Vi",
+                                      "name": "Match · Nessim & Dayhana  vs  Caro & Cami",
+                                      "width": "fill_container",
+                                      "height": 52,
+                                      "gap": 10,
+                                      "justifyContent": "space_between",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "Eqh2A",
+                                          "name": "Left",
+                                          "width": "fill_container",
+                                          "gap": 8,
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "uLkBv",
+                                              "name": "Teams",
+                                              "fill": "$text-1",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Nessim & Dayhana  vs  Caro & Cami",
+                                              "lineHeight": 1.3,
+                                              "fontFamily": "$font",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "kQq8M",
+                                          "name": "Right",
+                                          "fill": "$text-3",
+                                          "content": "—",
+                                          "fontFamily": "$font",
+                                          "fontSize": 16,
+                                          "fontWeight": "700"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "F0rhAJ",
+                          "name": "Board Note",
+                          "fill": "$text-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Entrypoint de los tres «Ver todos» de C1, y el único sitio con el calendario completo: hasta ahora «Ver todos» llevaba a Grupos, que solo tiene la tabla. El buscador vive aquí y no en C1 porque es aquí donde la lista es larga — en el día, el partido que importa ya está arriba. Busca por jugador, pareja, grupo y etapa, sin acentos ni mayúsculas, y cada fila abre a anotar como en cualquier otra lista. Sin búsqueda, la lista se agrupa por estado (En vivo · Próximos · Terminados); con búsqueda se aplana, porque quien escribió un nombre no está explorando.",
+                          "lineHeight": 1.55,
+                          "fontFamily": "$font",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 }
