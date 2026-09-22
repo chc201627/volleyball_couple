@@ -36,6 +36,8 @@
   };
 
   var appState = AppState.create();
+  var repository = null;
+  var sessionId = null;
   var nodes = {};
 
   function workspaceInput() {
@@ -50,9 +52,9 @@
       unmatchedCount: snapshot.unmatched.length,
       groupCount: snapshot.groupCount,
       formatValidation: null,
-      hasTournament: false,
-      hasKingGame: false,
-      hasBracket: false,
+      hasTournament: !!snapshot.tournament,
+      hasKingGame: !!snapshot.king,
+      hasBracket: !!(snapshot.tournament && snapshot.tournament.format),
       complete: false,
       hasNextMatch: false,
       pendingRequestCount: 0,
@@ -65,7 +67,7 @@
       currentSubView: state.currentSubView,
       currentOverlay: state.currentOverlay,
       overlayMatchRevisions: state.overlayMatchRevisions,
-      sessionId: null,
+      sessionId: sessionId,
     };
   }
 
@@ -80,12 +82,52 @@
       if (field) field.focus();
       return;
     }
+    if (action.id === 'startTournament') { openOverlay('modeFork'); return; }
     if (action.targetView) navigate(action.targetView);
   }
 
   function generateTeams() {
     var result = appState.generateTeams();
     if (result.ok) navigate('teams');
+  }
+
+  /** Creating the tournament and landing on the day it is played are one
+   * action, not two. A tournament is played in a single afternoon: leaving
+   * someone on a confirmation screen after they pressed Start is a step that
+   * exists only in the code's model of the world, not the user's. */
+  function startTournament(options) {
+    var result = appState.startTournament(options || {});
+    if (!result.ok) return result;
+    state.currentOverlay = null;
+    state.currentSubView = 'today';
+    navigate('tournament');
+    publishSession();
+    return result;
+  }
+
+  function startKing(options) {
+    var result = appState.startKing(options || {});
+    if (!result.ok) return result;
+    state.currentOverlay = null;
+    navigate('tournament');
+    return result;
+  }
+
+  /** Published on start, exactly as v1 did: the share link exists from the
+   * first second rather than waiting for someone to remember to press Share.
+   * Failure is silent by design — the tournament is already playable locally,
+   * and blocking the court on a network error would be worse than a link that
+   * can be created later. */
+  function publishSession() {
+    if (!repository) return;
+    var snapshot = appState.get();
+    repository.createSession(snapshot.tournament, { ownerLabel: snapshot.ownerLabel }).then(function (result) {
+      if (result && result.status === 'synced' && result.sessionId) {
+        sessionId = result.sessionId;
+        history.replaceState(null, '', '#s=' + sessionId);
+        render();
+      }
+    }).catch(function () { /* stays local */ });
   }
 
   function navigate(viewId) {
@@ -176,6 +218,9 @@
       closeOverlay: closeOverlay,
       runPrimaryAction: runPrimaryAction,
       generateTeams: generateTeams,
+      startTournament: startTournament,
+      startKing: startKing,
+      sessionId: sessionId,
       rerender: render,
     };
   }
@@ -217,6 +262,36 @@
     renderOverlay(view);
   }
 
+  /** Same availability test v1's initFirebase() applied. A missing or
+   * placeholder config is not an error: the app runs local-only, which is the
+   * mode most people use it in. */
+  function createRepository() {
+    if (typeof firebase === 'undefined' || typeof FIREBASE_CONFIG === 'undefined' ||
+        FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY' ||
+        typeof createFirebaseTournamentRepository !== 'function') {
+      return null;
+    }
+    try {
+      var useEmulator = (location.hostname === '127.0.0.1' || location.hostname === 'localhost') &&
+        new URLSearchParams(location.search).get('firebaseEmulator') === '1';
+      if (!firebase.apps.length) {
+        firebase.initializeApp(useEmulator ? {
+          apiKey: 'demo-key',
+          authDomain: 'demo-volleyball-couple.firebaseapp.com',
+          databaseURL: 'http://127.0.0.1:9000/?ns=demo-volleyball-couple-default-rtdb',
+          projectId: 'demo-volleyball-couple',
+        } : FIREBASE_CONFIG);
+      }
+      if (useEmulator) {
+        firebase.app().auth().useEmulator('http://127.0.0.1:9099', { disableWarnings: true });
+        firebase.app().database().useEmulator('127.0.0.1', 9000);
+      }
+      return createFirebaseTournamentRepository(firebase.app());
+    } catch (error) {
+      return null;
+    }
+  }
+
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
@@ -234,6 +309,7 @@
       overlay: document.getElementById('app-overlay'),
     };
     if (typeof setLanguage === 'function') setLanguage(state.lang);
+    repository = createRepository();
     appState.load();
     // A state change re-renders the active screen; screens never poke the DOM
     // of other screens, because no other screen is mounted.

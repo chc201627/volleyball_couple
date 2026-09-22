@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Standings View Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Standings View — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/tournament.js"></script>
+  <script src="../js/standings-view.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+    function heading(title) { results.innerHTML += `<h2>${title}</h2>`; }
+
+    function row(teamId, points, setsFor, setsAgainst, played, won, lost) {
+      return { teamId, points, setsFor, setsAgainst, played: played || 0, won: won || 0, lost: lost || 0 };
+    }
+    function byId(view, id) { return view.rows.filter(r => r.teamId === id)[0]; }
+
+    // ===== Basics =====
+    heading('Derived values');
+    let view = standingsView([row('a', 18, 70, 51), row('b', 15, 52, 37)]);
+    assert(byId(view, 'a').diff === 19, 'Difference is derived, not expected from the caller');
+    assert(byId(view, 'a').rank === 1 && byId(view, 'b').rank === 2, 'Rank follows the incoming order');
+    assert(view.hasTies === false, 'No ties means no blocks');
+    assert(byId(view, 'a').medal === null, 'Medals are off by default — Groups shows positions, not podiums');
+
+    view = standingsView([row('a', 18, 70, 51), row('b', 15, 52, 37), row('c', 12, 57, 44), row('d', 9, 1, 1)], { medals: true });
+    assert(byId(view, 'a').medal === 'gold' && byId(view, 'b').medal === 'silver' && byId(view, 'c').medal === 'bronze',
+      'Medals mark the top three when asked for');
+    assert(byId(view, 'd').medal === null, 'Fourth place gets no medal');
+
+    // ===== A single tie, resolved by difference =====
+    heading('Tie resolved by difference');
+    view = standingsView([
+      row('lead', 18, 70, 51),
+      row('x', 12, 57, 44), // diff +13
+      row('y', 12, 49, 42), // diff +7
+      row('z', 12, 41, 45), // diff −4
+    ]);
+    assert(view.blocks.length === 1, 'Three pairs on the same points form one block');
+    assert(view.blocks[0].value === 12 && view.blocks[0].decidedBy === 'diff',
+      'The block is keyed on points and decided by difference — the second key in the sort');
+    assert(view.blocks[0].teamIds.join() === 'x,y,z', 'The block names exactly the tied rows');
+    assert(byId(view, 'lead').tieBlockId === null, 'A row on its own points is not in a block');
+    assert(['x','y','z'].every(id => byId(view, id).decidedBy === 'diff'),
+      'Every row in the block is highlighted on the deciding column, so it reads down as one column');
+
+    // ===== Nested tie, resolved by sets for =====
+    heading('Nested tie');
+    view = standingsView([
+      row('x', 12, 57, 44), // +13
+      row('y', 12, 49, 42), // +7
+      row('z', 12, 43, 36), // +7  ← same diff as y, split by setsFor
+      row('w', 12, 41, 45), // −4
+    ]);
+    assert(view.blocks[0].subBlocks.length === 1, 'Rows tied on points AND difference form a nested block');
+    const sub = view.blocks[0].subBlocks[0];
+    assert(sub.value === 7 && sub.decidedBy === 'setsFor', 'The nested block is keyed on difference and decided by points for');
+    assert(sub.teamIds.join() === 'y,z', 'The nested block names only the rows that are still level');
+    assert(byId(view, 'y').decidedBy === 'setsFor' && byId(view, 'z').decidedBy === 'setsFor',
+      'Nested rows switch to the column that actually separates them');
+    assert(byId(view, 'x').decidedBy === 'diff' && byId(view, 'w').decidedBy === 'diff',
+      'Rows the outer key already separated keep pointing at difference');
+
+    // ===== Exhausted chain =====
+    heading('Beyond the visible columns');
+    view = standingsView([row('p', 12, 50, 40), row('q', 12, 50, 40)]);
+    assert(view.blocks[0].subBlocks.length === 1, 'Identical rows still form a nested block');
+    assert(view.blocks[0].subBlocks[0].decidedBy === null,
+      'When head-to-head or entry order decides, no column is named — highlighting one would be a lie');
+    assert(byId(view, 'p').decidedBy === null && byId(view, 'q').decidedBy === null,
+      'Neither row claims a deciding column it does not have');
+
+    // ===== Non-consecutive equal values =====
+    heading('Only consecutive rows tie');
+    view = standingsView([row('a', 12, 1, 0), row('b', 9, 1, 0), row('c', 12, 1, 0)]);
+    assert(view.blocks.length === 0,
+      'Equal points that are not adjacent are not a tie — the caller passes an already-sorted table');
+
+    // ===== Edge cases =====
+    heading('Edges');
+    assert(standingsView([]).rows.length === 0, 'An empty table produces no rows');
+    assert(standingsView(null).hasTies === false, 'A missing table is handled rather than thrown on');
+    view = standingsView([row('solo', 3, 10, 20)]);
+    assert(view.rows[0].diff === -10, 'A negative difference is kept as-is');
+    assert(view.blocks.length === 0, 'One row cannot tie with itself');
+
+    // ===== Agreement with the real sort =====
+    heading('Agreement with tournament.js');
+    const teams = [
+      { id: 't0', name: 'A' }, { id: 't1', name: 'B' }, { id: 't2', name: 'C' }, { id: 't3', name: 'D' },
+    ];
+    const groups = createGroups(teams, 1);
+    const matches = generateMatches(groups).map(m => Object.assign({}, m));
+    // Give every match a result so the standings are fully determined.
+    matches.forEach((m, i) => {
+      m.status = 'finished'; m.played = true;
+      m.score1 = i % 2 === 0 ? 21 : 15;
+      m.score2 = i % 2 === 0 ? 15 : 21;
+    });
+    const standings = calculateStandings(groups, matches).get('A');
+    const derived = standingsView(standings);
+    assert(derived.rows.map(r => r.teamId).join() === standings.map(r => r.teamId).join(),
+      'The view never reorders — it only annotates what the sort already decided');
+    assert(derived.rows.every((r, i) => r.rank === i + 1), 'Ranks match the sorted positions');
+    assert(STANDINGS_TIE_CHAIN.join() === 'diff,setsFor',
+      'The visible chain is difference then points-for, mirroring the sort after points');
+
+    // ===== Summary =====
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>

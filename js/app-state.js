@@ -15,7 +15,13 @@ var AppState;
 (function () {
   'use strict';
 
-  var KEYS = { players: 'bv-players', tournament: 'bv-tournament', king: 'bv-king' };
+  var KEYS = {
+    players: 'bv-players',
+    tournament: 'bv-tournament',
+    king: 'bv-king',
+    // New in v2: remembered so the organiser types their name once, ever.
+    ownerLabel: 'bv-owner-label',
+  };
   var VALID_LEVELS = [1, 2, 3];
   var VALID_GENDERS = ['male', 'female', 'unspecified'];
 
@@ -96,6 +102,9 @@ var AppState;
     var state = {
       players: [],
       teams: null,
+      tournament: null,
+      king: null,
+      ownerLabel: '',
       unmatched: [],
       teamSize: 2,
       pairingMode: 'random',
@@ -115,6 +124,9 @@ var AppState;
       return {
         players: state.players.slice(),
         teams: state.teams ? state.teams.slice() : null,
+        tournament: state.tournament,
+        king: state.king,
+        ownerLabel: state.ownerLabel,
         unmatched: state.unmatched.slice(),
         teamSize: state.teamSize,
         pairingMode: state.pairingMode,
@@ -184,6 +196,16 @@ var AppState;
             if (isValidLevel(player.level)) normalised.level = Number(player.level);
             return normalised;
           });
+        }
+        state.tournament = readJSON(KEYS.tournament);
+        state.king = readJSON(KEYS.king);
+        var storedLabel = readJSON(KEYS.ownerLabel);
+        if (typeof storedLabel === 'string') state.ownerLabel = storedLabel;
+        // A restored tournament implies teams existed; without this the nav
+        // locks Teams and Tournament after a reload even though a real
+        // tournament is running.
+        if (state.tournament && state.tournament.teams && !state.teams) {
+          state.teams = state.tournament.teams.map(normaliseTeam);
         }
         emit();
         return snapshot();
@@ -305,6 +327,95 @@ var AppState;
       },
 
       hasTeams: function () { return Array.isArray(state.teams) && state.teams.length > 0; },
+
+      /* --- Tournament ---------------------------------------------------- */
+
+      /** Builds the tournament and, when a repository is available, publishes
+       * it in the same step. v1 did the same: the share link exists from the
+       * moment the tournament starts, not from the moment someone remembers to
+       * press Share. A tournament is played in one afternoon; asking people to
+       * publish it as a separate errand is how a session ends up local-only
+       * with three phones typing the same scores.
+       *
+       * `ownerLabel` is optional and falls back to "Organizador" in the
+       * history. It is stored so the next tournament pre-fills it. */
+      startTournament: function (options) {
+        options = options || {};
+        if (!state.teams || state.teams.length < 2) return { ok: false, reason: 'notEnoughTeams' };
+
+        var teams = createTeams({ teams: state.teams });
+        var groups = createGroups(teams, state.groupCount);
+
+        var format = null;
+        try {
+          format = presetFormat(state.formatPreset, groups);
+        } catch (error) {
+          return { ok: false, reason: 'presetUnavailable' };
+        }
+        if (format) {
+          var validation = validateFormat(format, groups);
+          if (!validation.valid) return { ok: false, reason: 'invalidFormat', errors: validation.errors };
+        }
+
+        var tournament = {
+          teams: teams,
+          groups: groups,
+          matches: generateStageMatches(format, groups),
+          players: state.players.slice(),
+        };
+        // Classic carries no format at all (D1) — omitting the key keeps a
+        // classic tournament byte-identical to what v1 wrote.
+        if (format) tournament.format = format;
+
+        state.tournament = tournament;
+        writeJSON(KEYS.tournament, tournament);
+
+        if (options.ownerLabel) {
+          state.ownerLabel = String(options.ownerLabel).slice(0, 50);
+          writeJSON(KEYS.ownerLabel, state.ownerLabel);
+        }
+
+        emit();
+        return { ok: true, tournament: tournament, ownerLabel: state.ownerLabel };
+      },
+
+      resetTournament: function () {
+        state.tournament = null;
+        removeKey(KEYS.tournament);
+        emit();
+        return { ok: true };
+      },
+
+      /* --- King of the Court --------------------------------------------- */
+
+      /** Local only, exactly as in v1: King never created a Firebase session.
+       * Nothing about it is shared, so there is no session and no history. */
+      startKing: function (options) {
+        options = options || {};
+        if (!state.teams || state.teams.length < 2) return { ok: false, reason: 'notEnoughTeams' };
+        var teams = createTeams({ teams: state.teams });
+        try {
+          state.king = createKingGame(teams, options.winCondition || 'consecutive', options.target || 5);
+        } catch (error) {
+          return { ok: false, reason: 'notEnoughTeams' };
+        }
+        writeJSON(KEYS.king, state.king);
+        emit();
+        return { ok: true, king: state.king };
+      },
+
+      setKing: function (king) {
+        state.king = king;
+        writeJSON(KEYS.king, king);
+        emit();
+      },
+
+      resetKing: function () {
+        state.king = null;
+        removeKey(KEYS.king);
+        emit();
+        return { ok: true };
+      },
 
       storage: {
         keys: KEYS,

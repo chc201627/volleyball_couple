@@ -39,6 +39,7 @@ var PRECACHE = [
   './js/tournament-repository.js',
   './js/king-of-court.js',
   './js/workspace-view-machine.js',
+  './js/standings-view.js',
   './js/app-state.js',
   './js/ui/dom-helpers.js',
   './js/ui/icon-registry.js',
@@ -48,6 +49,8 @@ var PRECACHE = [
   './js/ui/screens/import.js',
   './js/ui/screens/manual-pairing.js',
   './js/ui/screens/tournament-config.js',
+  './js/ui/screens/teams.js',
+  './js/ui/screens/tournament-day.js',
   './js/app-orchestrator.js',
 ];
 
