@@ -406,7 +406,10 @@
 }
 .c-status__action {
   flex: none;
-  min-height: 32px;
+  /* The way out of a state is an access/navigation control like any other, so
+     it clears the 44px bar rather than staying a 32px chip. */
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
   padding: 0 var(--space-3);
   border-radius: var(--space-2);
   background: var(--surface-2);
@@ -548,7 +551,11 @@
 
 /* --- Person row --- */
 .c-person {
+  /* Wraps rather than squeezing: with two actions on the row, 320px left the
+     name column narrow enough to break a word in half ("Canc / ha 2"). The
+     avatar and name stay on the first line and the actions drop below. */
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) 0;
@@ -564,10 +571,12 @@
   background: var(--surface-2);
   color: var(--text-2);
 }
-.c-person__text { flex: 1 1 auto; min-width: 0; }
-.c-person__name { font-size: var(--font-body); font-weight: 600; overflow-wrap: anywhere; }
+.c-person__text { flex: 1 1 8rem; min-width: 0; }
+/* break-word, not anywhere: a long single token still has to break, but a
+   name with spaces in it wraps between words like text is supposed to. */
+.c-person__name { font-size: var(--font-body); font-weight: 600; overflow-wrap: break-word; }
 .c-person__meta { font-size: var(--font-caption); color: var(--text-3); }
-.c-person__actions { display: flex; gap: var(--space-1); flex: none; }
+.c-person__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); flex: 0 1 auto; margin-left: auto; }
 
 /* --- List --- */
 .c-list {
@@ -1444,3 +1453,64 @@
   text-align: center;
   line-height: 1.3;
 }
+
+/* ============================================
+   Collaboration
+   ============================================ */
+
+.day__access { box-shadow: inset 0 0 0 1px rgba(127, 209, 255, 0.24); background: var(--overlay-info-12); }
+.day__access-head { display: flex; align-items: center; gap: var(--space-2); }
+.day__access-icon { color: var(--state-info); }
+.day__access-title { font-size: var(--font-h2); font-weight: 700; line-height: 1.3; }
+.day__access-body { font-size: var(--font-meta); color: var(--text-2); line-height: 1.5; }
+.day__hero-readonly { font-size: var(--font-meta); color: var(--text-3); }
+
+.access__explainer { align-items: flex-start; }
+.access__icon { color: var(--accent); }
+.access__title { font-size: 18px; font-weight: 700; line-height: 1.3; }
+.access__body { font-size: 14px; color: var(--text-2); line-height: 1.5; }
+.access__hint { font-size: var(--font-caption); color: var(--text-3); line-height: 1.45; }
+
+.share__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+}
+.share__link-icon { flex: none; color: var(--text-3); }
+.share__url {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.share__actions { display: flex; gap: var(--space-2); }
+
+.day__collab { display: flex; gap: var(--space-2); }
+/* Two side-by-side ghost buttons still have to clear 44px and fit 320px, so
+   they share the row evenly and let their labels shrink rather than overflow. */
+.day__collab .c-button { flex: 1 1 0; min-width: 0; padding: 0 var(--space-3); }
+.day__collab .c-button__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The pending-request badge. Sits on the glyph rather than the label so the
+   tab keeps its fixed height at 320px, where four tabs share the row. */
+.c-tab__glyph { position: relative; display: inline-flex; }
+.c-tab__badge,
+.c-nav-rail__badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--state-warn);
+  color: #10140a;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+.c-tab__badge { position: absolute; top: -5px; left: 11px; }
+.c-nav-rail__badge { margin-left: var(--space-1); display: inline-block; }

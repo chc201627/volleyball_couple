@@ -45,7 +45,15 @@
     return null;
   }
 
+  /** A spectator sees the same score and cannot touch it. The row stops being
+   * interactive rather than showing a control that refuses on tap. */
+  function canScore(ctx) {
+    var session = ctx.appState.get().session;
+    return !session || session.role === 'owner' || session.role === 'scorer';
+  }
+
   function matchRowFor(ctx, tournament, view) {
+    var scoring = canScore(ctx);
     return C.matchRow({
       teams: matchTitle(tournament, view),
       score: scoreText(view),
@@ -64,7 +72,7 @@
           ctx.openOverlay('matchHistory', { matchId: view.matchId, revisions: view.revision });
         },
       }) : null,
-      onClick: function () { ctx.openOverlay('scoring', { matchId: view.matchId }); },
+      onClick: scoring ? function () { ctx.openOverlay('scoring', { matchId: view.matchId }); } : null,
     });
   }
 
@@ -92,17 +100,30 @@
       ? label('tournament.format.stage.' + view.stageId, view.stageId)
       : label('tournament.group', 'Grupo ' + view.groupId, { id: view.groupId });
 
-    return el('section', { class: 'c-panel day__hero' }, [
+    var children = [
       el('div', { class: 'c-panel__head' }, [
         C.overline(label('workspace.tournament.nextMatch.heading', 'Siguiente') + ' · ' + stageLabel, 'accent'),
         el('span', { class: 'c-panel__meta', text: day.progress.played + ' / ' + day.progress.total }),
       ]),
       el('p', { class: 'day__hero-teams', text: matchTitle(tournament, view) }),
-      C.button({
+    ];
+
+    if (canScore(ctx)) {
+      children.push(C.button({
         label: label('workspace.tournament.nextMatch.scoreBtn', 'Anotar este partido'),
         onClick: function () { ctx.openOverlay('scoring', { matchId: view.matchId }); },
-      }),
-    ]);
+      }));
+    } else {
+      // No scoring button at all for a spectator, and no per-match request
+      // either: access is granted for the whole tournament, so asking belongs
+      // in the one card at the top.
+      children.push(el('p', {
+        class: 'day__hero-readonly',
+        text: label('day.readOnlyMatch', 'Solo lectura — no puedes anotar este torneo'),
+      }));
+    }
+
+    return el('section', { class: 'c-panel day__hero' }, children);
   }
 
   function stageProgressPanel(day) {
@@ -387,6 +408,30 @@
     render: function (ctx) {
       var snapshot = ctx.appState.get();
       var tournament = snapshot.tournament;
+      var session = snapshot.session;
+
+      // A dead or unreadable link has to say so. Falling through to "no
+      // tournament yet" would blame the visitor for a session somebody else
+      // reset, and hand them a Teams button that is not theirs to press.
+      if (session && (session.state === 'notFound' || session.state === 'unsupported')) {
+        var gone = session.state === 'notFound';
+        return [C.emptyState({
+          icon: gone ? 'circle-alert' : 'info',
+          title: gone
+            ? label('session.goneTitle', 'Este torneo ya no está disponible')
+            : label('session.unsupportedTitle', 'No podemos abrir este torneo'),
+          text: gone
+            ? label('session.goneText', 'El organizador lo reinició, o el link está incompleto. Pídele uno nuevo.')
+            : label('session.unsupportedText', 'El link viene de una versión más reciente de la app. Recarga para actualizarla.'),
+          actions: [C.button({
+            label: gone
+              ? label('session.leaveLink', 'Salir del link compartido')
+              : label('session.reload', 'Recargar'),
+            variant: 'ghost',
+            onClick: gone ? ctx.leaveSession : function () { window.location.reload(); },
+          })],
+        })];
+      }
 
       if (!tournament) {
         return [C.emptyState({
@@ -414,7 +459,81 @@
       });
 
       var subView = ctx.view.subView || 'today';
-      var body = [
+      var body = [];
+
+      // One access card, at the top, once. The permission is per tournament,
+      // so repeating the offer on every match would suggest a scope that does
+      // not exist.
+      if (session && session.role === 'spectator') {
+        body.push(el('section', { class: 'c-panel day__access' }, [
+          el('div', { class: 'day__access-head' }, [
+            IconRegistry.icon('eye', { size: 16, class: 'day__access-icon' }),
+            C.overline(label('day.readOnly', 'Solo lectura'), 'info'),
+          ]),
+          el('p', {
+            class: 'day__access-title',
+            text: label('day.viewingTournament', 'Estás viendo un torneo compartido'),
+          }),
+          el('p', {
+            class: 'day__access-body',
+            text: label('day.accessBody',
+              'Los resultados se actualizan en vivo. Para anotar necesitas que el organizador te dé acceso, y se concede para todo el torneo — no partido a partido.'),
+          }),
+          C.button({
+            label: session.accessStatus === 'pending'
+              ? label('access.pendingShort', 'Solicitud enviada')
+              : label('tournament.access.request', 'Pedir acceso para anotar'),
+            disabled: session.accessStatus === 'pending',
+            onClick: function () { ctx.openOverlay('requestAccess'); },
+          }),
+        ]));
+      }
+
+      // The owner reaches Anotadores from inside the tournament, because that is
+      // where the nav badge points. A pending request gets its own strip: it
+      // means somebody is standing on the court waiting to be let in.
+      if (session && session.role === 'owner') {
+        var requests = session.requests || {};
+        var uids = Object.keys(requests);
+        var pending = uids.filter(function (uid) { return requests[uid].status === 'pending'; }).length;
+
+        if (pending) {
+          body.push(C.statusStrip({
+            icon: 'users',
+            tone: 'warn',
+            assertive: true,
+            text: pending === 1
+              ? label('day.oneRequest', 'Alguien pide acceso para anotar')
+              : label('day.manyRequests', pending + ' personas piden acceso para anotar', { count: pending }),
+            action: {
+              label: label('day.reviewRequests', 'Revisar'),
+              onClick: function () { ctx.openOverlay('scorers'); },
+            },
+          }));
+        }
+
+        body.push(el('div', { class: 'day__collab' }, [
+          C.button({
+            // No count on the label: at 320px the two buttons share the row and
+            // "Anotadores · 3" ellipsised into "Anotadore…". The pending count
+            // is on the nav badge, and the overlay states the total.
+            label: label('scorers.title', 'Anotadores'),
+            variant: 'ghost',
+            icon: 'users',
+            block: false,
+            onClick: function () { ctx.openOverlay('scorers'); },
+          }),
+          C.button({
+            label: label('day.share', 'Compartir'),
+            variant: 'ghost',
+            icon: 'share-2',
+            block: false,
+            onClick: function () { ctx.openOverlay('share'); },
+          }),
+        ]));
+      }
+
+      body = body.concat([
         C.subTabs({
           active: subView,
           label: label('workspace.nav.tournament', 'Torneo'),
@@ -426,7 +545,7 @@
           }),
           onSelect: ctx.selectSubView,
         }),
-      ];
+      ]);
 
       if (subView === 'groups') body = body.concat(renderGroups(ctx, tournament, standings));
       else if (subView === 'bracket') body = body.concat(renderBracket(ctx, tournament, day, resolution));

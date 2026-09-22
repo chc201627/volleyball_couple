@@ -182,6 +182,8 @@ var UIComponents;
           type: 'button',
           'aria-current': active ? 'page' : null,
           'aria-disabled': locked ? 'true' : null,
+          // The badge is a glyph; the count has to reach a screen reader too.
+          'aria-label': item.badge ? item.label + ' · ' + item.badge : null,
           title: locked ? item.lockReason : null,
         },
         on: {
@@ -191,7 +193,13 @@ var UIComponents;
           },
         },
       }, [
-        icon(locked ? 'lock' : item.icon, { size: 20 }),
+        el('span', { class: 'c-tab__glyph' }, [
+          icon(locked ? 'lock' : item.icon, { size: 20 }),
+          // A waiting scorer has to be visible from any destination, not only
+          // from the one that can act on it. The count is also in the label so
+          // it is not colour and position alone (REQ-UX-72).
+          item.badge ? el('span', { class: 'c-tab__badge', text: String(item.badge) }) : null,
+        ]),
         el('span', { class: 'c-tab__label', text: item.label }),
       ]);
     }));
@@ -223,7 +231,10 @@ var UIComponents;
             if (options.onSelect) options.onSelect(item.id);
           },
         },
-      }, [el('span', { text: item.label })]);
+      }, [
+        el('span', { text: item.label }),
+        item.badge ? el('span', { class: 'c-nav-rail__badge', text: String(item.badge) }) : null,
+      ]);
     }));
   }
 

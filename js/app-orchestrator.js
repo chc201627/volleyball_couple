@@ -38,13 +38,18 @@
   var appState = AppState.create();
   var repository = null;
   var sessionId = null;
+  var unsubscribeSession = null;
+  // What the session last said we were, so a role change can be announced
+  // rather than only re-rendered.
+  var lastRole = null;
   var nodes = {};
 
   function workspaceInput() {
     var snapshot = appState.get();
+    var session = snapshot.session;
     return {
-      role: 'owner',
-      sessionState: 'ok',
+      role: session ? session.role : 'owner',
+      sessionState: session ? session.state : 'ok',
       playerCount: snapshot.players.length,
       teamSize: snapshot.teamSize,
       couplesGenerated: !!snapshot.teams,
@@ -57,7 +62,10 @@
       hasBracket: !!(snapshot.tournament && snapshot.tournament.format),
       complete: isComplete(snapshot),
       hasNextMatch: false,
-      pendingRequestCount: 0,
+      pendingRequestCount: session && session.requests
+        ? Object.keys(session.requests).filter(function (uid) { return session.requests[uid].status === 'pending'; }).length
+        : 0,
+      firebaseConnected: session ? session.connection !== 'offline' : undefined,
       // Same test v1's initFirebase() applies, so both entry points agree on
       // whether a session is even possible.
       firebaseAvailable: typeof firebase !== 'undefined' &&
@@ -105,6 +113,7 @@
       return;
     }
     if (action.id === 'startTournament') { openOverlay('modeFork'); return; }
+    if (action.id === 'requestAccess') { openOverlay('requestAccess'); return; }
     if (action.targetView) navigate(action.targetView);
   }
 
@@ -175,14 +184,91 @@
     toast.timer = setTimeout(function () { DomHelpers.clear(nodes.toast); }, 3200);
   }
 
+  /** A shared link is the whole collaboration model: open it, and the session
+   * decides what you are allowed to do. The role comes from the repository
+   * rather than from anything this client claims, so a spectator cannot talk
+   * itself into scoring. */
+  function subscribeToSession(id) {
+    if (!repository || !id) return;
+    if (unsubscribeSession) unsubscribeSession();
+    sessionId = id;
+    lastRole = null;
+    unsubscribeSession = repository.watchSession(id, function (snapshot) {
+      appState.adoptSession(id, snapshot);
+      announceRoleChange(snapshot && snapshot.role);
+      render();
+    });
+  }
+
+  /** A permission that changes has to be said out loud. Granting access closes
+   * the request overlay on its own — the role gate stops allowing it — and a
+   * revocation makes the scoring buttons vanish; either one, unannounced,
+   * leaves someone staring at a screen that silently became a different one.
+   * The first snapshot is not a change, so it says nothing. */
+  function announceRoleChange(role) {
+    if (!role) return;
+    var previous = lastRole;
+    lastRole = role;
+    if (!previous || previous === role) return;
+    if (previous === 'spectator' && role === 'scorer') {
+      toast({
+        title: label('access.toast.approved', 'Ya puedes anotar'),
+        sub: label('access.toast.approvedSub', 'El organizador te dio acceso a este torneo'),
+      });
+    } else if (previous === 'scorer' && role === 'spectator') {
+      toast({
+        title: label('access.toast.revoked', 'Se te quitó el acceso'),
+        sub: label('access.toast.revokedSub', 'Sigues viendo el torneo en solo lectura'),
+      });
+    }
+  }
+
+  /** The way out of a session that is gone: drop the link and fall back to
+   * whatever this device has locally. The link cannot be repaired from here,
+   * and the tournament in storage is still intact. */
+  function leaveSession() {
+    if (unsubscribeSession) { unsubscribeSession(); unsubscribeSession = null; }
+    sessionId = null;
+    lastRole = null;
+    // Only the hash identifies the session, so only the hash is dropped: the
+    // query string is whatever the visitor arrived with and is not ours to
+    // discard.
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    appState.clearSession();
+    navigate('setup');
+  }
+
+  function sessionIdFromUrl() {
+    var hash = window.location.hash;
+    if (!hash || hash.indexOf('#s=') !== 0) return null;
+    var id = hash.slice(3).trim();
+    return id.length >= 8 ? id : null;
+  }
+
+  function shareUrl() {
+    if (!sessionId) return null;
+    return window.location.origin + window.location.pathname + '#s=' + sessionId;
+  }
+
+  function requestAccess(deviceLabel) {
+    if (!repository || !sessionId) return Promise.resolve({ status: 'denied' });
+    return repository.requestAccess(sessionId, deviceLabel).catch(function () { return { status: 'offline' }; });
+  }
+
+  function setAccess(memberId, status) {
+    if (!repository || !sessionId) return Promise.resolve({ status: 'denied' });
+    return repository.setAccess(sessionId, memberId, status).catch(function () { return { status: 'offline' }; });
+  }
+
   function publishSession() {
     if (!repository) return;
     var snapshot = appState.get();
     repository.createSession(snapshot.tournament, { ownerLabel: snapshot.ownerLabel }).then(function (result) {
       if (result && result.status === 'synced' && result.sessionId) {
-        sessionId = result.sessionId;
-        history.replaceState(null, '', '#s=' + sessionId);
-        render();
+        history.replaceState(null, '', '#s=' + result.sessionId);
+        // Subscribe to our own session too: the organiser needs the same live
+        // feed as everyone else, including scorer requests as they arrive.
+        subscribeToSession(result.sessionId);
       }
     }).catch(function () { /* stays local */ });
   }
@@ -238,6 +324,7 @@
         icon: destination.icon,
         label: label(destination.labelKey, destination.id),
         locked: !navItem || navItem.enabled === false,
+        badge: navItem ? navItem.badge : null,
         lockReason: navItem && navItem.lockReasonKey ? label(navItem.lockReasonKey, '') : null,
       };
     });
@@ -279,6 +366,10 @@
       startKing: startKing,
       saveResult: saveResult,
       toast: toast,
+      requestAccess: requestAccess,
+      setAccess: setAccess,
+      shareUrl: shareUrl,
+      leaveSession: leaveSession,
       sessionId: sessionId,
       rerender: render,
     };
@@ -382,6 +473,10 @@
     if (typeof setLanguage === 'function') setLanguage(state.lang);
     repository = createRepository();
     appState.load();
+    // A link takes precedence over whatever is in storage: someone opening a
+    // shared tournament wants that tournament, not the one they ran last week.
+    var linked = sessionIdFromUrl();
+    if (linked) subscribeToSession(linked);
     // A state change re-renders the active screen; screens never poke the DOM
     // of other screens, because no other screen is mounted.
     appState.subscribe(function () { render(); });

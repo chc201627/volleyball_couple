@@ -213,6 +213,57 @@
     assert(state.get().players.length !== snapshotA.players.length,
       'Snapshots are copies — a caller cannot mutate state by holding one');
 
+    // ===== Shared session =====
+    heading('Shared session');
+    state = fresh();
+    const remote = {
+      role: 'scorer',
+      accessStatus: 'approved',
+      connection: 'online',
+      schemaVersion: 3,
+      tournament: {
+        teams: [
+          { id: 't1', name: 'A & B', players: [{ id: 'p1', name: 'A' }, { id: 'p2', name: 'B' }] },
+          { id: 't2', name: 'C & D', players: [{ id: 'p3', name: 'C' }, { id: 'p4', name: 'D' }] },
+        ],
+        groups: [], matches: [],
+      },
+    };
+    state.adoptSession('session-abc', remote);
+    assert(state.get().session.id === 'session-abc' && state.get().session.state === 'ok',
+      'Adopting a readable session records it as ok');
+    assert(state.get().session.role === 'scorer',
+      'The role comes from the session, never from what the client would like to be');
+    assert(state.get().tournament === remote.tournament,
+      'The remote tournament wins outright — a merged local edit would be invisible to everyone else');
+    assert(state.get().teams.length === 2, 'Teams are rebuilt from the adopted tournament');
+    assert(JSON.parse(localStorage.getItem(AppState.KEYS.tournament)) !== null,
+      'The adopted tournament is still written to storage so the link survives a dead signal');
+
+    state = fresh();
+    state.adoptSession('session-gone', null);
+    assert(state.get().session.state === 'notFound' && state.get().session.role === 'spectator',
+      'A session that is not there is recorded as notFound, with no role granted');
+    assert(state.get().tournament === null, 'A missing session leaves no tournament behind');
+
+    state = fresh();
+    state.adoptSession('session-future', { error: 'unsupported-schema', schemaVersion: 9, tournament: null });
+    assert(state.get().session.state === 'unsupported',
+      'A schema this client cannot read fails closed as unsupported rather than rendering empty');
+
+    state = fresh();
+    state.adoptSession('session-legacy', { legacy: true, schemaVersion: 1, tournament: { teams: [], groups: [], matches: [] } });
+    assert(state.get().session.legacy === true && state.get().session.role === 'spectator',
+      'A schema-v1 link stays readable, and read-only');
+
+    state = fresh();
+    state.adoptSession('session-abc', remote);
+    let sessionNotifications = 0;
+    state.subscribe(() => { sessionNotifications++; });
+    state.clearSession();
+    assert(state.get().session === null, 'Leaving a session clears it');
+    assert(sessionNotifications === 2, 'Leaving a session notifies subscribers so the shell re-renders');
+
     // ===== Summary =====
     const total = passed + failed;
     const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';

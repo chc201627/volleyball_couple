@@ -55,6 +55,7 @@ var PRECACHE = [
   './js/ui/screens/scoring.js',
   './js/ui/screens/king.js',
   './js/ui/screens/results.js',
+  './js/ui/screens/collaboration.js',
   './js/app-orchestrator.js',
 ];
 

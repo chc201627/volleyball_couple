@@ -444,9 +444,19 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
 
     function watchSession(sessionId, onSnapshot) {
       var raw = null, access = null, requests = null, ownRef = null, membersRef = null;
+      // Whether the session node has answered at all. Until it has, there is
+      // nothing truthful to say: emitting null early would flash "this
+      // tournament is gone" over a session that is merely still loading.
+      var loaded = false;
       var sessionRef = db.ref('tournaments/' + sessionId);
       var connectedRef = db.ref('.info/connected');
-      function emit() { if (raw) onSnapshot(joinedSnapshot(raw, access, requests)); }
+      /** A session that answered with nothing is reported as nothing. Staying
+       * silent instead left a dead link showing whatever tournament happened to
+       * be in local storage, as if it were the shared one. */
+      function emit() {
+        if (!loaded) return;
+        onSnapshot(raw ? joinedSnapshot(raw, access, requests) : null);
+      }
       function bindPrivate() {
         if (ownRef) ownRef.off();
         if (membersRef) membersRef.off();
@@ -470,6 +480,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
       connectedRef.on('value', function (snap) { connected = snap.val() !== false; emit(); });
       sessionRef.on('value', function (snap) {
         raw = snap.val();
+        loaded = true;
         authorship[sessionId] = Object.assign({}, authorship[sessionId], {
           ownerUid: raw && raw.ownerUid,
           ownerLabel: raw && raw.ownerLabel,

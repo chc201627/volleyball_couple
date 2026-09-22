@@ -163,7 +163,7 @@
 
   function actionsRow(ctx) {
     var actions = [
-      { icon: 'share-2', label: label('tournament.share', 'Compartir'), onClick: function () { ctx.openOverlay('share'); } },
+      { icon: 'share-2', label: label('day.share', 'Compartir'), onClick: function () { ctx.openOverlay('share'); } },
       { icon: 'history', label: label('history.title', 'Historial'), onClick: function () { ctx.openOverlay('history'); } },
       { icon: 'rotate-ccw', label: label('workspace.results.startAnother', 'Nuevo torneo'), onClick: function () { ctx.navigate('setup'); } },
     ];

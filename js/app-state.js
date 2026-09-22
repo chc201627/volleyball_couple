@@ -104,6 +104,7 @@ var AppState;
       teams: null,
       tournament: null,
       king: null,
+      session: null,
       ownerLabel: '',
       unmatched: [],
       teamSize: 2,
@@ -126,6 +127,7 @@ var AppState;
         teams: state.teams ? state.teams.slice() : null,
         tournament: state.tournament,
         king: state.king,
+        session: state.session,
         ownerLabel: state.ownerLabel,
         unmatched: state.unmatched.slice(),
         teamSize: state.teamSize,
@@ -438,6 +440,49 @@ var AppState;
         writeJSON(KEYS.tournament, state.tournament);
         emit();
         return { ok: true };
+      },
+
+      /** Takes over the tournament from a shared session.
+       *
+       * The remote copy wins outright rather than being merged: the session is
+       * the authority for a shared tournament, and a local edit that survived a
+       * merge would be a result nobody else can see. The local copy is still
+       * written to storage so the link keeps working with no signal.
+       *
+       * A legacy (schema v1) or unreadable session carries no tournament; the
+       * session state is recorded either way so the screens can explain it
+       * instead of rendering an empty destination. */
+      adoptSession: function (sessionId, snapshot) {
+        if (!snapshot) {
+          state.session = { id: sessionId, state: 'notFound', role: 'spectator', accessStatus: null, requests: null, connection: 'offline', legacy: false };
+          emit();
+          return snapshot;
+        }
+
+        state.session = {
+          id: sessionId,
+          state: snapshot.error ? 'unsupported' : 'ok',
+          role: snapshot.role || 'spectator',
+          accessStatus: snapshot.accessStatus || null,
+          requests: snapshot.requests || null,
+          connection: snapshot.connection || 'online',
+          authState: snapshot.authState || 'pending',
+          legacy: !!snapshot.legacy,
+          schemaVersion: snapshot.schemaVersion,
+        };
+
+        if (snapshot.tournament) {
+          state.tournament = snapshot.tournament;
+          state.teams = (snapshot.tournament.teams || []).map(normaliseTeam);
+          writeJSON(KEYS.tournament, state.tournament);
+        }
+        emit();
+        return snapshot;
+      },
+
+      clearSession: function () {
+        state.session = null;
+        emit();
       },
 
       resetTournament: function () {
