@@ -82,7 +82,7 @@
           // so blur is the only gesture available.
           var committed = String(scoreInput.commit(raw, stored(match, side)));
           if (side === 1) draft.raw1 = committed; else draft.raw2 = committed;
-          ctx.rerender();
+          ctx.rerenderOverlay();
         },
       },
     });
@@ -92,7 +92,7 @@
       if (side === 1) draft.raw1 = next; else draft.raw2 = next;
       lastAction = { side: side, delta: delta };
       bumpSide = side;
-      ctx.rerender();
+      ctx.rerenderOverlay();
     }
 
     var minus = el('button', {
@@ -311,7 +311,7 @@
                 var next = scoreInput.step(side === 1 ? draft.raw1 : draft.raw2, -lastAction.delta, stored(match, side));
                 if (side === 1) draft.raw1 = next; else draft.raw2 = next;
                 lastAction = null;
-                ctx.rerender();
+                ctx.rerenderOverlay();
               },
             },
           }, [

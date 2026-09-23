@@ -410,22 +410,28 @@ var UIComponents;
     });
   }
 
+  /** The score/teams area and the trailing history icon are separate real
+   * buttons, never nested: a <button> inside a <button> is invalid HTML, and
+   * the inner click used to bubble into the outer one and reopen scoring
+   * right after opening history. */
   function matchRow(options) {
     options = options || {};
     var left = el('div', { class: 'c-match__left' });
     if (options.dot) left.appendChild(el('span', { class: ['c-match__dot', 'c-match__dot--' + options.dot] }));
     left.appendChild(el('p', { class: 'c-match__teams', text: options.teams }));
-    var children = [left, el('span', {
+    var score = el('span', {
       class: ['c-match__score', options.tone && 'c-match__score--' + options.tone],
       text: options.score,
-    })];
-    if (options.trailing) children.push(options.trailing);
+    });
     var interactive = typeof options.onClick === 'function';
-    return el(interactive ? 'button' : 'div', {
-      class: ['c-match', interactive && 'is-interactive'],
+    var hit = el(interactive ? 'button' : 'div', {
+      class: ['c-match__hit', interactive && 'is-interactive'],
       attrs: interactive ? { type: 'button' } : null,
       on: interactive ? { click: options.onClick } : null,
-    }, children);
+    }, [left, score]);
+    var children = [hit];
+    if (options.trailing) children.push(options.trailing);
+    return el('div', { class: 'c-match' }, children);
   }
 
   function coupleRow(options) {

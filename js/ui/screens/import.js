@@ -63,7 +63,7 @@
       class: 'import__textarea',
       attrs: {
         rows: 8,
-        placeholder: 'May, Mujer, 2\nCarlos, Hombre, 2\nValentina, Mujer, 3',
+        placeholder: 'Milo, Hombre, 5\nCarlos, Hombre, 5\nCaro, Mujer, 4\nPipe, Hombre, 4\nMay, Mujer, 4',
         'aria-label': translate('import.label', 'Lista de jugadores'),
       },
       on: { input: function (event) { text = event.target.value; refresh(); } },

@@ -331,9 +331,19 @@
   function renderChrome(view) {
     var items = destinationItems(view);
 
+    // Same gate as the kebab: only once there is a tournament, and only on
+    // Torneo, where a schedule long enough to search for a match exists.
+    var hasTournament = view.view === 'tournament' && appState.get().tournament;
+    var searchAction = hasTournament ? [{
+      icon: 'search',
+      tone: 'muted',
+      label: translate('matches.search', 'Buscar por jugador, pareja o grupo'),
+      onClick: function () { openOverlay('allMatches'); },
+    }] : [];
+
     // One menu for everything that is not the match in front of you, and only on
     // the destination those actions belong to.
-    var menuAction = view.view === 'tournament' && appState.get().tournament ? [{
+    var menuAction = hasTournament ? [{
       icon: 'ellipsis-vertical',
       tone: 'muted',
       label: translate('history.menuLabel', 'Opciones del torneo'),
@@ -345,7 +355,7 @@
       title: translate('workspace.nav.' + view.view, view.view),
       // Shown from 600px up, where the fixed tab bar is dropped.
       nav: { active: view.view, items: items, onSelect: navigate },
-      actions: menuAction,
+      actions: searchAction.concat(menuAction),
       lang: {
         code: state.lang.toUpperCase(),
         label: translate('app.toggleLanguage', 'Cambiar idioma'),
@@ -387,6 +397,7 @@
       history: historyEntries,
       sessionId: sessionId,
       rerender: render,
+      rerenderOverlay: rerenderOverlay,
     };
   }
 
@@ -443,6 +454,13 @@
     renderChrome(view);
     renderScreen(view);
     renderOverlay(view);
+  }
+
+  /** For overlay-local state changes (a step tap, a blur commit) that touch
+   * nothing outside the sheet: a full render() also tears down and restarts
+   * the screen's enter animation behind it, which is the flash this avoids. */
+  function rerenderOverlay() {
+    renderOverlay(computeWorkspace(workspaceInput()));
   }
 
   /** A missing or placeholder config is not an error: the app runs local-only,

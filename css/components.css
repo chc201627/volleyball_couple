@@ -490,13 +490,20 @@
 .c-match {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
   width: 100%;
   min-height: 52px;
+}
+.c-match__hit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
   text-align: left;
 }
-.c-match.is-interactive { cursor: pointer; }
+.c-match__hit.is-interactive { cursor: pointer; }
 .c-match__left {
   display: flex;
   align-items: center;
