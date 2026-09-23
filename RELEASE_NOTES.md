@@ -1,5 +1,12 @@
 # Release Notes
 
+## v2.0.1 — WhatsApp & Flexible List Import Support
+
+- **Flexible bulk import**: `js/player-import.js` now strips numbered prefixes (`1. `, `1) `, `1- `), bullet points (`- `, `* `, `• `), and chat header lines (e.g. `Confirmados:`, `Suplentes:`, `Lista de hoy:`).
+- **Extended delimiters**: supports dashes (`-`, `—`, `–`), slashes (`/`), colons (`:`), and pipes (`|`) alongside commas, semicolons, and tabs. Compound names with hyphens (e.g. `Ana-María`) are preserved without triggering mixed-delimiter errors.
+- **Test coverage**: added unit tests for flexible list formats in `tests/player-import.test.html`.
+- Static assets only; no Firebase schema or Rules changes required.
+
 ## v2.0.0 — TO-BE Redesign
 
 - Full rewrite of the presentation layer against `design/volleyball-couple.pen` (35 artboards, 9 flows), delivered as slices A–L on a single branch (`feat/redesign-v2`); see `redesign-plan.md`. `js/app.js` (3,685 lines) and `css/styles.css` (2,489 lines) are gone, replaced by one module per screen (`js/ui/screens/*.js`) and per layer (`css/design-tokens.css`, `app-shell.css`, `components.css`, `screens.css`, `animations.css`).
