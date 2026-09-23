@@ -60,6 +60,10 @@
   --level-2-bg: rgba(167, 139, 250, 0.2);
   --level-3-fg: #f97316;
   --level-3-bg: rgba(249, 115, 22, 0.2);
+  --level-4-fg: #fb923c;
+  --level-4-bg: rgba(251, 146, 60, 0.2);
+  --level-5-fg: #ef4444;
+  --level-5-bg: rgba(239, 68, 68, 0.2);
 
   /* --- Group identity (A–H), each >=5.9:1 on --surface-1/2 --- */
   --group-1: #4fa8ff;

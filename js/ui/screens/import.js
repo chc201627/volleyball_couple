@@ -45,7 +45,7 @@
       nameTooShort: 'El nombre es demasiado corto',
       nameTooLong: 'El nombre supera los 50 caracteres',
       invalidGender: '«' + (issue.params.token || '') + '» no es un género reconocido',
-      invalidLevel: '«' + (issue.params.token || '') + '» no es un nivel (1, 2 o 3)',
+      invalidLevel: '«' + (issue.params.token || '') + '» no es un nivel (1-5)',
       tooManyColumns: 'La línea tiene ' + (issue.params.count || '?') + ' columnas, se esperan 3',
       unclosedQuote: 'Comilla sin cerrar',
       mixedDelimiter: 'Separador distinto al del resto',

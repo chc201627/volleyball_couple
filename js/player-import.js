@@ -223,7 +223,7 @@ var parsePlayerImport, validatePlayerImport;
       var levelToken = String(draft.levelToken == null ? '' : draft.levelToken).trim();
       var level = null;
       if (levelToken) {
-        if (/^[123]$/.test(levelToken)) level = Number(levelToken);
+        if (/^[1-5]$/.test(levelToken)) level = Number(levelToken);
         else issues.push(makeIssue('level', 'invalidLevel', { token: draft.levelToken }));
       }
 

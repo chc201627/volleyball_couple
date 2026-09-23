@@ -49,7 +49,7 @@
 
     function seed(state, count) {
       for (let i = 0; i < count; i++) {
-        state.addPlayer({ name: 'P' + i, gender: i % 2 ? 'male' : 'female', level: (i % 3) + 1 });
+        state.addPlayer({ name: 'P' + i, gender: i % 2 ? 'male' : 'female', level: (i % 5) + 1 });
       }
       return state;
     }
@@ -74,7 +74,7 @@
       'An unset level is OMITTED, never written as null or undefined — Firebase set() rejects undefined');
 
     state.addPlayer({ name: 'BadLevel', gender: 'female', level: 9 });
-    assert(!('level' in state.get().players[3]), 'A level outside 1|2|3 is dropped rather than stored');
+    assert(!('level' in state.get().players[3]), 'A level outside 1-5 is dropped rather than stored');
 
     state.addPlayer({ name: 'Nobody', gender: 'alien' });
     assert(state.get().players[4].gender === 'unspecified', 'An unknown gender falls back to unspecified');

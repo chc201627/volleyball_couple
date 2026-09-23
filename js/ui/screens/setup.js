@@ -117,6 +117,8 @@
       { id: 1, label: translate('form.level1', 'Nivel 1') },
       { id: 2, label: translate('form.level2', 'Nivel 2') },
       { id: 3, label: translate('form.level3', 'Nivel 3') },
+      { id: 4, label: translate('form.level4', 'Nivel 4') },
+      { id: 5, label: translate('form.level5', 'Nivel 5') },
     ];
 
     return C.panel({ label: translate('form.heading', 'Añadir jugador') }, [

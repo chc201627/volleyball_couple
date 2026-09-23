@@ -12,7 +12,7 @@ var AppState;
     // New in v2: remembered so the organiser types their name once, ever.
     ownerLabel: 'bv-owner-label',
   };
-  var VALID_LEVELS = [1, 2, 3];
+  var VALID_LEVELS = [1, 2, 3, 4, 5];
   var VALID_GENDERS = ['male', 'female', 'unspecified'];
 
   /** Storage throws in private mode, on a full quota, on a disabled origin. None

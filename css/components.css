@@ -483,6 +483,8 @@
 .c-chip--level-1 { background: var(--level-1-bg); color: var(--level-1-fg); }
 .c-chip--level-2 { background: var(--level-2-bg); color: var(--level-2-fg); }
 .c-chip--level-3 { background: var(--level-3-bg); color: var(--level-3-fg); }
+.c-chip--level-4 { background: var(--level-4-bg); color: var(--level-4-fg); }
+.c-chip--level-5 { background: var(--level-5-bg); color: var(--level-5-fg); }
 
 /* --- Match row --- */
 .c-match {
