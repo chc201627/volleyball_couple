@@ -14,12 +14,27 @@ var parsePlayerImport, validatePlayerImport;
     { name: 'tab', character: '\t' },
     { name: 'semicolon', character: ';' },
     { name: 'comma', character: ',' },
+    { name: 'pipe', character: '|' },
+    { name: 'colon', character: ':' },
+    { name: 'slash', character: '/' },
+    { name: 'dash', character: '-' },
+    { name: 'en-dash', character: '–' },
+    { name: 'em-dash', character: '—' },
   ];
   var GENDER_TOKENS = {
     h: 'male', hombre: 'male', masculino: 'male', male: 'male', man: 'male',
     f: 'female', female: 'female', woman: 'female', mujer: 'female', femenino: 'female',
     u: 'unspecified', unspecified: 'unspecified', 'sin especificar': 'unspecified', 'no especificado': 'unspecified', '-': 'unspecified',
   };
+  var CHAT_HEADERS = [
+    'confirmados', 'confirmados hoy', 'jugadores confirmados', 'lista confirmados', 'confirmadas',
+    'suplentes', 'suplentes hoy', 'lista suplentes', 'suplente',
+    'lista de hoy', 'lista hoy', 'lista', 'lista de jugadores',
+    'lista de espera', 'en espera', 'espera', 'esperas',
+    'reserva', 'reservas',
+    'convocados', 'jugadores', 'jugadoras',
+    'confirmed', 'substitutes', 'waiting list', 'players'
+  ];
   function makeIssue(field, code, params) {
     return { field: field, code: code, params: params || {} };
   }
@@ -32,6 +47,22 @@ var parsePlayerImport, validatePlayerImport;
     return result.replace(/\s+/g, ' ');
   }
 
+  function cleanLinePrefix(text) {
+    var str = String(text == null ? '' : text).trim();
+    return str.replace(/^(?:\s*(?:\d+[\.\)\-]|[-*•]))+\s*/, '');
+  }
+
+  function isNoiseLine(rawLine) {
+    var cleaned = cleanLinePrefix(rawLine);
+    var trimmed = cleaned.trim();
+    if (!trimmed) return true;
+    var folded = fold(trimmed);
+    if (!/[a-z]/.test(folded)) return true;
+    if (trimmed[trimmed.length - 1] === ':') return true;
+    if (CHAT_HEADERS.indexOf(folded) !== -1) return true;
+    return false;
+  }
+
   function splitRecords(text) {
     var records = [];
     var buffer = '';
@@ -41,7 +72,10 @@ var parsePlayerImport, validatePlayerImport;
 
     function pushRecord(unclosed) {
       if (buffer.trim()) {
-        records.push({ raw: buffer, sourceLine: startLine, unclosedQuote: !!unclosed });
+        var cleaned = cleanLinePrefix(buffer);
+        if (cleaned.trim() && !isNoiseLine(buffer)) {
+          records.push({ raw: cleaned, sourceLine: startLine, unclosedQuote: !!unclosed });
+        }
       }
       buffer = '';
     }
@@ -73,7 +107,10 @@ var parsePlayerImport, validatePlayerImport;
     return records;
   }
   function delimiterCounts(record) {
-    var counts = { '\t': 0, ';': 0, ',': 0 };
+    var counts = {};
+    for (var d = 0; d < DELIMITERS.length; d++) {
+      counts[DELIMITERS[d].character] = 0;
+    }
     var inQuotes = false;
     for (var i = 0; i < record.length; i++) {
       if (record[i] === '"') {
@@ -93,10 +130,20 @@ var parsePlayerImport, validatePlayerImport;
     return { name: 'name', character: null };
   }
 
+  var PRIMARY_DELIMITERS = ['\t', ';', ',', '|'];
+
   function usesMixedDelimiter(record, selected) {
     var counts = delimiterCounts(record);
     if (!selected.character) {
-      return counts['\t'] > 0 || counts[';'] > 0 || counts[','] > 0;
+      return PRIMARY_DELIMITERS.some(function (char) {
+        return counts[char] > 0;
+      });
+    }
+    var isPrimary = PRIMARY_DELIMITERS.indexOf(selected.character) !== -1;
+    if (isPrimary) {
+      return counts[selected.character] === 0 || PRIMARY_DELIMITERS.some(function (char) {
+        return char !== selected.character && counts[char] > 0;
+      });
     }
     return counts[selected.character] === 0 || DELIMITERS.some(function (delimiter) {
       return delimiter.character !== selected.character && counts[delimiter.character] > 0;

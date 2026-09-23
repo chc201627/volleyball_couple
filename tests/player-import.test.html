@@ -128,6 +128,24 @@
       var empty = analyze('\n  \r\n', 'en').validated;
       assert(!empty.summary.canCommit && hasCode(empty.batchIssues, 'emptyBatch'), 'blocks an empty batch');
 
+      var numberedList = analyze('1. Ana\n2. Bob', 'en');
+      assert(numberedList.parsed.rows.length === 2 && numberedList.validated.rows[0].player.name === 'Ana' && numberedList.validated.rows[1].player.name === 'Bob', 'parses numbered lists');
+
+      var dashSeparated = analyze('Carlos - H - 3', 'es');
+      assert(dashSeparated.parsed.dialect === 'dash' && dashSeparated.validated.rows[0].player.name === 'Carlos' && dashSeparated.validated.rows[0].player.gender === 'male' && dashSeparated.validated.rows[0].player.level === 3, 'parses dash-separated lists');
+
+      var slashSeparated = analyze('Maria / M / 2', 'es');
+      assert(slashSeparated.parsed.dialect === 'slash' && slashSeparated.validated.rows[0].player.name === 'Maria' && slashSeparated.validated.rows[0].player.gender === 'female' && slashSeparated.validated.rows[0].player.level === 2, 'parses slash-separated lists');
+
+      var colonSeparated = analyze('Elena: F: 1', 'en');
+      assert(colonSeparated.parsed.dialect === 'colon' && colonSeparated.validated.rows[0].player.name === 'Elena' && colonSeparated.validated.rows[0].player.gender === 'female' && colonSeparated.validated.rows[0].player.level === 1, 'parses colon-separated lists');
+
+      var bulletedList = analyze('- Ana\n* Bob', 'en');
+      assert(bulletedList.parsed.rows.length === 2 && bulletedList.validated.rows[0].player.name === 'Ana' && bulletedList.validated.rows[1].player.name === 'Bob', 'parses bulleted lists');
+
+      var chatHeaderList = analyze('Confirmados:\n1. Carlos', 'es');
+      assert(chatHeaderList.parsed.rows.length === 1 && chatHeaderList.validated.rows[0].player.name === 'Carlos', 'ignores chat headers and parses player list');
+
       finish();
     })();
   </script>
