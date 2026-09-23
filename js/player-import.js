@@ -3,7 +3,7 @@
  *
  * Pure, framework-agnostic parsing and validation. It deliberately exposes
  * only parsePlayerImport() and validatePlayerImport(); UI, IDs, and storage
- * remain app.js responsibilities.
+ * remain orchestrator responsibilities.
  */
 /* exported parsePlayerImport, validatePlayerImport */
 var parsePlayerImport, validatePlayerImport;
@@ -223,7 +223,7 @@ var parsePlayerImport, validatePlayerImport;
       var levelToken = String(draft.levelToken == null ? '' : draft.levelToken).trim();
       var level = null;
       if (levelToken) {
-        if (/^[123]$/.test(levelToken)) level = Number(levelToken);
+        if (/^[1-5]$/.test(levelToken)) level = Number(levelToken);
         else issues.push(makeIssue('level', 'invalidLevel', { token: draft.levelToken }));
       }
 

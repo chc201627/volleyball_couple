@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Match History Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+    pre { margin: 4px 0 12px 20px; color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Match History — Test Suite</h1>
+  <div id="results"></div>
+  <script src="../js/match-history.js"></script>
+  <script>
+    const results = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function assert(condition, testName, detail) {
+      if (condition) {
+        passed++;
+        results.innerHTML += `<p class="pass">✓ ${testName}</p>`;
+      } else {
+        failed++;
+        results.innerHTML += `<p class="fail">✗ ${testName}</p>`;
+        if (detail) results.innerHTML += `<pre>${detail}</pre>`;
+      }
+    }
+
+    function heading(title) { results.innerHTML += `<h2>${title}</h2>`; }
+
+    // A fixed afternoon so every day boundary in these tests is deliberate.
+    const NOW = new Date(2026, 8, 22, 14, 40, 0).getTime();
+    const MINUTE = 60000;
+    const HOUR = 60 * MINUTE;
+    const OWNER = 'uid-owner';
+    const SCORER = 'uid-scorer';
+
+    function entry(overrides) {
+      return Object.assign({
+        matchId: 'm1',
+        revision: 1,
+        score1: 9,
+        score2: 6,
+        status: 'finished',
+        updatedBy: SCORER,
+        updatedAt: NOW - 30 * MINUTE,
+        authorLabel: 'Caro · iPhone',
+        action: 'created',
+      }, overrides);
+    }
+
+    const options = { now: NOW, ownerUid: OWNER, viewerUid: OWNER };
+
+    // ===== The diff =====
+    heading('What changed');
+    let view = matchHistoryView([
+      entry({ revision: 3, score1: 9, score2: 7, action: 'edited', updatedAt: NOW - 4 * MINUTE }),
+      entry({ revision: 2, score1: 9, score2: 8, action: 'edited', updatedAt: NOW - 20 * MINUTE }),
+      entry({ revision: 1, score1: 9, score2: 6, action: 'created', updatedAt: NOW - 35 * MINUTE }),
+    ], options);
+
+    let rows = view.groups[0].rows;
+    assert(rows[0].score === '9 – 7' && rows[0].previousScore === '9 – 8',
+      'A change shows the value it replaced, taken from the revision below it');
+    assert(rows[2].previousScore === null && rows[2].isFirst,
+      'The first result has nothing to compare against and says so instead of diffing from nothing');
+    assert(view.total === 3 && view.matchCount === 1, 'The header counts records and the matches they touch');
+
+    view = matchHistoryView([
+      entry({ revision: 5, score1: 9, score2: 7, action: 'edited' }),
+      entry({ revision: 2, score1: 9, score2: 4, action: 'created' }),
+    ], options);
+    assert(view.groups[0].rows[0].previousScore === '9 – 4',
+      'A gap in revisions still diffs against the entry below it, not against revision − 1');
+
+    view = matchHistoryView([
+      entry({ revision: 2, score1: 9, score2: 6, action: 'edited' }),
+      entry({ revision: 1, score1: 9, score2: 6, action: 'created' }),
+    ], options);
+    assert(view.groups[0].rows[0].previousScore === null,
+      'A revision that did not change the score shows no diff');
+
+    const two = matchHistoryView([
+      entry({ matchId: 'm1', revision: 2, score1: 9, score2: 7 }),
+      entry({ matchId: 'm2', revision: 1, score1: 5, score2: 9 }),
+      entry({ matchId: 'm1', revision: 1, score1: 9, score2: 5 }),
+    ], options);
+    assert(two.groups[0].rows[0].previousScore === '9 – 5',
+      'The previous value comes from the same match, not from whatever was written before it');
+    assert(two.matchCount === 2, 'Two matches are counted as two');
+
+    // ===== Grouping by day =====
+    heading('When');
+    view = matchHistoryView([
+      entry({ revision: 3, updatedAt: NOW - 10 * MINUTE }),
+      entry({ revision: 2, updatedAt: NOW - 20 * HOUR }),
+      entry({ revision: 1, updatedAt: NOW - 48 * HOUR }),
+    ], options);
+    assert(view.groups.length === 3, 'Entries split into one group per calendar day');
+    assert(view.groups[0].dayOffset === 0 && view.groups[1].dayOffset === 1 && view.groups[2].dayOffset === 2,
+      'Groups carry how many days back they are, so the screen can say today and yesterday');
+    assert(view.groups[0].count === 1, 'Each group counts its own rows');
+
+    const beforeMidnight = new Date(2026, 8, 22, 0, 30, 0).getTime();
+    const lateYesterday = new Date(2026, 8, 21, 23, 45, 0).getTime();
+    view = matchHistoryView([entry({ updatedAt: lateYesterday })], { now: beforeMidnight, ownerUid: OWNER });
+    assert(view.groups[0].dayOffset === 1,
+      'Forty-five minutes earlier but across midnight is yesterday, not today');
+
+    view = matchHistoryView([
+      entry({ revision: 2, updatedAt: NOW - 4 * MINUTE }),
+      entry({ revision: 1, updatedAt: NOW - 3 * HOUR }),
+    ], options);
+    rows = view.groups[0].rows;
+    assert(rows[0].at.relative === true && rows[0].at.minutesAgo === 4,
+      'Something from the last hour is offered as minutes ago');
+    assert(rows[1].at.relative === false && /^\d\d:\d\d$/.test(rows[1].at.clock),
+      'Anything older reads as clock time');
+
+    view = matchHistoryView([entry({ updatedAt: null })], options);
+    assert(view.groups[0].rows[0].at.unknown === true,
+      'A missing timestamp is reported as unknown rather than as 1970');
+
+    // ===== Authorship =====
+    heading('Who');
+    view = matchHistoryView([
+      entry({ revision: 3, updatedBy: OWNER, authorLabel: 'Pipe' }),
+      entry({ revision: 2, updatedBy: SCORER, authorLabel: 'Caro · iPhone' }),
+      entry({ revision: 1, updatedBy: 'uid-other', authorLabel: null }),
+    ], options);
+    rows = view.groups[0].rows;
+    assert(rows[0].author.isYou && rows[0].author.isOwner,
+      'The viewer who is also the organiser is both, and the screen decides which to say');
+    assert(!rows[1].author.isYou && !rows[1].author.isOwner && rows[1].author.label === 'Caro · iPhone',
+      'A scorer is named by the label copied into the entry');
+    assert(rows[2].author.unknown === false && rows[2].author.label === null,
+      'An entry with a uid but no label is not unknown — it is someone, just unnamed');
+
+    view = matchHistoryView([
+      entry({ updatedBy: OWNER, authorLabel: 'Pipe' }),
+    ], { now: NOW, ownerUid: OWNER, viewerUid: SCORER });
+    assert(view.groups[0].rows[0].author.isOwner && !view.groups[0].rows[0].author.isYou,
+      'Seen by a scorer, the organiser is the organiser and not "you"');
+
+    // ===== Filters =====
+    heading('Filters');
+    const mixed = [
+      entry({ revision: 3, action: 'conflictResolved' }),
+      entry({ revision: 2, action: 'edited' }),
+      entry({ revision: 1, action: 'created' }),
+    ];
+    assert(matchHistoryView(mixed, Object.assign({}, options, { filter: 'created' })).groups[0].rows.length === 1,
+      'A filter keeps only its own kind of event');
+    assert(matchHistoryView(mixed, Object.assign({}, options, { filter: 'conflictResolved' })).groups[0].rows[0].action === 'conflictResolved',
+      'A resolved conflict is a filterable event of its own, not an edit');
+    const filtered = matchHistoryView(mixed, Object.assign({}, options, { filter: 'edited' }));
+    assert(filtered.total === 3 && filtered.shown === 1,
+      'The header keeps describing the whole history while a filter narrows what is shown');
+    assert(matchHistoryView(mixed, Object.assign({}, options, { filter: 'nonsense' })).filter === 'all',
+      'An unknown filter falls back to showing everything');
+
+    const limited = matchHistoryView(mixed, Object.assign({}, options, { limit: 2 }));
+    assert(limited.shown === 2 && limited.hidden === 1,
+      'A limit reports what it left out, so the screen can offer the rest');
+
+    // ===== One match =====
+    heading('One match');
+    const timeline = matchTimelineView([
+      entry({ matchId: 'm1', revision: 3, score1: 9, score2: 7, action: 'edited', updatedAt: NOW - 4 * MINUTE }),
+      entry({ matchId: 'm2', revision: 1, score1: 1, score2: 9 }),
+      entry({ matchId: 'm1', revision: 1, score1: 9, score2: 6, action: 'created', updatedAt: NOW - 35 * MINUTE }),
+      entry({ matchId: 'm1', revision: 2, score1: 9, score2: 8, action: 'conflictResolved', updatedAt: NOW - 20 * MINUTE }),
+    ], 'm1', options);
+    assert(timeline.total === 3, 'Only the asked-for match is in its timeline');
+    assert(timeline.rows.map(r => r.revision).join(',') === '3,2,1',
+      'The timeline runs from the newest revision back to the first');
+    assert(timeline.current.revision === 3 && timeline.current.score === '9 – 7',
+      'The result that stands is the newest revision');
+    assert(timeline.rows[1].previousScore === '9 – 6' && timeline.rows[1].action === 'conflictResolved',
+      'A resolved conflict shows both the version that lost and the one that stayed');
+    assert(matchTimelineView([], 'm1', options).empty === true, 'A match with no history is empty, not broken');
+
+    // ===== Sessions older than the history =====
+    heading('Before the history existed');
+    const legacy = legacyHistoryView([
+      { id: 'm1', status: 'finished', score1: 9, score2: 7, revision: 2, updatedBy: 'uid-x', updatedAt: NOW - 2 * HOUR },
+      { id: 'm2', status: 'pending', score1: null, score2: null, revision: 0, updatedBy: null, updatedAt: null },
+      { id: 'm3', status: 'live', score1: 4, score2: 3, revision: 1, updatedBy: null, updatedAt: NOW - 10 * MINUTE },
+    ], options);
+    assert(legacy.legacy === true, 'The legacy view says what it is, so the screen can explain the gap');
+    assert(legacy.total === 2, 'Only matches with a result have a last change to show');
+    assert(legacy.rows[0].matchId === 'm3', 'Legacy rows are newest first, like the real history');
+    assert(legacy.rows[0].author.unknown === true,
+      'Without a stored label there is no author to name, and that is stated rather than guessed');
+    assert(legacy.rows[0].previousScore === null,
+      'A legacy row carries no diff: the previous value was never recorded');
+    assert(legacyHistoryView([], options).empty === true, 'A legacy session with nothing played is empty');
+
+    // ===== Empty and defensive =====
+    heading('Empty and malformed');
+    assert(matchHistoryView([], options).empty === true, 'No entries is an empty history, not an error');
+    assert(matchHistoryView(null, options).total === 0, 'A missing list behaves like an empty one');
+    assert(matchHistoryView([{ revision: 1 }], options).total === 0,
+      'An entry with no match id is dropped rather than grouped under undefined');
+    assert(matchHistoryView([entry({ score1: null, score2: null })], options).groups[0].rows[0].score === null,
+      'An entry with no score reports none instead of printing "null – null"');
+    assert(HISTORY_FILTERS.join(',') === 'all,created,edited,conflictResolved',
+      'The filter vocabulary is published, so the screen and this module cannot drift');
+
+    // ===== Summary =====
+    const total = passed + failed;
+    const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';
+    results.innerHTML += `<div class="summary ${summaryClass}">${passed}/${total} tests passed` +
+      (failed > 0 ? ` — ${failed} FAILED` : ' — ALL PASSED') + '</div>';
+  </script>
+</body>
+</html>

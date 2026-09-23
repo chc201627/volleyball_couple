@@ -20,7 +20,7 @@
   <div id="results"></div>
   <script src="../js/tournament.js"></script>
   <script src="../js/tournament-format.js"></script>
-  <script src="../js/tournament-day.js"></script>
+  <script src="../js/tournament-day-selectors.js"></script>
   <script>
     const results = document.getElementById('results');
     let passed = 0;
@@ -308,7 +308,7 @@
     })();
 
     (function () {
-      // tournament-day.js only depends on tournament.js/tournament-format.js (not
+      // tournament-day-selectors.js only depends on tournament.js/tournament-format.js (not
       // king-of-court.js), so this fixture is a plain object shaped like a finished
       // KingState rather than a real createKingGame()/recordRally() run.
       const king = { winner: { id: 't1', name: 'Team 1' } };
@@ -370,6 +370,81 @@
     (function () {
       const summary = formatTournamentSummary(undefined, undefined);
       assert(summary === '', 'formatTournamentSummary: no view/labels never throws and returns an empty string');
+    })();
+
+    // ─── every match ─────────────────────────────────────────────────────────
+
+    (function () {
+      const day = tournamentDay({
+        matches: [
+          { id: 'm1', groupId: 'A', team1Id: 't1', team2Id: 't2', order: 1, status: 'finished', played: true, score1: 9, score2: 6 },
+          { id: 'm2', groupId: 'A', team1Id: 't3', team2Id: 't4', order: 2, status: 'live', score1: 3, score2: 2 },
+          { id: 'm3', groupId: 'A', team1Id: 't1', team2Id: 't3', order: 3, status: 'pending' },
+        ],
+        groups: [{ id: 'A', teams: [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }] }],
+      });
+      assert(day.all.length === 3, 'tournamentDay: `all` carries every match, whatever its state');
+      assert(day.all.map(v => v.matchId).join() === 'm1,m2,m3',
+        'tournamentDay: `all` keeps schedule order rather than grouping by state');
+      assert(day.all.length >= day.live.length + day.pending.length,
+        'tournamentDay: the state lists are subsets of `all`, not a different set of matches');
+    })();
+
+    // ─── searchMatchViews ────────────────────────────────────────────────────
+
+    (function () {
+      const teams = [
+        { id: 't1', name: 'Caro & Cami', players: [{ name: 'Caro' }, { name: 'Cami' }] },
+        { id: 't2', name: 'Lu & Sepúlveda', players: [{ name: 'Lu' }, { name: 'Sepúlveda' }] },
+        { id: 't3', name: 'María & Andrés', players: [{ name: 'María' }, { name: 'Andrés' }] },
+        { id: 't4', name: 'Pipe & Lina', players: [{ name: 'Pipe' }, { name: 'Lina' }] },
+      ];
+      const views = [
+        { matchId: 'm1', groupId: 'A', stageId: 'group', team1Id: 't1', team2Id: 't2' },
+        { matchId: 'm2', groupId: 'B', stageId: 'group', team1Id: 't3', team2Id: 't4' },
+        { matchId: 'm3', groupId: null, stageId: 'final', team1Id: 't1', team2Id: 't4' },
+      ];
+      const search = (query, options) => searchMatchViews(views, query, Object.assign({ teams: teams }, options || {}));
+
+      const idle = search('');
+      assert(idle.active === false && idle.results.length === 3,
+        'searchMatchViews: an empty query is not a search — every match comes back');
+      assert(searchMatchViews(views, '   ').active === false,
+        'searchMatchViews: whitespace is an empty query, not a filter that matches nothing');
+
+      assert(search('caro').results.map(v => v.matchId).join() === 'm1,m3',
+        'searchMatchViews: a player name finds every match that player is in');
+      assert(search('Caro & Cami').results.length === 2,
+        'searchMatchViews: the pair name works as well as the player names');
+
+      assert(search('maria').results.map(v => v.matchId).join() === 'm2',
+        'searchMatchViews: typing without accents still finds María — nobody types accents on a court');
+      assert(search('SEPULVEDA').results.map(v => v.matchId).join() === 'm1',
+        'searchMatchViews: case and accents are both folded');
+
+      assert(search('caro lu').results.map(v => v.matchId).join() === 'm1',
+        'searchMatchViews: every word has to match, so two names narrow to the match between them');
+      assert(search('lu caro').results.map(v => v.matchId).join() === 'm1',
+        'searchMatchViews: word order does not matter — nobody knows which pair is listed first');
+      assert(search('caro maria').results.length === 0,
+        'searchMatchViews: two names that never meet return nothing rather than either one');
+
+      assert(search('b').results.map(v => v.matchId).join() === 'm2',
+        'searchMatchViews: the group is searchable too');
+
+      const withStages = search('final', {
+        termsFor: (view) => (view.stageId === 'final' ? ['Final'] : ['Grupos']),
+      });
+      assert(withStages.results.map(v => v.matchId).join() === 'm3',
+        'searchMatchViews: the caller supplies already-translated stage names, and they are searchable');
+
+      assert(search('zzz').results.length === 0 && search('zzz').total === 3,
+        'searchMatchViews: no match reports none found while still stating how many there are');
+      assert(searchMatchViews(null, 'caro').results.length === 0,
+        'searchMatchViews: a missing list searches to nothing instead of throwing');
+      assert(searchMatchViews(views, 'caro', {}).results.length === 0 &&
+        searchMatchViews(views, 't1', {}).results.length === 2,
+        'searchMatchViews: with no teams there are no names to match, only the ids it falls back to');
     })();
 
     // ─── Summary ─────────────────────────────────────────────────────────────

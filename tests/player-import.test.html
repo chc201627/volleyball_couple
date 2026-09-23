@@ -108,10 +108,10 @@
       assert(optional.rows[0].player.gender === 'unspecified' && !Object.prototype.hasOwnProperty.call(optional.rows[0].player, 'level'), 'defaults empty gender and omits empty level');
       assert(optional.rows[1].player.level === 1, 'accepts level-only input with an empty gender column');
 
-      ['1', '2', '3'].forEach(function (level) {
+      ['1', '2', '3', '4', '5'].forEach(function (level) {
         assert(analyze('Player,F,' + level, 'en').validated.rows[0].player.level === Number(level), 'stores numeric level ' + level);
       });
-      var badTokens = analyze('Player,other,4', 'en').validated.rows[0];
+      var badTokens = analyze('Player,other,6', 'en').validated.rows[0];
       assert(hasCode(badTokens.issues, 'invalidGender') && hasCode(badTokens.issues, 'invalidLevel') && !badTokens.player, 'blocks unknown gender and invalid level');
 
       var minName = analyze(' A \n' + 'B'.repeat(50), 'en').validated;

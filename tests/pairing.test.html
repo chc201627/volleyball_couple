@@ -41,7 +41,7 @@
     function teamAverages(teams) {
       return teams.map(function (team) {
         const sum = team.players.reduce(function (acc, p) {
-          return acc + (typeof p.level === 'number' ? p.level : 2);
+          return acc + (typeof p.level === 'number' ? p.level : 3);
         }, 0);
         return sum / team.players.length;
       });
@@ -302,26 +302,26 @@
       });
     })();
 
-    // --- Level Balancing: unleveled players contribute value 2 (Intermediate) to team average ---
+    // --- Level Balancing: unleveled players contribute value 3 (Intermediate) to team average ---
     (function () {
       const team = { players: [
-        { name: 'A1', gender: 'unspecified', level: 3 },
-        { name: 'A2', gender: 'unspecified' } // no level → counts as 2
+        { name: 'A1', gender: 'unspecified', level: 1 },
+        { name: 'A2', gender: 'unspecified' } // no level → counts as 3
       ], type: 'same' };
-      assert(teamLevelAverage(team) === 2.5, 'Level balance: unleveled player counted as level 2 in team average',
+      assert(teamLevelAverage(team) === 2, 'Level balance: unleveled player counted as level 3 in team average',
         `Got ${teamLevelAverage(team)}`);
     })();
 
-    // --- Level whitelist: values outside {1,2,3} are treated as unleveled ---
+    // --- Level whitelist: values outside {1,2,3,4,5} are treated as unleveled ---
     (function () {
-      assert(isValidLevel(1) && isValidLevel(2) && isValidLevel(3),
-        'Level whitelist: 1, 2 and 3 are valid levels');
-      [0, 4, 7, -1, 2.5, NaN, '2', null, undefined].forEach(function (bad) {
+      assert(isValidLevel(1) && isValidLevel(2) && isValidLevel(3) && isValidLevel(4) && isValidLevel(5),
+        'Level whitelist: 1 through 5 are valid levels');
+      [0, 6, 8, -1, 2.5, NaN, '2', null, undefined].forEach(function (bad) {
         assert(!isValidLevel(bad), 'Level whitelist: invalid value rejected', `Value: ${String(bad)}`);
       });
-      assert(getPlayerLevel({ name: 'X', level: 7 }) === 2,
+      assert(getPlayerLevel({ name: 'X', level: 8 }) === 3,
         'Level whitelist: out-of-range level defaults to Intermediate in averages');
-      const teams = [{ players: [{ name: 'X', gender: 'male', level: 7 }], type: 'same' }];
+      const teams = [{ players: [{ name: 'X', gender: 'male', level: 8 }], type: 'same' }];
       assert(hasExplicitLevel(teams) === false,
         'Level whitelist: out-of-range level does not activate balancing');
     })();

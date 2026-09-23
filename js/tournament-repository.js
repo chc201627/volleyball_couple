@@ -31,9 +31,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     });
     return Object.keys(byId).map(function (id) { return byId[id]; });
   }
-  /** Format node under `structure/format` never stores `pairs` (D3) — knockout pairings
-   * live on the generated match nodes, not the persisted format. Empty `customRules` is
-   * OMITTED, never written as an empty string, null, or undefined. */
+  /** `pairs` is never persisted (D3): knockout pairings live on the match nodes. Empty
+   * `customRules` is omitted, never written as '' or null. */
   function encodeFormat(format) {
     if (!format) return null;
     var stagesById = {};
@@ -50,23 +49,8 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     }
     return encoded;
   }
-  /** Mirrors encodeFormat's shape (stagesById kept as an id-keyed map, matching every
-   * tournament-format.js consumer: resolveFormat/rulesForMatch/isValidToken all do keyed
-   * `stagesById[id]` lookups, never array indexing).
-   *
-   * HOTFIX (v1.8.1): `pairs` is intentionally never persisted (D3), but
-   * `isValidToken()`'s `winner:` branch reads `srcStage.pairs.length` to bound-check the
-   * ordinal, and `validateFormat()` requires every knockout stage to carry `pairs`. Both
-   * ran against the decoded (post-Firebase-sync) format with `pairs` permanently
-   * `undefined`, so every `winner:k-<stage>-<n>` token failed validation and
-   * `resolveFormat()` marked every stage after the first knockout stage `invalid` for any
-   * tournament that had round-tripped through a shared session. Knockout match team1Id/
-   * team2Id are never mutated after creation (generateStageMatches writes the slot-descriptor
-   * tokens once; resolveFormat only ever computes a projection, it never writes back onto the
-   * match), so the original `pairs` for a stage can always be rebuilt by reading those tokens
-   * back off that stage's decoded match nodes, ordered by the ordinal encoded in the match id
-   * (`k-<stageId>-<n>`). This restores the engine invariant "a runtime format always carries
-   * pairs" without persisting pairs to Firebase or touching firebase-rules.json. */
+  /** Rebuilds each stage's `pairs` from its match ids: they are never persisted, and
+   * without them every `winner:` token failed after a round trip (v1.8.1). */
   function rehydratePairs(stageId, matches) {
     var prefix = 'k-' + stageId + '-';
     return (matches || [])
@@ -198,6 +182,55 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     return liveOrFinished && validScores &&
       (command.status !== 'finished' || command.score1 !== command.score2);
   }
+  /** `created`, `conflictResolved` or `edited`: the distinction is what lets the history
+   * separate "someone scored this" from "someone corrected it". */
+  function historyAction(current, command) {
+    if (!current) return 'created';
+    if (command && command.afterConflict) return 'conflictResolved';
+    return 'edited';
+  }
+  /** The author label is copied into every entry: a spectator cannot read the member
+   * list, and an immutable snapshot should hold the name as it was then. */
+  function historyEntry(command, revision, uid, authorLabel, action, timestamp) {
+    return {
+      score1: command.score1,
+      score2: command.score2,
+      status: command.status,
+      revision: revision,
+      updatedBy: uid,
+      updatedAt: timestamp,
+      authorLabel: String(authorLabel || 'Organizador').slice(0, 50),
+      action: action,
+    };
+  }
+  /** Flattens `{matchId: {revision: entry}}` newest first, sorting on the stored
+   * `revision` rather than the key. */
+  function decodeHistory(raw) {
+    var entries = [];
+    Object.keys(raw || {}).forEach(function (matchId) {
+      var byRevision = raw[matchId] || {};
+      Object.keys(byRevision).forEach(function (key) {
+        var entry = byRevision[key];
+        if (!entry) return;
+        entries.push({
+          matchId: matchId,
+          revision: entry.revision,
+          score1: entry.score1,
+          score2: entry.score2,
+          status: entry.status,
+          updatedBy: entry.updatedBy,
+          updatedAt: entry.updatedAt,
+          authorLabel: entry.authorLabel,
+          action: entry.action,
+        });
+      });
+    });
+    entries.sort(function (a, b) {
+      if (a.updatedAt !== b.updatedAt) return (b.updatedAt || 0) - (a.updatedAt || 0);
+      return (b.revision || 0) - (a.revision || 0);
+    });
+    return entries;
+  }
   createInMemoryTournamentRepository = function (options) {
     options = options || {};
     var runtime = options.runtime || { uid: options.uid || 'memory-device', authState: 'ready', connection: 'online' };
@@ -207,6 +240,7 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     var now = typeof options.now === 'function' ? options.now : Date.now;
     var sessions = clone(options.sessions || {});
     var watchers = {};
+    var historyWatchers = {};
     var sequence = 0;
     function accessFor(session) {
       return session.access && session.access[runtime.uid] ? session.access[runtime.uid].status : null;
@@ -222,25 +256,47 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         role: owner ? 'owner' : (ownAccess === 'approved' ? 'scorer' : 'spectator'),
         accessStatus: ownAccess,
         requests: owner ? clone(session.access || {}) : null,
+        ownerUid: session.ownerUid || null,
+        viewerUid: runtime.authState === 'ready' ? runtime.uid : null,
       });
     }
     function notify(sessionId) {
       var current = snapshot(sessions[sessionId]);
       (watchers[sessionId] || []).slice().forEach(function (listener) { listener(current); });
+      var history = decodeHistory(sessions[sessionId] && sessions[sessionId].resultHistory);
+      (historyWatchers[sessionId] || []).slice().forEach(function (listener) { listener(history); });
+    }
+    function authorLabelFor(session) {
+      if (session.ownerUid === runtime.uid) return session.ownerLabel || 'Organizador';
+      var member = session.access && session.access[runtime.uid];
+      return (member && member.label) || 'Anotador';
     }
     return {
-      createSession: function (tournament) {
+      createSession: function (tournament, options) {
         var sessionId = 'memory-' + (++sequence);
+        var ownerLabel = options && options.ownerLabel;
         sessions[sessionId] = {
           schemaVersion: (tournament && tournament.format) ? 3 : 2,
           ownerUid: runtime.uid,
           createdAt: now(),
           structure: encodeStructure(tournament || {}),
           results: {},
+          resultHistory: {},
           access: {},
         };
+        if (ownerLabel) sessions[sessionId].ownerLabel = String(ownerLabel).slice(0, 50);
         notify(sessionId);
         return Promise.resolve({ sessionId: sessionId });
+      },
+      watchHistory: function (sessionId, onSnapshot) {
+        if (!historyWatchers[sessionId]) historyWatchers[sessionId] = [];
+        historyWatchers[sessionId].push(onSnapshot);
+        onSnapshot(decodeHistory(sessions[sessionId] && sessions[sessionId].resultHistory));
+        return function () {
+          historyWatchers[sessionId] = (historyWatchers[sessionId] || []).filter(function (item) {
+            return item !== onSnapshot;
+          });
+        };
       },
       watchSession: function (sessionId, onSnapshot) {
         if (!watchers[sessionId]) watchers[sessionId] = [];
@@ -286,17 +342,29 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         if (command.expectedRevision !== currentRevision) {
           return Promise.resolve({ status: 'conflict', current: clone(current) });
         }
+        var revision = currentRevision + 1;
+        var timestamp = now();
         var result = {
           score1: command.score1,
           score2: command.score2,
           status: command.status,
-          revision: currentRevision + 1,
+          revision: revision,
           updatedBy: runtime.uid,
-          updatedAt: now(),
+          updatedAt: timestamp,
         };
+        // Result and history land together, as the Firebase adapter does: a history
+        // with holes is worse than no history.
         session.results[command.matchId] = result;
+        session.resultHistory = session.resultHistory || {};
+        session.resultHistory[command.matchId] = session.resultHistory[command.matchId] || {};
+        session.resultHistory[command.matchId][revision] = historyEntry(
+          command, revision, runtime.uid, authorLabelFor(session),
+          historyAction(current, command), timestamp
+        );
         notify(sessionId);
-        return Promise.resolve({ status: 'synced', result: clone(result) });
+        // The same shape the Firebase adapter returns, so a harness cannot pass on a
+        // field production never hands back.
+        return Promise.resolve({ status: 'synced', result: { score1: result.score1, score2: result.score2, status: result.status, revision: revision, updatedBy: runtime.uid } });
       },
       removeSession: function (sessionId) {
         var session = sessions[sessionId];
@@ -324,6 +392,9 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
     var authState = currentUser ? 'ready' : 'pending';
     var connected = true;
     var signingIn = null;
+    /** Per-session authorship cache filled by watchSession, so a save does not pay an
+     * extra round trip to find out what name to stamp on the history entry. */
+    var authorship = {};
 
     function requireUser() {
       if (auth.currentUser) { currentUser = auth.currentUser; authState = 'ready'; return Promise.resolve(currentUser); }
@@ -347,21 +418,37 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         role: owner ? 'owner' : (status === 'approved' ? 'scorer' : 'spectator'),
         accessStatus: status,
         requests: owner ? (requests || {}) : null,
+        // Both uids travel with the snapshot so the history can say "you" and "the
+        // organiser" without reading the member list, which a spectator cannot.
+        ownerUid: raw.ownerUid || null,
+        viewerUid: uid || null,
       });
     }
 
     function watchSession(sessionId, onSnapshot) {
       var raw = null, access = null, requests = null, ownRef = null, membersRef = null;
+      // Whether the session node has answered at all: emitting null early would flash
+      // "this tournament is gone" over one that is still loading.
+      var loaded = false;
       var sessionRef = db.ref('tournaments/' + sessionId);
       var connectedRef = db.ref('.info/connected');
-      function emit() { if (raw) onSnapshot(joinedSnapshot(raw, access, requests)); }
+      /** A session that answered with nothing is reported as nothing: staying silent
+       * left a dead link showing whatever was in local storage. */
+      function emit() {
+        if (!loaded) return;
+        onSnapshot(raw ? joinedSnapshot(raw, access, requests) : null);
+      }
       function bindPrivate() {
         if (ownRef) ownRef.off();
         if (membersRef) membersRef.off();
         ownRef = membersRef = null; access = requests = null;
         if (!currentUser) { emit(); return; }
         ownRef = db.ref('tournamentAccess/' + sessionId + '/members/' + currentUser.uid);
-        ownRef.on('value', function (snap) { access = snap.val(); emit(); }, function () { access = null; emit(); });
+        ownRef.on('value', function (snap) {
+          access = snap.val();
+          authorship[sessionId] = Object.assign({}, authorship[sessionId], { memberLabel: access && access.label });
+          emit();
+        }, function () { access = null; emit(); });
         if (raw && raw.ownerUid === currentUser.uid) {
           membersRef = db.ref('tournamentAccess/' + sessionId + '/members');
           membersRef.on('value', function (snap) { requests = snap.val() || {}; emit(); });
@@ -372,21 +459,55 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
         if (!user) requireUser().catch(function () { authState = 'error'; emit(); });
       });
       connectedRef.on('value', function (snap) { connected = snap.val() !== false; emit(); });
-      sessionRef.on('value', function (snap) { raw = snap.val(); bindPrivate(); emit(); });
+      sessionRef.on('value', function (snap) {
+        raw = snap.val();
+        loaded = true;
+        authorship[sessionId] = Object.assign({}, authorship[sessionId], {
+          ownerUid: raw && raw.ownerUid,
+          ownerLabel: raw && raw.ownerLabel,
+        });
+        bindPrivate();
+        emit();
+      });
       return function () { sessionRef.off(); connectedRef.off(); if (ownRef) ownRef.off(); if (membersRef) membersRef.off(); stopAuth(); };
+    }
+    /** Cache first; the reads below only run for a save with no active subscription.
+     * Both paths are readable by the writer. */
+    function resolveAuthorLabel(sessionId, user) {
+      var cached = authorship[sessionId] || {};
+      if (cached.ownerUid === user.uid) return Promise.resolve(cached.ownerLabel || 'Organizador');
+      if (cached.ownerUid && cached.memberLabel) return Promise.resolve(cached.memberLabel);
+      return db.ref('tournaments/' + sessionId + '/ownerUid').once('value').then(function (snap) {
+        if (snap.val() === user.uid) {
+          return db.ref('tournaments/' + sessionId + '/ownerLabel').once('value')
+            .then(function (label) { return label.val() || 'Organizador'; });
+        }
+        return db.ref('tournamentAccess/' + sessionId + '/members/' + user.uid + '/label').once('value')
+          .then(function (label) { return label.val() || 'Anotador'; });
+      }).catch(function () { return 'Anotador'; });
     }
 
     return {
-      createSession: function (tournament) {
+      createSession: function (tournament, options) {
         return requireUser().then(function (user) {
           var sessionRef = db.ref('tournaments').push();
-          return sessionRef.set({
+          var payload = {
             schemaVersion: (tournament && tournament.format) ? 3 : 2, ownerUid: user.uid, createdAt: { '.sv': 'timestamp' },
             structure: encodeStructure(tournament || {}),
-          }).then(function () { return { status: 'synced', sessionId: sessionRef.key }; });
+          };
+          // Written once, at creation: the session node's .write only allows create and
+          // delete, so ownerLabel is immutable afterwards by construction.
+          var ownerLabel = options && options.ownerLabel;
+          if (ownerLabel) payload.ownerLabel = String(ownerLabel).slice(0, 50);
+          return sessionRef.set(payload).then(function () { return { status: 'synced', sessionId: sessionRef.key }; });
         }).catch(classify);
       },
       watchSession: watchSession,
+      watchHistory: function (sessionId, onSnapshot) {
+        var ref = db.ref('tournaments/' + sessionId + '/resultHistory');
+        ref.on('value', function (snap) { onSnapshot(decodeHistory(snap.val())); }, function () { onSnapshot([]); });
+        return function () { ref.off(); };
+      },
       requestAccess: function (sessionId, label) {
         return requireUser().then(function (user) {
           return db.ref('tournamentAccess/' + sessionId + '/members/' + user.uid).set({
@@ -402,21 +523,39 @@ var createInMemoryTournamentRepository, createFirebaseTournamentRepository;
           }).then(function () { return { status: 'synced' }; });
         }).catch(classify);
       },
+      /** Multi-path update, not a transaction: a transaction cannot touch a sibling
+       * node atomically, and the rules already pin `revision` to stored + 1. */
       saveResult: function (sessionId, command) {
         if (!validResult(command)) return Promise.resolve({ status: 'invalid' });
         if (!connected) return Promise.resolve({ status: 'offline' });
         return requireUser().then(function (user) {
-          var conflict = null;
-          var resultRef = db.ref('tournaments/' + sessionId + '/results/' + command.matchId);
-          return resultRef.transaction(function (current) {
-            var revision = current ? current.revision : 0;
-            if (revision !== command.expectedRevision) { conflict = current; return; }
-            return {
+          return resolveAuthorLabel(sessionId, user).then(function (authorLabel) {
+            var base = 'tournaments/' + sessionId + '/';
+            var revision = command.expectedRevision + 1;
+            var result = {
               score1: command.score1, score2: command.score2, status: command.status,
-              revision: revision + 1, updatedBy: user.uid, updatedAt: { '.sv': 'timestamp' },
+              revision: revision, updatedBy: user.uid, updatedAt: { '.sv': 'timestamp' },
             };
-          }, undefined, false).then(function (outcome) {
-            return outcome.committed ? { status: 'synced', result: outcome.snapshot.val() } : { status: 'conflict', current: clone(conflict) };
+            var action = historyAction(command.expectedRevision > 0 ? { revision: command.expectedRevision } : null, command);
+            var payload = {};
+            payload[base + 'results/' + command.matchId] = result;
+            payload[base + 'resultHistory/' + command.matchId + '/' + revision] =
+              historyEntry(command, revision, user.uid, authorLabel, action, { '.sv': 'timestamp' });
+            return db.ref().update(payload).then(function () {
+              // updatedAt stays unresolved here; the authoritative value arrives through
+              // watchSession. No consumer reads it off this return value.
+              return { status: 'synced', result: { score1: result.score1, score2: result.score2, status: result.status, revision: revision, updatedBy: user.uid } };
+            }, function (error) {
+              // A lost race and a lost permission are the same rejection, so re-read the
+              // stored revision to tell them apart.
+              return db.ref(base + 'results/' + command.matchId).once('value').then(function (snap) {
+                var stored = snap.val();
+                if ((stored ? stored.revision : 0) !== command.expectedRevision) {
+                  return { status: 'conflict', current: clone(stored) };
+                }
+                throw error;
+              }, function () { throw error; });
+            });
           });
         }).catch(classify);
       },

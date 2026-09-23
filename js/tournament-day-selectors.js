@@ -1,22 +1,11 @@
-/**
- * Tournament Day Module — pure, DOM-free selectors for the Tournament command
- * center and Results/completion screen (REQ-UX-31/32/33/50/52).
- *
- * Standalone pure-function module (no DOM access, no side effects, no i18n).
- * Depends on: tournament.js (isTournamentComplete), tournament-format.js
- * (rulesForMatch). Both load earlier in the contractual script order.
- *
- * Exposed functions:
- *   tournamentDay(input)
- *   formatTournamentSummary(view, labels)
- *   TOURNAMENT_DAY_COLLAPSE_AFTER
+/** Pure, DOM-free selectors for the Tournament and Results screens: next match,
+ * the state lists, stage progress, the outcome, and finding a match by name.
  */
 
-/* exported tournamentDay, formatTournamentSummary, TOURNAMENT_DAY_COLLAPSE_AFTER */
+/* exported tournamentDay, formatTournamentSummary, searchMatchViews, TOURNAMENT_DAY_COLLAPSE_AFTER */
 
-/** Sections longer than this collapse behind "Show all (N)" (REQ-UX-32, D12).
- * The module always returns full arrays plus counts — collapsing is a
- * rendering concern owned by app.js. */
+/** Sections longer than this collapse behind "Show all" (REQ-UX-32). Full arrays
+ * are always returned; collapsing is the screen's decision. */
 var TOURNAMENT_DAY_COLLAPSE_AFTER = 5;
 
 /** A stage's sort weight: the format's stage `order`, or 1 when there is no
@@ -27,7 +16,7 @@ function tournamentDayStageOrder(format, stageId) {
   return stage ? stage.order : 1;
 }
 
-/** Matches the fallback already used throughout app.js: prefer the explicit
+/** Matches the fallback used throughout the tournament modules: prefer the explicit
  * `status` field, else derive it from `played`. */
 function tournamentDayMatchStatus(match) {
   return match.status || (match.played ? 'finished' : 'pending');
@@ -45,10 +34,8 @@ function tournamentDayProjectedMatch(resolution, matchId) {
   return null;
 }
 
-/** Builds one MatchView from a raw match, enriched with Set Rules
- * (rulesForMatch) and, for formatted sessions, the resolveFormat() projection
- * (resolved team ids, slot tokens, scorability). Classic matches always
- * carry real team ids, so they are resolved/scorable by construction. */
+/** One MatchView: the raw match plus its set rules and, for formatted sessions,
+ * the resolveFormat() projection. Classic matches are resolved by construction. */
 function tournamentDayBuildMatchView(match, format, resolution) {
   var stageId = match.stageId || match.groupId;
   var rules = rulesForMatch(format, match.id);
@@ -130,9 +117,8 @@ function tournamentDayStandingsRows(standings, groupId) {
   return standings[groupId] || [];
 }
 
-/** Two standings rows are truly tied when every tiebreak field used by
- * calculateStandings' sort agrees (points, set differential, setsFor and,
- * when present, the extended-tiebreak `h2hWins` scalar). */
+/** Truly tied means every tiebreak field the standings sort uses agrees: points,
+ * differential, setsFor and, when present, `h2hWins`. */
 function tournamentDayRowsTied(a, b) {
   if (!a || !b) return false;
   if (a.points !== b.points) return false;
@@ -142,9 +128,8 @@ function tournamentDayRowsTied(a, b) {
   return true;
 }
 
-/** Champion resolution (REQ-UX-50): King > formatted knockout final > single
- * classic group (champion or tied lead) > multi-group classic (group
- * winners) > none. */
+/** Champion resolution (REQ-UX-50), in order: King, knockout final, a single
+ * classic group, group winners, none. */
 function tournamentDayOutcome(views, complete, format, resolution, standings, groups, king) {
   var empty = { kind: 'none', championTeamId: null, groupWinners: [], tiedTeamIds: [] };
 
@@ -190,8 +175,7 @@ function tournamentDayOutcome(views, complete, format, resolution, standings, gr
 }
 
 /**
- * Pure Tournament Day selectors: next match, live/pending/recently-finished
- * lists, stage progress and the champion/outcome projection.
+ * Next match, the state lists, stage progress and the outcome projection.
  *
  * @param {{ matches?: Array, teams?: Array, groups?: Array, format?: object|null,
  *   resolution?: object|null, standings?: (Map|object), king?: object|null }} input
@@ -256,6 +240,9 @@ function tournamentDay(input) {
   return {
     nextMatch: nextMatch,
     nextMatchReason: nextMatchReason,
+    // Every match, in schedule order: the lists below are the day screen's
+    // summary, and `recentlyFinished` is only the tail of what was played.
+    all: views,
     live: live,
     pending: pendingAll,
     recentlyFinished: recentlyFinished,
@@ -268,10 +255,8 @@ function tournamentDay(input) {
 }
 
 /**
- * Plain-text export summary (REQ-UX-52). Pure and i18n-free (D6): the caller
- * supplies already-translated pieces via `labels`, a set of optional
- * callbacks/strings this function invokes with the raw TournamentDayView
- * data it needs to describe.
+ * Plain-text export summary (REQ-UX-52). The caller supplies already-translated
+ * pieces via `labels`, so this stays free of i18n.
  *
  * @param {object} view - a tournamentDay() result (or a fake with the same shape)
  * @param {{ title?: string, championLine?: function, groupWinnerLine?: function,
@@ -308,4 +293,56 @@ function formatTournamentSummary(view, labels) {
   }
 
   return lines.join('\n');
+}
+
+
+/** Case- and accent-insensitive folding, as the import parser does it: on a court
+ * nobody types accents, and a search that misses one stops being used. */
+function tournamentDayFold(value) {
+  var text = String(value == null ? '' : value).trim().toLowerCase();
+  if (typeof text.normalize === 'function') {
+    text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  return text;
+}
+
+/**
+ * Find matches by what a person remembers: both pairs, every player, the group
+ * and whatever else the caller knows. Every word must match, in any order.
+ *
+ * @param {Array} views - match views from tournamentDay()
+ * @param {string} query - what was typed
+ * @param {Object} [options] - { teams, termsFor }
+ * @returns {{ query: string, active: boolean, results: Array, total: number }}
+ */
+function searchMatchViews(views, query, options) {
+  var all = Array.isArray(views) ? views : [];
+  options = options || {};
+  var words = tournamentDayFold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) {
+    return { query: '', active: false, results: all.slice(), total: all.length };
+  }
+
+  var teamsById = {};
+  (options.teams || []).forEach(function (team) { teamsById[team.id] = team; });
+
+  function teamTerms(teamId) {
+    var team = teamsById[teamId];
+    if (!team) return [teamId];
+    var terms = [team.name];
+    (team.players || []).forEach(function (player) { terms.push(player && player.name); });
+    return terms;
+  }
+
+  var results = all.filter(function (view) {
+    var terms = teamTerms(view.team1Id).concat(teamTerms(view.team2Id));
+    if (view.groupId) terms.push(view.groupId);
+    if (typeof options.termsFor === 'function') {
+      terms = terms.concat(options.termsFor(view) || []);
+    }
+    var haystack = terms.filter(Boolean).map(tournamentDayFold).join(' ');
+    return words.every(function (word) { return haystack.indexOf(word) !== -1; });
+  });
+
+  return { query: String(query), active: true, results: results, total: all.length };
 }

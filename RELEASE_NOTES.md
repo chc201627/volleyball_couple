@@ -1,14 +1,15 @@
 # Release Notes
 
-## v1.9.2 — Inline Match Finder
+## v2.0.0 — TO-BE Redesign
 
-- Added an inline, real-time match finder directly above the tournament group and knockout stage views:
-  - Real-time case- and accent-insensitive filtering (`normalizeSearchString`) across player names, team labels, group identifiers, and knockout stage names.
-  - Direct score/edit/resume action button on matching result cards to open scoring immediately without scrolling through long schedules.
-  - Clean keyboard support (ESC key clears search and restores full tournament view) and dedicated clear button.
-  - Mobile-first compliance with ≥44px touch targets and responsive layout verified at 320px viewport.
-  - Fully bilingual (English and Spanish).
-- Static assets only; no Firebase Rules change.
+- Full rewrite of the presentation layer against `design/volleyball-couple.pen` (35 artboards, 9 flows), delivered as slices A–L on a single branch (`feat/redesign-v2`); see `redesign-plan.md`. `js/app.js` (3,685 lines) and `css/styles.css` (2,489 lines) are gone, replaced by one module per screen (`js/ui/screens/*.js`) and per layer (`css/design-tokens.css`, `app-shell.css`, `components.css`, `screens.css`, `animations.css`).
+- New navigation shell: app bar + bottom tab bar + sub-tabs (Torneo · Hoy/Grupos) + bottom sheets for overlays, replacing the single long conditional page.
+- **Change history**: every result revision is now visible — a full history behind the tournament menu, a per-match timeline, and day-grouped filters (Todo/Nuevos/Ediciones/Conflictos). Backed by `resultHistory` (append-only, monotonic revision) alongside `results/{matchId}`.
+- **Every match, and finding one by name** (board C6): a searchable list of every match across all groups from Results, independent of stage — replaces the v1.9.2 inline match finder (`js/app.js`), which this redesign deletes.
+- Animate.css is gone. `css/animations.css` centralizes every `@keyframes` and utility class, with a `prefers-reduced-motion` guard; the removal fixes a production bug where `removePlayer()` silently failed to delete a player if the CDN did not load (the exit animation's `animationend` never fired).
+- Responsive: two columns at ≥600px, three at ≥960px, driven by `[data-col]` markers the shell reads back from the rendered screen rather than a duplicated list.
+- Design/verified at 320px first; zero horizontal overflow across the full flow (create tournament → score → standings → search → menu → history) in both languages.
+- Static assets only; no Firebase Rules change beyond the `resultHistory` node and `ownerLabel` added during the redesign (already covered by `firebase-rules.json` and `tests/firebase-rules.test.js`).
 
 ## v1.9.1 — Round-Robin Match Order Preservation
 

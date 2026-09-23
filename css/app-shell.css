@@ -1,0 +1,122 @@
+/* ============================================
+   App shell — v2.0.0
+   The frame every screen renders into: app bar on top, scrolling main in the
+   middle, navigation at the bottom, overlays above everything.
+
+   Only the active screen lives in #app-main. There is no hidden-toggling of
+   sibling screens, which is why this file carries no [hidden] override: v1
+   needed `[hidden] { display: none !important }` because layout rules kept
+   winning against the attribute.
+   ============================================ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.app__main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  /* The tab bar is fixed, so the scroll container reserves its height instead
+     of letting it sit on top of the last row — the overlap visible at 390,
+     600 and 960 in v1.9.1. */
+  padding-bottom: calc(var(--tab-bar-height) + var(--space-5) + env(safe-area-inset-bottom, 0px));
+}
+
+.app__action-bar {
+  position: sticky;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(to top, var(--surface-0) 70%, transparent);
+}
+
+.app__tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--surface-1);
+}
+
+.app__overlay:empty { display: none; }
+
+/* Where a toast appears. What it looks like is the c-toast component. */
+.app__toast {
+  position: fixed;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(var(--tab-bar-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  pointer-events: none;
+}
+.app__toast:empty { display: none; }
+
+/* --- Breakpoints ---
+   From 600px the navigation moves into the app bar and the fixed tab bar is
+   dropped entirely, which is where v1's sticky nav overlapped content most
+   visibly. Layout columns arrive with the screens that use them. */
+@media (min-width: 600px) {
+  .app__main {
+    width: min(100%, 920px);
+    margin-inline: auto;
+    padding: var(--space-5) var(--space-5) var(--space-6);
+  }
+  .app__tab-bar { display: none; }
+  .app__toast { left: auto; right: var(--space-5); width: min(360px, 100%); bottom: var(--space-5); }
+  .app__action-bar {
+    position: static;
+    padding-inline: 0;
+    background: none;
+  }
+
+  /* Two columns (board G2). A screen opts in by tagging its sections with
+     data-col; anything untagged spans the full width, so a screen that never
+     asked for columns is unaffected and a section that belongs to neither side
+     — a banner, a warning — still reads across. `align-items: start` stops the
+     short column from stretching to match the tall one. */
+  .app__main--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    /* Both: `items` keeps a short column from stretching to the tall one's
+       height, `content` keeps the rows from being stretched to fill the screen
+       — which put 76px of nothing between the sub-tabs and the columns. */
+    align-items: start;
+    align-content: start;
+    gap: var(--space-4);
+  }
+  /* Each column flows on its own; the gap inside matches the gap between. */
+  .app__col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+  .app__main--split > * { grid-column: 1 / -1; }
+  .app__main--split > [data-col="main"] { grid-column: 1; }
+  .app__main--split > [data-col="side"] { grid-column: 2; }
+}
+
+@media (min-width: 960px) {
+  .app__main {
+    width: min(100%, 1180px);
+  }
+  /* Three columns (board G1): context, the match being played, and the table
+     that no longer needs a tab of its own at this width. */
+  .app__main--triple {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr) minmax(0, 1.1fr);
+  }
+  .app__main--triple > * { grid-column: 1 / -1; }
+  .app__main--triple > [data-col="side"] { grid-column: 1; }
+  .app__main--triple > [data-col="main"] { grid-column: 2; }
+  .app__main--triple > [data-col="extra"] { grid-column: 3; }
+}

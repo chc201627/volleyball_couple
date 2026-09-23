@@ -24,7 +24,7 @@ function shuffle(array) {
 
 // --- Level-Balanced Team Generation ---
 
-const DEFAULT_LEVEL = 2;    // Players without an explicit level count as Intermediate
+const DEFAULT_LEVEL = 3;    // Players without an explicit level count as Intermediate
 const EPS = 1e-9;           // Floating-point tolerance for improvement/tie comparisons
 const MAX_ITERATIONS = 100; // Safety cap; the swap loop terminates on its own well before this
 
@@ -39,19 +39,19 @@ function normGender(player) {
 
 /**
  * Whether a value is a valid skill level. Restored state (localStorage,
- * Firebase) may carry arbitrary numbers, so membership in {1,2,3} is
+ * Firebase) may carry arbitrary numbers, so membership in {1,2,3,4,5} is
  * required — a bare typeof check is not enough.
  * @param {*} level
  * @returns {boolean}
  */
 function isValidLevel(level) {
-  return level === 1 || level === 2 || level === 3;
+  return level === 1 || level === 2 || level === 3 || level === 4 || level === 5;
 }
 
 /**
- * Get a player's skill level, defaulting unleveled players to Intermediate (2).
+ * Get a player's skill level, defaulting unleveled players to Intermediate (3).
  * @param {object} player
- * @returns {number} 1|2|3
+ * @returns {number} 1|2|3|4|5
  */
 function getPlayerLevel(player) {
   return isValidLevel(player.level) ? player.level : DEFAULT_LEVEL;
