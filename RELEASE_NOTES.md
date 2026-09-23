@@ -1,5 +1,12 @@
 # Release Notes
 
+## v2.0.2 — Manual Pairing Gender & Overlay Rerender Fixes
+
+- **Candidate gender and level indicators**: candidate player buttons and fixed pair rows in the Manual Pairing sheet now display their gender (`Hombre` / `Mujer` / `Sin género`) and skill level (`N1`, `N2`, `N3`).
+- **Overlay rerender scoping**: fixed an issue where tapping candidates or modal options triggered full screen transitions. Overlays now use `rerenderOverlay()`, preserving background view state without triggering reflow animations.
+- **Background ghosting prevention**: guarded `anim-screen-in` against repeated reflows on the same destination screen, hid bottom action bars and tab bars under active modal overlays (`body.has-overlay`), and deepened modal scrim opacity with background blur.
+- Static assets only; no Firebase schema or Rules changes required.
+
 ## v2.0.1 — WhatsApp & Flexible List Import Support
 
 - **Flexible bulk import**: `js/player-import.js` now strips numbered prefixes (`1. `, `1) `, `1- `), bullet points (`- `, `* `, `• `), and chat header lines (e.g. `Confirmados:`, `Suplentes:`, `Lista de hoy:`).

@@ -20,7 +20,7 @@
 /** The single source of truth for the release. scripts/bump-version.js rewrites
  * this line together with every `?v=` in index.html, so the cache name and the
  * URLs the page asks for can never drift apart. */
-var ASSET_VERSION = '2.0.1';
+var ASSET_VERSION = '2.0.2';
 var CACHE_VERSION = 'bv-' + ASSET_VERSION;
 
 /** Firebase SDKs are deliberately NOT precached: they are large, versioned by

@@ -198,7 +198,11 @@
             { id: 'consecutive', label: translate('king.condConsecutive', 'Seguidas'), active: kingCondition === 'consecutive' },
             { id: 'total', label: translate('king.condTotal', 'Totales'), active: kingCondition === 'total' },
           ],
-          onSelect: function (id) { kingCondition = id; ctx.rerender(); },
+          onSelect: function (id) {
+            kingCondition = id;
+            if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+            else ctx.rerender();
+          },
         })),
       ]),
       el('div', { class: 'fork__setting' }, [
@@ -208,7 +212,11 @@
           options: [5, 7, 10].map(function (value) {
             return { id: value, label: String(value), active: kingTarget === value };
           }),
-          onSelect: function (id) { kingTarget = id; ctx.rerender(); },
+          onSelect: function (id) {
+            kingTarget = id;
+            if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+            else ctx.rerender();
+          },
         })),
       ]),
     ]);
@@ -228,7 +236,11 @@
           title: translate('workspace.teams.forkTournament', 'Torneo'),
           desc: translate('teams.forkTournamentDesc', 'Grupos, tabla y final. Todos juegan lo mismo.'),
           active: isTournament,
-          onClick: function () { forkMode = 'tournament'; ctx.rerender(); },
+          onClick: function () {
+            forkMode = 'tournament';
+            if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+            else ctx.rerender();
+          },
           extra: [ownerField(ctx, snapshot)],
         }),
         modeCard(ctx, {
@@ -236,7 +248,11 @@
           title: translate('workspace.teams.forkKing', 'King of the Court'),
           desc: translate('teams.forkKingDesc', 'El que gana se queda en la cancha. Cola de retadores.'),
           active: !isTournament,
-          onClick: function () { forkMode = 'king'; ctx.rerender(); },
+          onClick: function () {
+            forkMode = 'king';
+            if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+            else ctx.rerender();
+          },
           extra: [kingSettings(ctx)],
         }),
         isTournament ? el('button', {

@@ -410,8 +410,14 @@
     return 'tournament';
   }
 
+  var lastScreenId = null;
+
   function renderScreen(view) {
-    var screen = UIScreens[screenIdFor(view)];
+    var nextScreenId = screenIdFor(view);
+    var screenChanged = lastScreenId !== nextScreenId;
+    lastScreenId = nextScreenId;
+
+    var screen = UIScreens[nextScreenId];
     if (screen && typeof screen.render === 'function') {
       DomHelpers.mount(nodes.main, screen.render(screenContext(view)));
     } else {
@@ -427,12 +433,15 @@
       !!nodes.main.querySelector(':scope > [data-col]'));
     nodes.main.classList.toggle('app__main--triple',
       !!nodes.main.querySelector(':scope > [data-col="extra"]'));
-    nodes.main.classList.remove('anim-screen-in');
-    void nodes.main.offsetWidth; // restart the transition on every destination change
-    nodes.main.classList.add('anim-screen-in');
+    if (screenChanged) {
+      nodes.main.classList.remove('anim-screen-in');
+      void nodes.main.offsetWidth; // restart the transition only on real destination change
+      nodes.main.classList.add('anim-screen-in');
+    }
   }
 
   function renderOverlay(view) {
+    document.body.classList.toggle('has-overlay', !!(view && view.overlay));
     if (!view.overlay) { DomHelpers.clear(nodes.overlay); return; }
     var overlay = UIScreens[view.overlay];
     if (overlay && typeof overlay.render === 'function') {

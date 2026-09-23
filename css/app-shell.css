@@ -49,6 +49,11 @@
 }
 
 .app__overlay:empty { display: none; }
+body.has-overlay .app__action-bar,
+body.has-overlay .app__tab-bar {
+  visibility: hidden;
+  pointer-events: none;
+}
 
 /* Where a toast appears. What it looks like is the c-toast component. */
 .app__toast {

@@ -183,8 +183,10 @@
   padding-left: var(--space-2);
 }
 .pairing__fixed-left { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.pairing__pin { color: var(--accent); }
+.pairing__fixed-info { min-width: 0; }
+.pairing__pin { color: var(--accent); flex: none; }
 .pairing__fixed-name { font-size: var(--font-body); font-weight: 600; overflow-wrap: anywhere; }
+.pairing__fixed-meta { font-size: var(--font-caption); color: var(--text-3); }
 
 .pairing__pool-row { display: flex; gap: var(--space-2); }
 .pairing__candidate {
@@ -194,7 +196,7 @@
   align-items: center;
   gap: var(--space-2);
   min-height: var(--touch-min);
-  padding: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-control);
   background: var(--surface-2);
   color: var(--text-1);
@@ -208,10 +210,27 @@
   box-shadow: inset 0 0 0 1.5px var(--accent);
   color: var(--accent);
 }
+.pairing__candidate-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
 .pairing__candidate-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
+}
+.pairing__candidate-meta {
+  font-size: var(--font-caption);
+  font-weight: 500;
+  color: var(--text-3);
+  line-height: 1.2;
+}
+.pairing__candidate.is-selected .pairing__candidate-meta {
+  color: var(--accent);
+  opacity: 0.9;
 }
 .pairing__empty { font-size: var(--font-meta); color: var(--text-3); }
 

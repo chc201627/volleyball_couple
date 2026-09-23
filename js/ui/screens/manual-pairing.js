@@ -18,6 +18,16 @@
     return player ? player.name : '';
   }
 
+  function metaOf(player) {
+    if (!player) return '';
+    var parts = [];
+    if (player.gender === 'male') parts.push(translate('form.genderMale', 'Hombre'));
+    else if (player.gender === 'female') parts.push(translate('form.genderFemale', 'Mujer'));
+    else parts.push(translate('form.genderUnspecified', 'Sin género'));
+    if (player.level) parts.push(translate('players.levelShort', 'N' + player.level, { level: player.level }));
+    return parts.join(' · ');
+  }
+
   /* --- Fixed pairs ------------------------------------------------------ */
 
   function fixedPairs(ctx, pairs) {
@@ -27,10 +37,19 @@
         return el('div', { class: 'pairing__fixed' }, [
           el('div', { class: 'pairing__fixed-left' }, [
             IconRegistry.icon('circle-check', { size: 15, class: 'pairing__pin' }),
-            el('p', {
-              class: 'pairing__fixed-name',
-              text: pair.map(function (id) { return nameOf(ctx, id); }).join('  &  '),
-            }),
+            el('div', { class: 'pairing__fixed-info' }, [
+              el('p', {
+                class: 'pairing__fixed-name',
+                text: pair.map(function (id) { return nameOf(ctx, id); }).join('  &  '),
+              }),
+              el('p', {
+                class: 'pairing__fixed-meta',
+                text: pair.map(function (id) {
+                  var p = playerById(ctx, id);
+                  return p ? p.name + ' (' + metaOf(p) + ')' : '';
+                }).join('  ·  '),
+              }),
+            ]),
           ]),
           C.iconButton({
             icon: 'x',
@@ -55,8 +74,9 @@
     for (var i = 0; i < available.length; i += 2) {
       rows.push(el('div', { class: 'pairing__pool-row' }, available.slice(i, i + 2).map(function (player) {
         var isSelected = selected.indexOf(player.id) !== -1;
+        var meta = metaOf(player);
         return el('button', {
-          class: ['pairing__candidate', isSelected && 'is-selected'],
+          class: ['pairing__candidate', isSelected && 'is-selected', player.gender && 'pairing__candidate--' + player.gender],
           attrs: { type: 'button', 'aria-pressed': isSelected ? 'true' : 'false' },
           on: {
             click: function () {
@@ -68,12 +88,16 @@
                 selected.push(player.id);
                 if (selected.length > teamSize) selected.shift();
               }
-              ctx.rerender();
+              if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+              else ctx.rerender();
             },
           },
         }, [
           IconRegistry.icon(isSelected ? 'circle-check' : 'circle', { size: 16 }),
-          el('span', { class: 'pairing__candidate-name', text: player.name }),
+          el('div', { class: 'pairing__candidate-info' }, [
+            el('span', { class: 'pairing__candidate-name', text: player.name }),
+            meta ? el('span', { class: 'pairing__candidate-meta', text: meta }) : null,
+          ]),
         ]);
       })));
     }
@@ -124,7 +148,8 @@
           onClick: function () {
             ctx.appState.setManualPairs(pairs.concat([selected.slice()]));
             selected = [];
-            ctx.rerender();
+            if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+            else ctx.rerender();
           },
         }),
         C.button({

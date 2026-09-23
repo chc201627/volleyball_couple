@@ -82,7 +82,7 @@
   --overlay-warn-12: rgba(255, 194, 75, 0.12);
   --overlay-error-12: rgba(255, 107, 107, 0.12);
   --overlay-info-12: rgba(127, 209, 255, 0.12);
-  --scrim: rgba(0, 0, 0, 0.7);
+  --scrim: rgba(8, 8, 8, 0.85);
 
   /* --- Type --- */
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
