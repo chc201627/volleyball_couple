@@ -1,5 +1,11 @@
 # Release Notes
 
+## v2.0.4 — Restore Footer Version Display
+
+- **Application footer and version restored**: restored the footer in the application shell with dynamic `footer.copyright` localization and static fallback, ensuring the running version (`v2.0.4`) and copyright are visibly displayed at the bottom of the page across both desktop and mobile viewports.
+- **Automated footer version bump**: updated `scripts/bump-version.js` to keep the HTML footer in sync automatically alongside asset query strings, service worker cache, and dictionary entries.
+- Static assets only; no Firebase schema or Rules changes required.
+
 ## v2.0.3 — Fix Overlay Action Bar Visibility
 
 - **Action bar isolation in overlays**: scoped `body.has-overlay` hiding rule strictly to the background `.app` shell (`body.has-overlay .app .app__action-bar`), ensuring action buttons inside modal overlays (such as "Revisar lista" / "Importar jugadores" in bulk player import) remain visible and accessible.

@@ -51,8 +51,12 @@ function bump(version) {
   var attribute = /((?:src|href)="[^"]*?)\?v=[^"]*"/g;
   var stampCount = (html.match(attribute) || []).length;
   var stamped = html.replace(attribute, '$1?v=' + version + '"');
+  var footerPattern = /(id="app-footer-text"[^>]*>.*?v)\d+\.\d+\.\d+/;
+  if (footerPattern.test(stamped)) {
+    stamped = stamped.replace(footerPattern, '$1' + version);
+  }
   if (stamped !== html) write('index.html', stamped);
-  changes.push('index.html — ' + stampCount + ' asset stamps');
+  changes.push('index.html — ' + stampCount + ' asset stamps and footer version');
 
   var sw = read('service-worker.js');
   var bumped = sw.replace(/var ASSET_VERSION = '[^']+';/, "var ASSET_VERSION = '" + version + "';");

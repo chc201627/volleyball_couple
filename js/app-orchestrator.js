@@ -368,6 +368,10 @@
       items: items,
       onSelect: navigate,
     }));
+
+    if (nodes.footerText) {
+      nodes.footerText.textContent = translate('footer.copyright', '© 2026 Emparejamiento de Vóley Playa — v2.0.4');
+    }
   }
 
   /** Everything a screen may reach: state and intents, never the shell's
@@ -549,6 +553,8 @@
       bar: document.getElementById('app-bar'),
       main: document.getElementById('app-main'),
       tabbar: document.getElementById('app-tabbar'),
+      footer: document.getElementById('app-footer'),
+      footerText: document.getElementById('app-footer-text'),
       overlay: document.getElementById('app-overlay'),
       toast: document.getElementById('app-toast'),
     };
