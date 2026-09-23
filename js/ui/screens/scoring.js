@@ -339,7 +339,7 @@
         el('p', { class: 'scoring__reason', text: check.ok ? '' : reasonText(check.reason, rules) }),
       ]);
 
-      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+      return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('tournament.scoreTitle', 'Anotar'),
           sub: teamNameFor(ctx, match, 1) + ' vs ' + teamNameFor(ctx, match, 2),

@@ -281,7 +281,7 @@
   }
 
   function shell(ctx, body, sub) {
-    return el('div', { class: 'overlay-screen anim-screen-in' }, [
+    return el('div', { class: 'overlay-screen' }, [
       C.subBar({
         title: translate('history.fullTitle', 'Historial de cambios'),
         sub: sub,
@@ -364,7 +364,7 @@
         }))));
       }
 
-      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+      return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('history.matchTitle', 'Historial del partido'),
           sub: matchTitle(tournament, matchId),

@@ -105,6 +105,8 @@
   flex-direction: column;
   background: var(--surface-0);
   overflow-y: auto;
+  opacity: 1 !important;
+  animation: none !important;
 }
 .overlay-screen__body {
   flex: 1 1 auto;

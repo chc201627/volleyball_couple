@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Repository guidance for coding agents. The production application is currently **v2.0.5**.
+Repository guidance for coding agents. The production application is currently **v2.0.6**.
 
 ## Project
 

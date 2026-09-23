@@ -445,8 +445,13 @@
   }
 
   function renderOverlay(view) {
-    document.body.classList.toggle('has-overlay', !!(view && view.overlay));
-    if (!view.overlay) { DomHelpers.clear(nodes.overlay); return; }
+    var hasOverlay = !!(view && view.overlay);
+    document.body.classList.toggle('has-overlay', hasOverlay);
+    if (!hasOverlay) {
+      document.body.classList.remove('has-fullscreen-overlay');
+      DomHelpers.clear(nodes.overlay);
+      return;
+    }
     var overlay = UIScreens[view.overlay];
     if (overlay && typeof overlay.render === 'function') {
       DomHelpers.mount(nodes.overlay, overlay.render(screenContext(view)));
@@ -458,6 +463,8 @@
         }),
       ]));
     }
+    var isFullscreen = !!nodes.overlay.querySelector('.overlay-screen');
+    document.body.classList.toggle('has-fullscreen-overlay', isFullscreen);
   }
 
   function render() {

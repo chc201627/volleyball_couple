@@ -356,7 +356,7 @@
       var snapshot = ctx.appState.get();
       var tournament = snapshot.tournament;
       if (!tournament) {
-        return el('div', { class: 'overlay-screen anim-screen-in' }, [
+        return el('div', { class: 'overlay-screen' }, [
           C.subBar({
             title: translate('matches.title', 'Todos los partidos'),
             onBack: function () { ctx.closeOverlay(); },
@@ -463,7 +463,7 @@
         });
       }
 
-      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+      return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('matches.title', 'Todos los partidos'),
           sub: translate('matches.progress',

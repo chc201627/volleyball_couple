@@ -67,6 +67,11 @@ body.has-overlay .app .app__footer {
   visibility: hidden;
   pointer-events: none;
 }
+body.has-fullscreen-overlay .app,
+body.has-overlay:has(.overlay-screen) .app {
+  visibility: hidden;
+  pointer-events: none;
+}
 .app__overlay .app__action-bar {
   visibility: visible;
   pointer-events: auto;

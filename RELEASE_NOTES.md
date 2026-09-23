@@ -1,4 +1,10 @@
 # Release Notes
+ 
+## v2.0.6 — Eliminate Overlay Ghosting and Screen Flashing
+
+- **Complete elimination of overlay flashing and ghosting**: resolved the visual flicker/cross-fade occurring across full-screen overlays (manual pairing, bulk import, tournament configuration, scoring, history, and search). Removed `anim-screen-in` opacity fades (`0 -> 1` keyframe) from all full-screen overlay components and enforced `animation: none !important; opacity: 1 !important;` in `css/screens.css`.
+- **Background isolation during fullscreen overlays**: added `has-fullscreen-overlay` shell state and rule `body.has-fullscreen-overlay .app, body.has-overlay:has(.overlay-screen) .app { visibility: hidden; }` in `css/app-shell.css` to guarantee the underlying background screen (`.app`) is completely hidden and invisible when any full-screen overlay is mounted.
+- Static assets only; no Firebase schema or Rules changes required.
 
 ## v2.0.5 — Manual Pairing Persistence & Overlay Action Bar Fixes
 

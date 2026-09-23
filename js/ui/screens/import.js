@@ -213,7 +213,7 @@
   UIScreens.import = {
     render: function (ctx) {
       var isReview = step === STEP_REVIEW;
-      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+      return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('import.pasteMode', 'Pegar lista'),
           sub: isReview ? translate('import.step2', 'Paso 2 de 2 · revisar') : translate('import.step1', 'Paso 1 de 2 · pegar'),

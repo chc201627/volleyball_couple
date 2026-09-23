@@ -77,7 +77,7 @@
         }),
       ]));
 
-      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+      return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('access.screenTitle', 'Anotar este torneo'),
           sub: translate('access.screenSub', 'Pide acceso al organizador'),
@@ -162,7 +162,7 @@
         onClick: function () { ctx.openOverlay('share'); },
       }));
 
-      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+      return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('scorers.title', 'Anotadores'),
           sub: pending.length

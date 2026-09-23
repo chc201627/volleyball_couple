@@ -168,7 +168,7 @@
         }),
       ]));
 
-      return el('div', { class: 'overlay-screen anim-screen-in' }, [
+      return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('pairing.manualTitle', 'Emparejar a mano'),
           sub: pairs.length + ' ' + translate('pairing.ofFixed', 'parejas fijadas'),
