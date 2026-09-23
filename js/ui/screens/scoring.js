@@ -74,15 +74,33 @@
           var clean = scoreInput.sanitize(event.target.value);
           event.target.value = clean;
           if (side === 1) draft.raw1 = clean; else draft.raw2 = clean;
+          updateWinningHighlights(match);
           refreshSaveState(ctx, match);
         },
-        focus: function () { celebration = null; },
-        blur: function () {
-          // Confirm on leaving: there is no accept button on a numeric keypad,
-          // so blur is the only gesture available.
-          var committed = String(scoreInput.commit(raw, stored(match, side)));
+        focus: function (event) {
+          celebration = null;
+          setTimeout(function () {
+            try {
+              if (document.activeElement === event.target && typeof event.target.select === 'function') {
+                event.target.select();
+              }
+            } catch (e) {}
+          }, 30);
+        },
+        blur: function (event) {
+          // Confirm on leaving without tearing down DOM, allowing smooth field-to-field navigation
+          var currentRaw = side === 1 ? draft.raw1 : draft.raw2;
+          var committed = String(scoreInput.commit(currentRaw, stored(match, side)));
           if (side === 1) draft.raw1 = committed; else draft.raw2 = committed;
-          ctx.rerenderOverlay();
+          event.target.value = committed;
+          updateWinningHighlights(match);
+          refreshSaveState(ctx, match);
+        },
+        keydown: function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.target.blur();
+          }
         },
       },
     });
@@ -123,6 +141,25 @@
       ]),
       el('div', { class: 'scoring__stepper' }, [minus, field, plus]),
     ]);
+  }
+
+  function updateWinningHighlights(match) {
+    var score1 = currentValue(match, 1);
+    var score2 = currentValue(match, 2);
+    var winner = scoreInput.winnerOf(score1, score2);
+    var blocks = document.querySelectorAll('.scoring__block');
+    if (blocks.length >= 2) {
+      blocks[0].classList.toggle('is-winning', winner === 1);
+      blocks[1].classList.toggle('is-winning', winner === 2);
+      var field1 = blocks[0].querySelector('.scoring__value');
+      var field2 = blocks[1].querySelector('.scoring__value');
+      if (field1) field1.classList.toggle('is-winning', winner === 1);
+      if (field2) field2.classList.toggle('is-winning', winner === 2);
+      var plus1 = blocks[0].querySelector('.scoring__step--add');
+      var plus2 = blocks[1].querySelector('.scoring__step--add');
+      if (plus1) plus1.classList.toggle('is-winning', winner === 1);
+      if (plus2) plus2.classList.toggle('is-winning', winner === 2);
+    }
   }
 
   /** Kept out of the render pass so typing does not rebuild the field and lose

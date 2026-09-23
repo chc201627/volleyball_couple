@@ -1,5 +1,13 @@
 # Release Notes
  
+## v2.0.7 — Score Direct Keyboard Input & Touch Focus Fixes
+
+- **Direct score typing without + / −**: fixed a critical closure bug in `js/ui/screens/scoring.js` where the `blur` event committed a stale render-time variable instead of the typed value in `draft`, previously causing typed numbers (e.g. 9, 5, 7) to be wiped and reverted back to 0 on exit.
+- **In-place highlight and validation updates**: updated winning side indicators and the "Guardar resultado" state in real-time without tearing down the overlay DOM on blur, enabling seamless tabbing and tapping between team score inputs.
+- **Auto-select on focus**: score input fields now auto-select their contents on focus, allowing one-tap replacement of initial zeros with typed numbers.
+- **Keyboard navigation**: added Enter key handling on score inputs to commit and blur gracefully.
+- Static assets only; no Firebase schema or Rules changes required.
+
 ## v2.0.6 — Eliminate Overlay Ghosting and Screen Flashing
 
 - **Complete elimination of overlay flashing and ghosting**: resolved the visual flicker/cross-fade occurring across full-screen overlays (manual pairing, bulk import, tournament configuration, scoring, history, and search). Removed `anim-screen-in` opacity fades (`0 -> 1` keyframe) from all full-screen overlay components and enforced `animation: none !important; opacity: 1 !important;` in `css/screens.css`.

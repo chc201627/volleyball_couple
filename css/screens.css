@@ -594,12 +594,14 @@
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
+  height: var(--touch-score);
   padding: 0 0 var(--space-2);
   border: 0;
   border-bottom: 2px solid var(--hairline-strong);
   border-radius: 0;
   background: none;
   color: var(--text-1);
+  caret-color: var(--accent);
   font-family: var(--font-family);
   font-size: var(--font-display);
   font-weight: 700;
