@@ -55,10 +55,18 @@
           icon: 'trophy',
           title: translate('workspace.tournament.nextMatch.reason.' + day.nextMatchReason, 'Sin partido pendiente'),
           text: day.complete ? translate('workspace.results.seeResults', 'El torneo ha terminado.') : null,
-          actions: day.complete ? [C.button({
-            label: translate('workspace.tournament.nextMatch.seeResults', 'Ver resultados'),
-            onClick: function () { ctx.navigate('results'); },
-          })] : null,
+          actions: day.complete ? [
+            C.button({
+              label: translate('workspace.tournament.nextMatch.seeResults', 'Ver resultados'),
+              onClick: function () { ctx.navigate('results'); },
+            }),
+            C.button({
+              variant: 'ghost',
+              icon: 'rotate-ccw',
+              label: translate('workspace.results.startAnother', 'Nuevo torneo'),
+              onClick: function () { ctx.openOverlay('confirmReset'); },
+            }),
+          ] : null,
         }),
       ]);
     }

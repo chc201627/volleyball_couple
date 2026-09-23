@@ -85,9 +85,7 @@
         desc: translate('teams.clearDesc', 'Borra el plantel y empieza de cero'),
         danger: true,
         onClick: function () {
-          if (!window.confirm(translate('actions.confirmClear', '¿Seguro que quieres borrar todos los jugadores?'))) return;
-          ctx.appState.clearPlayers();
-          ctx.navigate('setup');
+          ctx.openOverlay('confirmClear');
         },
       },
     ];
@@ -281,6 +279,51 @@
           },
         }),
       ]);
+    },
+  };
+
+  UIScreens.confirmClear = {
+    render: function (ctx) {
+      var snapshot = ctx.appState.get();
+      var hasActiveTournament = !!snapshot.tournament || !!snapshot.king;
+      var actions = [
+        C.button({
+          icon: 'trash-2',
+          variant: 'danger',
+          label: translate('actions.clearAllAndReset', 'Vaciar todo y empezar de cero'),
+          onClick: function () {
+            ctx.appState.clearPlayers();
+            ctx.resetTournament('setup');
+            ctx.closeOverlay();
+          },
+        }),
+      ];
+
+      if (hasActiveTournament) {
+        actions.push(C.button({
+          icon: 'rotate-ccw',
+          variant: 'primary',
+          label: translate('actions.resetKeepPlayers', 'Nuevo torneo (conservar jugadores)'),
+          onClick: function () {
+            ctx.resetTournament('teams');
+            ctx.closeOverlay();
+          },
+        }));
+      }
+
+      actions.push(C.button({
+        variant: 'ghost',
+        label: translate('actions.cancel', 'Cancelar'),
+        onClick: function () {
+          ctx.closeOverlay();
+        },
+      }));
+
+      return C.sheet({
+        title: translate('actions.confirmClearTitle', '¿Vaciar jugadores?'),
+        sub: translate('actions.confirmClearDesc', '¿Qué deseas hacer para empezar de cero?'),
+        onDismiss: function () { ctx.closeOverlay(); },
+      }, actions);
     },
   };
 })();

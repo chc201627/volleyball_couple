@@ -27,6 +27,7 @@ var WORKSPACE_SUBVIEWS = { tournament: ['today', 'groups', 'bracket'] };
 var WORKSPACE_OVERLAYS = [
   'scoring', 'history', 'matchHistory', 'requestAccess', 'scorers', 'share', 'modeFork',
   'tournamentMenu', 'allMatches', 'import', 'manualPairing', 'tournamentConfig', 'formatEditor',
+  'confirmClear', 'confirmReset',
 ];
 
 /** Sub-view resolution. Only Tournament has them; everything else resolves to
@@ -100,6 +101,10 @@ function workspaceOverlayAllowed(id, input) {
       // Reachable while a tournament runs, but read-only there — the format is
       // locked once matches exist, and the screen says so rather than hiding.
       return { enabled: !!input.couplesGenerated, reasonKey: 'workspace.overlay.blocked.noTeams' };
+    case 'confirmClear':
+      return { enabled: input.role === 'owner', reasonKey: input.role === 'owner' ? null : 'workspace.overlay.blocked.readOnly' };
+    case 'confirmReset':
+      return { enabled: input.role === 'owner', reasonKey: input.role === 'owner' ? null : 'workspace.overlay.blocked.readOnly' };
     default:
       return { enabled: false, reasonKey: null };
   }

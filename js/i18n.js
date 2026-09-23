@@ -44,6 +44,13 @@ var t, translate, setLanguage, getLanguage;
       'actions.regenerate': 'Draw again',
       'actions.clearAll': 'Clear players',
       'actions.confirmClear': 'Delete every player?',
+      'actions.confirmClearTitle': 'Clear players?',
+      'actions.confirmClearDesc': 'What would you like to do to start fresh?',
+      'actions.clearAllAndReset': 'Clear all and start from scratch',
+      'actions.resetKeepPlayers': 'New tournament (keep players)',
+      'actions.cancel': 'Cancel',
+      'tournament.newTournamentTitle': 'Start a new tournament?',
+      'tournament.newTournamentDesc': 'What would you like to do with the current roster?',
       // Results
       'results.heading': 'Pairs',
       'results.typeMixed': 'Mixed',
@@ -160,7 +167,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'New tournament',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.7',
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.8',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': 'Who is playing today?',
@@ -501,6 +508,13 @@ var t, translate, setLanguage, getLanguage;
       'actions.regenerate': 'Regenerar',
       'actions.clearAll': 'Vaciar jugadores',
       'actions.confirmClear': '¿Seguro que quieres borrar todos los jugadores?',
+      'actions.confirmClearTitle': '¿Vaciar jugadores?',
+      'actions.confirmClearDesc': '¿Qué deseas hacer para empezar de cero?',
+      'actions.clearAllAndReset': 'Vaciar todo y empezar de cero',
+      'actions.resetKeepPlayers': 'Nuevo torneo (conservar jugadores)',
+      'actions.cancel': 'Cancelar',
+      'tournament.newTournamentTitle': '¿Empezar un nuevo torneo?',
+      'tournament.newTournamentDesc': '¿Qué deseas hacer con el plantel actual?',
       // Resultados
       'results.heading': 'Parejas',
       'results.typeMixed': 'Mixta',
@@ -617,7 +631,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Nuevo torneo',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.7',
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.8',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': '¿Quién juega hoy?',

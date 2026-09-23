@@ -245,6 +245,11 @@
     assert(routed({ currentOverlay: 'history' }).overlay === 'history', 'Full history opens for a running tournament');
     assert(computeWorkspace(baseInput({ currentOverlay: 'history' })).overlay === null, 'Full history refuses without a tournament');
 
+    assert(computeWorkspace(baseInput({ currentOverlay: 'confirmClear' })).overlay === 'confirmClear', 'confirmClear opens for owner');
+    assert(computeWorkspace(baseInput({ role: 'spectator', currentOverlay: 'confirmClear' })).overlay === null, 'confirmClear refused for spectator');
+    assert(computeWorkspace(baseInput({ currentOverlay: 'confirmReset' })).overlay === 'confirmReset', 'confirmReset opens for owner');
+    assert(computeWorkspace(baseInput({ role: 'spectator', currentOverlay: 'confirmReset' })).overlay === null, 'confirmReset refused for spectator');
+
     // ===== Summary =====
     const total = passed + failed;
     const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';

@@ -214,6 +214,15 @@
             if (field) { field.classList.toggle('is-open'); field.focus(); }
           },
         }),
+        C.iconButton({
+          icon: 'trash-2',
+          tone: 'muted',
+          size: 18,
+          label: translate('actions.clearAll', 'Vaciar jugadores'),
+          onClick: function () {
+            ctx.openOverlay('confirmClear');
+          },
+        }),
       ]),
     ]);
 

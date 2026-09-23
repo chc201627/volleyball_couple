@@ -146,9 +146,7 @@
           tone: 'danger',
           label: translate('tournament.reset', 'Reiniciar torneo'),
           onClick: function () {
-            if (!window.confirm(translate('tournament.confirmReset',
-              '¿Seguro que quieres reiniciar el torneo? Se borran los resultados y el link deja de funcionar.'))) return;
-            ctx.resetTournament();
+            ctx.openOverlay('confirmReset');
           },
         });
       }

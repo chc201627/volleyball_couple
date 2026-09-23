@@ -248,7 +248,7 @@
 
   /** The session is deleted rather than emptied: a reset ends the tournament, and
    * a surviving link would point at something nobody is playing. */
-  function resetTournament() {
+  function resetTournament(destination) {
     if (repository && sessionId && repository.removeSession) {
       repository.removeSession(sessionId).catch(function () { /* the local reset stands */ });
     }
@@ -259,9 +259,10 @@
     lastRole = null;
     appState.clearSession();
     appState.resetTournament();
+    appState.resetKing();
     history.replaceState(null, '', window.location.pathname + window.location.search);
     state.currentOverlay = null;
-    navigate('setup');
+    navigate(destination || 'setup');
   }
 
   function publishSession() {
@@ -278,7 +279,6 @@
   }
 
   function navigate(viewId) {
-    if (state.currentView === viewId) return;
     state.currentView = viewId;
     // A destination change closes whatever was stacked on top of it: an overlay
     // belongs to the screen that opened it, never to the shell.

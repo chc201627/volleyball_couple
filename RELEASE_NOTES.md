@@ -1,5 +1,15 @@
 # Release Notes
  
+## v2.0.8 — Styled Roster Clear & Clean Tournament Reset
+
+- **Modern styled bottom sheet for clearing players**: replaced native browser `window.confirm` popup with the application's standard styled modal bottom sheet (`confirmClear`). Accessible directly from the Setup screen roster header (`trash-2` button) as well as the Teams screen options panel.
+- **Clean tournament reset without clearing cache/cookies**: fixed an architectural trap where the "Nuevo torneo" action previously navigated to setup without resetting the tournament or removing it from `localStorage`, causing users to be perpetually routed back to the finished tournament due to `workspaceDefaultView` and forcing them to clear browser cookies/cache.
+- **Flexible reset confirmation options**: clicking "Nuevo torneo" or "Reiniciar torneo" presents `confirmReset` sheet offering two clear paths:
+  1. *Nuevo torneo (conservar jugadores)*: clears tournament, matches, standings, and history while preserving the player roster for a new tournament run.
+  2. *Vaciar todo y empezar de cero*: fully purges tournament, matches, history, and roster from state and `localStorage` to start completely fresh.
+- **Responsive & accessible**: verified at 320px mobile width with 0px horizontal overflow; touch targets >= 44x44px.
+- Static assets only; no Firebase schema or Rules changes required.
+
 ## v2.0.7 — Score Direct Keyboard Input & Touch Focus Fixes
 
 - **Direct score typing without + / −**: fixed a critical closure bug in `js/ui/screens/scoring.js` where the `blur` event committed a stale render-time variable instead of the typed value in `draft`, previously causing typed numbers (e.g. 9, 5, 7) to be wiped and reverted back to 0 on exit.

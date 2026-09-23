@@ -272,6 +272,23 @@
     assert(state.get().session === null, 'Leaving a session clears it');
     assert(sessionNotifications === 2, 'Leaving a session notifies subscribers so the shell re-renders');
 
+    // ===== Reset and Clear Purges =====
+    heading('Reset and Clear Purges');
+    state = seed(fresh(), 4);
+    state.startTournament();
+    state.clearPlayers();
+    assert(state.get().players.length === 0, 'clearPlayers empties roster');
+    assert(state.get().tournament === null, 'clearPlayers also wipes tournament state');
+    assert(localStorage.getItem(AppState.KEYS.tournament) === null, 'clearPlayers removes tournament from localStorage');
+
+    state = seed(fresh(), 4);
+    state.startTournament();
+    state.resetTournament();
+    assert(state.get().tournament === null, 'resetTournament sets tournament to null');
+    assert(localStorage.getItem(AppState.KEYS.tournament) === null, 'resetTournament removes tournament from localStorage');
+    assert(state.get().teams === null, 'resetTournament clears teams');
+    assert(state.get().players.length === 4, 'resetTournament preserves players for another run');
+
     // ===== Summary =====
     const total = passed + failed;
     const summaryClass = failed === 0 ? 'summary--pass' : 'summary--fail';

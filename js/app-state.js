@@ -240,6 +240,11 @@ var AppState;
       clearPlayers: function () {
         mutateRoster(function (roster) { roster.length = 0; });
         removeKey(KEYS.players);
+        state.tournament = null;
+        removeKey(KEYS.tournament);
+        state.king = null;
+        removeKey(KEYS.king);
+        emit();
         return { ok: true };
       },
 
@@ -447,6 +452,10 @@ var AppState;
       resetTournament: function () {
         state.tournament = null;
         removeKey(KEYS.tournament);
+        state.king = null;
+        removeKey(KEYS.king);
+        state.teams = null;
+        state.unmatched = [];
         emit();
         return { ok: true };
       },

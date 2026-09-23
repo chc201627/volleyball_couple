@@ -33,7 +33,7 @@
     var actions = [
       { icon: 'share-2', label: translate('day.share', 'Compartir'), onClick: function () { ctx.openOverlay('share'); } },
       { icon: 'history', label: translate('history.title', 'Historial'), onClick: function () { ctx.openOverlay('history'); } },
-      { icon: 'rotate-ccw', label: translate('workspace.results.startAnother', 'Nuevo torneo'), onClick: function () { ctx.navigate('setup'); } },
+      { icon: 'rotate-ccw', label: translate('workspace.results.startAnother', 'Nuevo torneo'), onClick: function () { ctx.openOverlay('confirmReset'); } },
     ];
     return el('div', { class: 'results__actions' }, actions.map(function (action) {
       return el('button', {
@@ -122,6 +122,43 @@
 
       body.push(actionsRow(ctx));
       return body;
+    },
+  };
+
+  UIScreens.confirmReset = {
+    render: function (ctx) {
+      return C.sheet({
+        title: translate('tournament.newTournamentTitle', '¿Empezar un nuevo torneo?'),
+        sub: translate('tournament.newTournamentDesc', '¿Qué deseas hacer con el plantel actual?'),
+        onDismiss: function () { ctx.closeOverlay(); },
+      }, [
+        C.button({
+          icon: 'users',
+          variant: 'primary',
+          label: translate('actions.resetKeepPlayers', 'Nuevo torneo (conservar jugadores)'),
+          onClick: function () {
+            ctx.resetTournament('teams');
+            ctx.closeOverlay();
+          },
+        }),
+        C.button({
+          icon: 'trash-2',
+          variant: 'danger',
+          label: translate('actions.clearAllAndReset', 'Vaciar todo y empezar de cero'),
+          onClick: function () {
+            ctx.appState.clearPlayers();
+            ctx.resetTournament('setup');
+            ctx.closeOverlay();
+          },
+        }),
+        C.button({
+          variant: 'ghost',
+          label: translate('actions.cancel', 'Cancelar'),
+          onClick: function () {
+            ctx.closeOverlay();
+          },
+        }),
+      ]);
     },
   };
 })();
