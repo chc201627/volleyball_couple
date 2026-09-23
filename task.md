@@ -571,3 +571,28 @@ Delivered as SDD change `organizer-workspace` (see `sdd/organizer-workspace/{pro
 **Acceptance criteria (spec §Acceptance):** four nav labels visible at 320×568 on first paint; Start impossible with an unmet readiness item; Next Match is the first content block above the fold at 320×568; owner approves a scorer without leaving Tournament; every scoring action ends in a visible state with in-view conflict Retry/Discard; champion/group-winners/tied-lead + standings visible on Results with no navigation; integration harness and `npm run test:rules` green; no untranslated key at 320px in EN or ES.
 
 **Deferred/known items** (tracked, not release blockers): `.workspace-status` sticky per wireframe (currently `position: static`); share/export confirmation label restore from `data-i18n`; gender/level chip accent colors approximated from the mockup (contrast-verified, not organizer-pixel-confirmed); Results summary date (no reliable timestamp on local-only saves); a pre-existing CSS-specificity quirk where `:hover` outranks a selected `--active` chip on desktop pointers only (touch/production mobile unaffected).
+
+## Phase 15: TO-BE Redesign (v2.0.0)
+
+Full presentation-layer rewrite against `design/volleyball-couple.pen` (35 artboards, 9 flows). Plan, slice inventory, and cleanup criteria live in `redesign-plan.md`. Delivered as slices (commits, not branches) on one tracker branch, `feat/redesign-v2`.
+
+| Slice | Content | Boards | Status |
+|---|---|---|---|
+| A | Data contract: `resultHistory` + `ownerLabel` rules, `watchHistory()`/multi-path `saveResult()`, version-floor notice, rule tests | H0 | [x] Done |
+| B | UI foundation: tokens, `dom.js`, `components.js`, `animations.css`, shell, app bar + tab bar, extended routing, service worker | 00, 01, M1 | [x] Done |
+| C | Setup: quick add, searchable list, readiness bar, paste-a-list, hand pairing, tournament config, format editor | A1–A6 | [x] Done |
+| D | Teams: compact couple rows, notices/options, mode-fork sheet | B1–B3 | [x] Done |
+| E | Tournament day: sub-tabs, Hoy, Grupos (`standings-view.js`), bracket | C1, C3, C4 | [x] Done |
+| F | Scoring: `score-input.js`, editable field, sync/conflict states, winner celebration | C2, C2b, C5, M2 | [x] Done |
+| G | Collaboration: spectator, access requests, scorers, share | D1–D4 | [x] Done |
+| H | Change history: `match-history.js`, submenu, full/per-match history, edge states | H1–H5 | [x] Done |
+| I | King of the Court: throne, rally, queue, champion | E1, E2 | [x] Done |
+| J | Completion: results in progress, champion, empty, session unavailable | F1–F4 | [x] Done |
+| K | Responsive: ≥600 nav in app bar + two columns, ≥960 three columns | G1, G2 | [x] Done |
+| L | Cleanup and release: sweep scripts, final deletions, docs, v2.0.0 | — | [x] Done |
+
+**Slice L closure (redesign-plan.md §7.4):** `scripts/css-unused.js` written (mirrors `scripts/i18n-unused.js`, with BEM-modifier and keyframe awareness) — both sweeps return zero. One truly dead utility (`.sr-only`, superseded by direct `aria-label`s) removed from `css/reset.css`. One real gap found and fixed: the `anim-score-bump` keyframes existed since board M2 but no screen ever applied the class — `js/ui/screens/scoring.js`'s `+`/`−` steppers now trigger it, consumed on the render it caused so it never replays on an unrelated rerender.
+
+**Verified:** 13 browser suites (598+ asserts) and `npm run test:rules` (25/25) green; `node scripts/i18n-unused.js --strict` and `node scripts/css-unused.js --strict` both clean; full walkthrough (create tournament → score → standings → search → menu → change history) at a real 320×568 viewport against the Firebase emulator, zero console errors, zero horizontal overflow.
+
+**Deferred, not a release blocker:** P1 QR code in the tournament menu (board H1, `redesign-plan.md` §9.3). **Known merge blocker:** `main` shipped v1.9.2 with a match search built on `js/app.js`/`css/styles.css`, which this redesign deletes; the same feature is board C6 here (`allMatches` + `searchMatchViews`) — the merge must take v2's deletions, not recover v1's files.

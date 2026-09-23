@@ -328,6 +328,8 @@ Dos reglas que salen del bug:
 
 **Criterio de cierre del slice L:** `scripts/css-unused.js` y `scripts/i18n-unused.js` devuelven cero, y ninguna función de `app.js` queda sin llamar.
 
+**Cerrado.** `scripts/css-unused.js` se escribió (con reconocimiento de modificadores BEM dinámicos y de `@keyframes`) y ambos barridos dan cero. `app.js` ya no existe: la pregunta "ninguna función sin llamar" se resolvió módulo por módulo durante el barrido de CSS, que encontró el `chip()` de género/nivel como el único caso real (queda como deuda conocida, no una función completamente muerta: el componente sí se usa, solo nunca con esos tonos) y un hueco genuino — `anim-score-bump` (board M2) nunca se aplicaba en la pantalla de anotar; ahora se dispara en cada `+`/`−`. Se borró además `.sr-only`, huérfana desde que el patrón real de accesibilidad quedó en `aria-label` directo.
+
 ---
 
 ## 8. Verificación
@@ -371,7 +373,7 @@ Trabajo identificado y **deliberadamente aplazado**, no olvidado. Se cierra ante
 
 | # | Pendiente | Por qué está fuera de su slice | Dónde entra |
 |---|---|---|---|
-| P1 | **Código QR en el menú del torneo (board H1).** El menú lleva Historial, Anotadores, Compartir y Reiniciar; el QR del canvas no está. | Generar un QR sin dependencias y sin build es trabajo propio —o una librería, que choca con el criterio de no añadir dependencias, o un generador a mano—, no un detalle del slice H. | Antes de L, como slice propio. |
+| P1 | **Código QR en el menú del torneo (board H1).** El menú lleva Historial, Anotadores, Compartir y Reiniciar; el QR del canvas no está. | Generar un QR sin dependencias y sin build es trabajo propio —o una librería, que choca con el criterio de no añadir dependencias, o un generador a mano—, no un detalle del slice H. | Sigue abierto. L se cerró sin P1: es una feature nueva, no limpieza, y no bloquea los criterios de cierre de L (§7.4). |
 | ~~P2~~ | ~~**Buscador de partidos por jugador o pareja.**~~ **Hecho**, y no como port de v1: board **C6 · TORNEO · TODOS LOS PARTIDOS**, con el buscador dentro del listado completo. Al implementarlo apareció que en v2 «Ver todos» llevaba a Grupos —que solo tiene la tabla— así que el calendario completo no existía en ninguna pantalla; C6 lo es. | — | Cerrado. |
 
 **Nota de ramas:** toda la cadena vive en **una sola rama, `feat/redesign-v2`**. Los slices son commits, no ramas: la convención de Feature Branch Chain de §5 se sigue en el orden del trabajo, no en su topología.

@@ -9,6 +9,7 @@
   /** Raw strings while typing; null means "showing the stored value". */
   var draft = { matchId: null, raw1: null, raw2: null };
   var lastAction = null;
+  var bumpSide = null;
   var sync = null;
   var conflict = null;
   var celebration = null;
@@ -17,6 +18,7 @@
   function reset() {
     draft = { matchId: null, raw1: null, raw2: null };
     lastAction = null;
+    bumpSide = null;
     sync = null;
     conflict = null;
     celebration = null;
@@ -50,9 +52,13 @@
 
   function scoreBlock(ctx, match, side, teamName, isWinning, focused) {
     var raw = side === 1 ? draft.raw1 : draft.raw2;
+    // Consumed on read: the bump plays once, on the render the step caused,
+    // not on every later rerender of a screen with no diffing.
+    var isBumping = bumpSide === side;
+    if (isBumping) bumpSide = null;
 
     var field = el('input', {
-      class: ['scoring__value', isWinning && 'is-winning'],
+      class: ['scoring__value', isWinning && 'is-winning', isBumping && 'anim-score-bump'],
       attrs: {
         type: 'text',
         // Numeric keypad without a minus sign or decimal point. The field still
@@ -85,6 +91,7 @@
       var next = scoreInput.step(side === 1 ? draft.raw1 : draft.raw2, delta, stored(match, side));
       if (side === 1) draft.raw1 = next; else draft.raw2 = next;
       lastAction = { side: side, delta: delta };
+      bumpSide = side;
       ctx.rerender();
     }
 
