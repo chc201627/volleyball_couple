@@ -1,5 +1,10 @@
 # Release Notes
 
+## v2.0.3 — Fix Overlay Action Bar Visibility
+
+- **Action bar isolation in overlays**: scoped `body.has-overlay` hiding rule strictly to the background `.app` shell (`body.has-overlay .app .app__action-bar`), ensuring action buttons inside modal overlays (such as "Revisar lista" / "Importar jugadores" in bulk player import) remain visible and accessible.
+- Static assets only; no Firebase schema or Rules changes required.
+
 ## v2.0.2 — Manual Pairing Gender & Overlay Rerender Fixes
 
 - **Candidate gender and level indicators**: candidate player buttons and fixed pair rows in the Manual Pairing sheet now display their gender (`Hombre` / `Mujer` / `Sin género`) and skill level (`N1`, `N2`, `N3`).
