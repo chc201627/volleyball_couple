@@ -74,7 +74,10 @@
         icon: 'pencil',
         title: translate('workspace.teams.editPairs', 'Editar parejas a mano'),
         desc: translate('teams.editDesc', 'Fija quién juega con quién'),
-        onClick: function () { ctx.openOverlay('manualPairing'); },
+        onClick: function () {
+          ctx.appState.setConfig({ pairingMode: 'manual' });
+          ctx.openOverlay('manualPairing');
+        },
       },
       {
         icon: 'x',

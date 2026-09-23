@@ -125,16 +125,16 @@
       // Selections can go stale when a player is removed from another screen.
       selected = selected.filter(function (id) { return !takenIds[id] && playerById(ctx, id); });
 
-      var remaining = Math.max(0, Math.floor(available.length / teamSize) - 0);
+      var remaining = Math.max(0, Math.floor(available.length / teamSize));
       var body = [
         fixedPairs(ctx, pairs),
         pool(ctx, available, teamSize),
-        C.statusStrip({
+        remaining > 0 ? C.statusStrip({
           icon: 'info',
           tone: 'neutral',
           text: translate('pairing.manualHint',
             'Las ' + remaining + ' parejas restantes se generan al azar', { count: remaining }),
-        }),
+        }) : null,
       ].filter(Boolean);
 
       body.push(el('div', { class: 'app__action-bar' }, [
@@ -146,7 +146,9 @@
             : translate('pairing.pickMore', 'Elige ' + teamSize + ' jugadores', { n: teamSize }),
           disabled: selected.length !== teamSize,
           onClick: function () {
-            ctx.appState.setManualPairs(pairs.concat([selected.slice()]));
+            var newPairs = pairs.concat([selected.slice()]);
+            ctx.appState.setManualPairs(newPairs);
+            ctx.appState.setConfig({ pairingMode: 'manual' });
             selected = [];
             if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
             else ctx.rerender();
@@ -154,8 +156,15 @@
         }),
         C.button({
           label: translate('pairing.done', 'Listo'),
-          variant: 'ghost',
-          onClick: function () { selected = []; ctx.closeOverlay(); },
+          variant: pairs.length > 0 ? 'primary' : 'ghost',
+          onClick: function () {
+            selected = [];
+            if (pairs.length > 0) {
+              ctx.appState.setConfig({ pairingMode: 'manual' });
+              ctx.generateTeams();
+            }
+            ctx.closeOverlay();
+          },
         }),
       ]));
 
@@ -163,7 +172,14 @@
         C.subBar({
           title: translate('pairing.manualTitle', 'Emparejar a mano'),
           sub: pairs.length + ' ' + translate('pairing.ofFixed', 'parejas fijadas'),
-          onBack: function () { selected = []; ctx.closeOverlay(); },
+          onBack: function () {
+            selected = [];
+            if (pairs.length > 0) {
+              ctx.appState.setConfig({ pairingMode: 'manual' });
+              ctx.generateTeams();
+            }
+            ctx.closeOverlay();
+          },
         }),
         el('div', { class: 'overlay-screen__body' }, body),
       ]);

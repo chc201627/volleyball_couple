@@ -177,6 +177,14 @@
     assert(state.get().manualPairs.length === 0,
       'A manual pair naming a removed player is dropped, never left pointing at a ghost');
 
+    state = seed(fresh(), 4);
+    roster = state.get().players;
+    state.setManualPairs([[roster[0].id, roster[1].id]]);
+    assert(state.get().pairingMode === 'manual',
+      'setManualPairs automatically activates manual pairing mode');
+    const autoManual = state.generateTeams();
+    assert(autoManual.teams.length === 2, 'generateTeams honours manual pairs without manual config toggle');
+
     // ===== Import =====
     heading('Import');
     state = fresh();

@@ -1,5 +1,13 @@
 # Release Notes
 
+## v2.0.5 — Manual Pairing Persistence & Overlay Action Bar Fixes
+
+- **Manual pairing persistence and application**: fixed an issue where manually created pairs were ignored and randomly shuffled upon closing the manual pairing sheet. Now, setting manual pairs or clicking "Listo" / "Volver" automatically activates manual pairing mode (`pairingMode: 'manual'`) and immediately updates the generated teams.
+- **Overlay action bar positioning**: fixed `.overlay-screen .app__action-bar` sticky positioning so action buttons sit directly at `bottom: 0` without an unnecessary 56px tab bar gap floating above content.
+- **Background scroll lock**: added `overflow: hidden` to `body.has-overlay` to prevent scroll chaining and background window movement during overlay interactions.
+- **Remaining pairs indicator**: hidden the "Las 0 parejas restantes se generan al azar" status strip when all players are already manually paired (`remaining === 0`).
+- Static assets only; no Firebase schema or Rules changes required.
+
 ## v2.0.4 — Restore Footer Version Display
 
 - **Application footer and version restored**: restored the footer in the application shell with dynamic `footer.copyright` localization and static fallback, ensuring the running version (`v2.0.4`) and copyright are visibly displayed at the bottom of the page across both desktop and mobile viewports.

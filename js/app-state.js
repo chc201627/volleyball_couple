@@ -266,6 +266,9 @@ var AppState;
 
       setManualPairs: function (pairs) {
         state.manualPairs = (pairs || []).slice();
+        if (state.manualPairs.length > 0) {
+          state.pairingMode = 'manual';
+        }
         emit();
         return snapshot();
       },
