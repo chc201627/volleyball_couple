@@ -113,6 +113,7 @@ function connectCdp(url, deadline) {
 async function readDevToolsPort(chrome, profile, deadline) {
   var portFile = path.join(profile, 'DevToolsActivePort');
   while (remainingMs(deadline)) {
+    if (chrome.spawnError) throw chrome.spawnError;
     if (chrome.exitCode !== null || chrome.signalCode) throw new Error('Chrome exited before exposing a DevTools port.');
     if (fs.existsSync(portFile)) {
       // Chrome creates this file before its contents are necessarily complete.
@@ -167,13 +168,25 @@ function waitForExit(child, timeoutMs) {
   return new Promise(function (resolve) { var timer = setTimeout(function () { resolve(false); }, timeoutMs); child.once('exit', function () { clearTimeout(timer); resolve(true); }); });
 }
 async function terminateChild(child, graceMs) {
-  if (!child || child.exitCode !== null || child.signalCode) return true;
+  if (!child || !child.pid || child.exitCode !== null || child.signalCode) return true;
   try { child.kill('SIGTERM'); }
   catch (error) { return child.exitCode !== null || child.signalCode !== null; }
   if (await waitForExit(child, graceMs)) return true;
   try { child.kill('SIGKILL'); }
   catch (error) { return child.exitCode !== null || child.signalCode !== null; }
   return waitForExit(child, graceMs);
+}
+
+function spawnChrome(executable, profile) {
+  var chrome = childProcess.spawn(executable, ['--headless=new', '--no-first-run', '--no-default-browser-check', '--window-size=1280,800', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: 'ignore' });
+  var started = new Promise(function (resolve, reject) {
+    chrome.once('spawn', resolve);
+    chrome.once('error', reject);
+  });
+  // Keep an error listener for the full child lifetime. An EACCES/ENOENT event
+  // can race startup, and without this listener Node treats it as unhandled.
+  chrome.on('error', function (error) { chrome.spawnError = error; });
+  return { chrome: chrome, started: started };
 }
 async function closeServer(server) {
   if (!server) return;
@@ -186,9 +199,11 @@ async function main() {
   var harnesses = fs.readdirSync(path.join(ROOT, 'tests')).filter(function (file) { return file.endsWith('.test.html'); }).sort();
   if (!harnesses.length) throw new Error('No standalone tests/*.test.html harnesses found.');
   var profile = fs.mkdtempSync(path.join(os.tmpdir(), 'volleyball-couple-chrome-'));
-  var chrome = childProcess.spawn(findBrowser(), ['--headless=new', '--no-first-run', '--no-default-browser-check', '--window-size=1280,800', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: 'ignore' });
+  var launched = spawnChrome(findBrowser(), profile);
+  var chrome = launched.chrome;
   var server, cleanupError;
   try {
+    await withinDeadline(launched.started, deadline, 'Chrome spawn');
     var chromePort = await readDevToolsPort(chrome, profile, deadline);
     server = await startServer(deadline);
     var port = server.address().port, results = [];
