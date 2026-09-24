@@ -119,13 +119,17 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-5 documentation sweep: no stale current-contract `1|2|3` restriction, removed-current-architecture `js/app.js`/`css/styles.css`, missing `tests/integration.test.html`, or legacy selector/view-machine module reference remains. Remaining removed-file mentions are explicitly historical deletion notes.
 - BUG-5 checks: `node --check scripts/run-browser-tests.js`, `npm run test:browser`, `npm run test:rules`, release consistency scan, documentation sweep, and `git diff --check` passed.
 - BUG-5 rollback boundary: revert this work-unit commit to remove the deterministic browser runner, contract/release documentation, and v2.0.11 cache stamps together, without changing BUG-1 through BUG-4 runtime behavior.
-- BUG-5 delivery: slice branch `codex/fix-v2-audit-bugs-05-contract-release`; authored changes: 341 additions + 136 deletions = 477 lines; running total: 1592 lines; slice boundary: final independent feature-branch-chain work unit after BUG-4; commit: PENDING-COMMIT. RDD remains disabled/unmanaged.
+- BUG-5 delivery: slice branch `codex/fix-v2-audit-bugs-05-contract-release`; authored changes: 341 additions + 136 deletions = 477 lines; running total: 1592 lines; slice boundary: final independent feature-branch-chain work unit after BUG-4; commit: `38b134eda078eb03431e8449972342adffcaaf97`. RDD remains disabled/unmanaged.
+- BUG-5 verifier correction: bounded the single browser-suite deadline across DevToolsActivePort readiness, loopback HTTP JSON, CDP connection, every CDP command (including navigation and runtime evaluation), and summary polling. Each stuck request destroys its HTTP socket or rejects its CDP command at the deadline. Chrome cleanup now sends SIGTERM, confirms exit after a grace period, escalates to SIGKILL when necessary, confirms that exit, then removes the temporary profile.
+- BUG-5 verifier findings closed with `node --test tests/browser-runner.test.js`: a fake wedged HTTP endpoint times out; assertion, `console.error`, and missing-summary fixtures all reject; an override browser path containing spaces resolves; and a SIGTERM-resistant child reaches the force-kill fallback without remaining alive. `BROWSER='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm run test:browser` passed through an explicit path containing spaces. Full `npm run test:browser` still passed 16/16 and 740/740. `npm run test:rules` was not rerun because no rules/product behavior changed.
+- BUG-5 corrective delivery: same slice branch; authored changes: 182 additions + 98 deletions = 280 lines; running total: 1872 lines; slice boundary: bounded runner correction attached to slice 5 after `38b134eda078eb03431e8449972342adffcaaf97`; corrective commit: PENDING-COMMIT. Rollback boundary: revert this corrective commit to restore the former runner only; revert `38b134eda078eb03431e8449972342adffcaaf97` as well to remove the entire BUG-5 work unit.
 
 ## Applicable Checks
 
 - Focused browser harnesses for each work unit.
 - All standalone `tests/*.test.html` harnesses through the established browser runner.
 - `npm run test:rules`.
+- `node --test tests/browser-runner.test.js` for runner failure and cleanup paths.
 - 320px visual/interaction verification with accessible-name and 44×44px checks.
 - Release/version consistency check if shipped asset content changes.
 

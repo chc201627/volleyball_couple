@@ -1,78 +1,66 @@
 #!/usr/bin/env node
 'use strict';
 
-/*
- * Development-only runner for the standalone browser harnesses. It starts an
- * isolated loopback server and Chrome DevTools Protocol session, so failures,
- * timeouts, and browser console errors all make the command fail.
- *
- * Set BROWSER to an executable path when Chrome/Chromium is installed outside
- * the usual locations.
- */
-
+/* Development-only runner. One bounded suite deadline covers Chrome readiness,
+ * loopback HTTP, CDP, page evaluation, and summary polling. */
 var fs = require('fs');
 var http = require('http');
 var os = require('os');
 var path = require('path');
 var childProcess = require('child_process');
-
 var ROOT = path.resolve(__dirname, '..');
 var TIMEOUT_MS = Number(process.env.BROWSER_TEST_TIMEOUT_MS || 15000);
-var MIME_TYPES = {
-  '.css': 'text/css; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-};
+var CLEANUP_GRACE_MS = 1500;
+var MIME_TYPES = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 
 function findBrowser() {
-  var candidates = [
-    process.env.BROWSER,
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  ].filter(Boolean);
-  for (var index = 0; index < candidates.length; index++) {
-    if (candidates[index].indexOf(path.sep) === -1 || fs.existsSync(candidates[index])) return candidates[index];
-  }
+  var candidates = [process.env.BROWSER, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'].filter(Boolean);
+  for (var i = 0; i < candidates.length; i++) if (candidates[i].indexOf(path.sep) === -1 || fs.existsSync(candidates[i])) return candidates[i];
   throw new Error('Chrome/Chromium was not found. Set BROWSER to its executable path.');
 }
 
-function wait(ms) {
-  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+function createDeadline(timeoutMs, label) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('BROWSER_TEST_TIMEOUT_MS must be a positive number.');
+  return { expiresAt: Date.now() + timeoutMs, label: label || 'operation' };
 }
-
-function requestJson(port, pathname, method) {
+function remainingMs(deadline) { return Math.max(0, deadline.expiresAt - Date.now()); }
+function timeoutError(deadline, operation) { return new Error((operation || deadline.label) + ' timed out after its ' + deadline.label + ' deadline.'); }
+function withinDeadline(promise, deadline, operation, onTimeout) {
+  var remaining = remainingMs(deadline);
+  if (!remaining) { if (onTimeout) onTimeout(); return Promise.reject(timeoutError(deadline, operation)); }
   return new Promise(function (resolve, reject) {
-    var request = http.request({ host: '127.0.0.1', port: port, path: pathname, method: method || 'GET' }, function (response) {
+    var timer = setTimeout(function () { if (onTimeout) onTimeout(); reject(timeoutError(deadline, operation)); }, remaining);
+    promise.then(function (value) { clearTimeout(timer); resolve(value); }, function (error) { clearTimeout(timer); reject(error); });
+  });
+}
+function wait(ms, deadline, operation) { return withinDeadline(new Promise(function (resolve) { setTimeout(resolve, ms); }), deadline, operation || 'wait'); }
+
+function requestJson(port, pathname, method, deadline) {
+  var request;
+  var promise = new Promise(function (resolve, reject) {
+    request = http.request({ host: '127.0.0.1', port: port, path: pathname, method: method || 'GET' }, function (response) {
       var body = '';
       response.setEncoding('utf8');
       response.on('data', function (chunk) { body += chunk; });
       response.on('end', function () {
-        if (response.statusCode < 200 || response.statusCode >= 300) return reject(new Error(method + ' ' + pathname + ' returned ' + response.statusCode));
+        if (response.statusCode < 200 || response.statusCode >= 300) return reject(new Error((method || 'GET') + ' ' + pathname + ' returned ' + response.statusCode));
         try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
       });
     });
     request.on('error', reject);
     request.end();
   });
+  return withinDeadline(promise, deadline, 'HTTP ' + (method || 'GET') + ' ' + pathname, function () { if (request) request.destroy(); });
 }
 
-function startServer() {
-  return new Promise(function (resolve, reject) {
-    var server = http.createServer(function (request, response) {
+function startServer(deadline) {
+  var server;
+  var promise = new Promise(function (resolve, reject) {
+    server = http.createServer(function (request, response) {
       var pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
       if (pathname === '/favicon.ico') { response.writeHead(204).end(); return; }
       var file = path.resolve(ROOT, '.' + pathname);
-      if (file !== ROOT && !file.startsWith(ROOT + path.sep)) {
-        response.writeHead(403).end('Forbidden');
-        return;
-      }
+      if (file !== ROOT && !file.startsWith(ROOT + path.sep)) { response.writeHead(403).end('Forbidden'); return; }
       fs.readFile(file, function (error, contents) {
         if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500).end('Not found'); return; }
         response.writeHead(200, { 'Content-Type': MIME_TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
@@ -82,22 +70,27 @@ function startServer() {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', function () { resolve(server); });
   });
+  return withinDeadline(promise, deadline, 'loopback test server', function () { if (server) server.close(); });
 }
 
-function connectCdp(url) {
-  return new Promise(function (resolve, reject) {
-    var socket = new WebSocket(url);
-    var nextId = 1;
-    var pending = new Map();
-    var events = [];
+function connectCdp(url, deadline) {
+  var socket;
+  var promise = new Promise(function (resolve, reject) {
+    socket = new WebSocket(url);
+    var nextId = 1, pending = new Map(), events = [];
+    function rejectPending(error) { pending.forEach(function (command) { clearTimeout(command.timer); command.reject(error); }); pending.clear(); }
     socket.addEventListener('open', function () {
       resolve({
         on: function (listener) { events.push(listener); },
         send: function (method, params) {
+          var remaining = remainingMs(deadline);
+          if (!remaining) return Promise.reject(timeoutError(deadline, 'CDP ' + method));
           return new Promise(function (resolveCommand, rejectCommand) {
             var id = nextId++;
-            pending.set(id, { resolve: resolveCommand, reject: rejectCommand });
-            socket.send(JSON.stringify({ id: id, method: method, params: params || {} }));
+            var timer = setTimeout(function () { pending.delete(id); rejectCommand(timeoutError(deadline, 'CDP ' + method)); }, remaining);
+            pending.set(id, { resolve: resolveCommand, reject: rejectCommand, timer: timer });
+            try { socket.send(JSON.stringify({ id: id, method: method, params: params || {} })); }
+            catch (error) { clearTimeout(timer); pending.delete(id); rejectCommand(error); }
           });
         },
         close: function () { socket.close(); },
@@ -106,47 +99,57 @@ function connectCdp(url) {
     socket.addEventListener('message', function (message) {
       var payload = JSON.parse(message.data);
       if (payload.id) {
-        var command = pending.get(payload.id);
-        if (!command) return;
-        pending.delete(payload.id);
+        var command = pending.get(payload.id); if (!command) return;
+        pending.delete(payload.id); clearTimeout(command.timer);
         if (payload.error) command.reject(new Error(payload.error.message)); else command.resolve(payload.result || {});
       } else events.forEach(function (listener) { listener(payload); });
     });
     socket.addEventListener('error', function () { reject(new Error('Could not connect to Chrome DevTools Protocol.')); });
-    socket.addEventListener('close', function () { pending.forEach(function (command) { command.reject(new Error('Chrome DevTools Protocol closed unexpectedly.')); }); });
+    socket.addEventListener('close', function () { rejectPending(new Error('Chrome DevTools Protocol closed unexpectedly.')); });
   });
+  return withinDeadline(promise, deadline, 'CDP connection', function () { if (socket) socket.close(); });
 }
 
-async function runHarness(chromePort, serverPort, harness) {
-  var target = await requestJson(chromePort, '/json/new?' + encodeURIComponent('about:blank'), 'PUT');
-  var cdp = await connectCdp(target.webSocketDebuggerUrl);
+async function readDevToolsPort(chrome, profile, deadline) {
+  var portFile = path.join(profile, 'DevToolsActivePort');
+  while (remainingMs(deadline)) {
+    if (chrome.exitCode !== null || chrome.signalCode) throw new Error('Chrome exited before exposing a DevTools port.');
+    if (fs.existsSync(portFile)) {
+      // Chrome creates this file before its contents are necessarily complete.
+      // Treat a partial first read as readiness still in progress, not as a
+      // malformed browser installation.
+      try {
+        var port = Number(fs.readFileSync(portFile, 'utf8').split('\n')[0]);
+        if (Number.isInteger(port) && port > 0) return port;
+      } catch (error) { /* the profile is still being initialized */ }
+    }
+    await wait(50, deadline, 'DevToolsActivePort readiness');
+  }
+  throw timeoutError(deadline, 'DevToolsActivePort readiness');
+}
+
+async function runHarness(chromePort, serverPort, harness, deadline) {
+  var target = await requestJson(chromePort, '/json/new?' + encodeURIComponent('about:blank'), 'PUT', deadline);
+  var cdp = await connectCdp(target.webSocketDebuggerUrl, deadline);
   var consoleErrors = [];
   cdp.on(function (event) {
-    if (event.method === 'Runtime.consoleAPICalled' && event.params.type === 'error') {
-      consoleErrors.push(event.params.args.map(function (arg) { return arg.value || arg.description || ''; }).join(' '));
-    }
+    if (event.method === 'Runtime.consoleAPICalled' && event.params.type === 'error') consoleErrors.push(event.params.args.map(function (arg) { return arg.value || arg.description || ''; }).join(' '));
     if (event.method === 'Runtime.exceptionThrown') consoleErrors.push(event.params.exceptionDetails.text || 'Uncaught browser exception');
     if (event.method === 'Log.entryAdded' && event.params.entry.level === 'error') consoleErrors.push(event.params.entry.text);
   });
   try {
     await Promise.all([cdp.send('Runtime.enable'), cdp.send('Log.enable'), cdp.send('Page.enable')]);
-    await cdp.send('Storage.clearDataForOrigin', {
-      origin: 'http://127.0.0.1:' + serverPort,
-      storageTypes: 'all',
-    });
+    await cdp.send('Storage.clearDataForOrigin', { origin: 'http://127.0.0.1:' + serverPort, storageTypes: 'all' });
     await cdp.send('Page.navigate', { url: 'http://127.0.0.1:' + serverPort + '/tests/' + harness });
-    var deadline = Date.now() + TIMEOUT_MS;
     var summary;
-    while (Date.now() < deadline) {
+    while (remainingMs(deadline)) {
       var evaluation = await cdp.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('.summary, #summary')).map(function (node) { return node.textContent; }).join('\\n')", returnByValue: true });
       summary = evaluation.result && evaluation.result.value;
       if (/\d+\/\d+\s+tests passed/.test(summary || '')) break;
-      await wait(100);
+      await wait(100, deadline, 'test summary polling');
     }
-    if (!summary || !/\d+\/\d+\s+tests passed/.test(summary)) throw new Error('timed out after ' + TIMEOUT_MS + 'ms without a test summary');
-    var count = /(\d+)\/(\d+)\s+tests passed/.exec(summary);
-    var passed = Number(count[1]);
-    var total = Number(count[2]);
+    if (!summary || !/\d+\/\d+\s+tests passed/.test(summary)) throw timeoutError(deadline, harness + ' test summary');
+    var count = /(\d+)\/(\d+)\s+tests passed/.exec(summary), passed = Number(count[1]), total = Number(count[2]);
     if (passed !== total || /FAILED/i.test(summary)) {
       var failures = await cdp.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('.fail')).map(function (node) { return node.textContent; }).join(' | ')", returnByValue: true });
       throw new Error(summary.replace(/\s+/g, ' ').trim() + ': ' + ((failures.result && failures.result.value) || 'no failure detail'));
@@ -155,43 +158,53 @@ async function runHarness(chromePort, serverPort, harness) {
     return { harness: harness, passed: passed, total: total };
   } finally {
     cdp.close();
-    await requestJson(chromePort, '/json/close/' + encodeURIComponent(target.id)).catch(function () {});
+    await requestJson(chromePort, '/json/close/' + encodeURIComponent(target.id), 'GET', createDeadline(CLEANUP_GRACE_MS, 'CDP target cleanup')).catch(function () {});
   }
 }
 
+function waitForExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode) return Promise.resolve(true);
+  return new Promise(function (resolve) { var timer = setTimeout(function () { resolve(false); }, timeoutMs); child.once('exit', function () { clearTimeout(timer); resolve(true); }); });
+}
+async function terminateChild(child, graceMs) {
+  if (!child || child.exitCode !== null || child.signalCode) return true;
+  try { child.kill('SIGTERM'); }
+  catch (error) { return child.exitCode !== null || child.signalCode !== null; }
+  if (await waitForExit(child, graceMs)) return true;
+  try { child.kill('SIGKILL'); }
+  catch (error) { return child.exitCode !== null || child.signalCode !== null; }
+  return waitForExit(child, graceMs);
+}
+async function closeServer(server) {
+  if (!server) return;
+  if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+  await withinDeadline(new Promise(function (resolve) { server.close(resolve); }), createDeadline(CLEANUP_GRACE_MS, 'loopback server cleanup'), 'loopback server cleanup', function () { if (typeof server.closeAllConnections === 'function') server.closeAllConnections(); }).catch(function () {});
+}
+
 async function main() {
+  var deadline = createDeadline(TIMEOUT_MS, 'browser suite');
   var harnesses = fs.readdirSync(path.join(ROOT, 'tests')).filter(function (file) { return file.endsWith('.test.html'); }).sort();
   if (!harnesses.length) throw new Error('No standalone tests/*.test.html harnesses found.');
-  var tempProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'volleyball-couple-chrome-'));
-  var chrome = childProcess.spawn(findBrowser(), ['--headless=new', '--no-first-run', '--no-default-browser-check', '--window-size=1280,800', '--remote-debugging-port=0', '--user-data-dir=' + tempProfile, 'about:blank'], { stdio: 'ignore' });
-  var server;
+  var profile = fs.mkdtempSync(path.join(os.tmpdir(), 'volleyball-couple-chrome-'));
+  var chrome = childProcess.spawn(findBrowser(), ['--headless=new', '--no-first-run', '--no-default-browser-check', '--window-size=1280,800', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: 'ignore' });
+  var server, cleanupError;
   try {
-    var portFile = path.join(tempProfile, 'DevToolsActivePort');
-    var chromePort;
-    for (var attempt = 0; attempt < 100; attempt++) {
-      if (fs.existsSync(portFile)) { chromePort = Number(fs.readFileSync(portFile, 'utf8').split('\n')[0]); break; }
-      await wait(50);
-    }
-    if (!chromePort) throw new Error('Chrome did not expose a DevTools port.');
-    server = await startServer();
-    var port = server.address().port;
-    var results = [];
+    var chromePort = await readDevToolsPort(chrome, profile, deadline);
+    server = await startServer(deadline);
+    var port = server.address().port, results = [];
     for (var index = 0; index < harnesses.length; index++) {
-      var result = await runHarness(chromePort, port, harnesses[index]);
-      results.push(result);
-      process.stdout.write('PASS ' + result.harness + ' ' + result.passed + '/' + result.total + '\n');
+      var result = await runHarness(chromePort, port, harnesses[index], deadline);
+      results.push(result); process.stdout.write('PASS ' + result.harness + ' ' + result.passed + '/' + result.total + '\n');
     }
     var totals = results.reduce(function (summary, result) { summary.passed += result.passed; summary.total += result.total; return summary; }, { passed: 0, total: 0 });
     process.stdout.write('PASS browser harnesses: ' + results.length + '/' + results.length + ', ' + totals.passed + '/' + totals.total + ' assertions\n');
   } finally {
-    if (server) await new Promise(function (resolve) { server.close(resolve); });
-    chrome.kill();
-    await Promise.race([
-      new Promise(function (resolve) { chrome.once('exit', resolve); }),
-      wait(2000),
-    ]);
-    fs.rmSync(tempProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    await closeServer(server);
+    if (!await terminateChild(chrome, CLEANUP_GRACE_MS)) cleanupError = new Error('Chrome did not terminate after SIGTERM and SIGKILL.');
+    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    if (cleanupError) throw cleanupError;
   }
 }
 
-main().catch(function (error) { process.stderr.write('FAIL browser harnesses: ' + error.message + '\n'); process.exitCode = 1; });
+if (require.main === module) main().catch(function (error) { process.stderr.write('FAIL browser harnesses: ' + error.message + '\n'); process.exitCode = 1; });
+module.exports = { CLEANUP_GRACE_MS: CLEANUP_GRACE_MS, createDeadline: createDeadline, findBrowser: findBrowser, requestJson: requestJson, runHarness: runHarness, startServer: startServer, terminateChild: terminateChild };
