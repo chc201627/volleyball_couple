@@ -309,6 +309,73 @@
   font-weight: 700;
 }
 .config__field-value.is-locked { color: var(--text-3); }
+.config__field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.config__stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.config__stepper-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: 18px;
+  font-weight: 700;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.config__stepper-btn:active {
+  background: var(--surface-3);
+}
+.config__stepper-input {
+  width: 48px;
+  height: 36px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+  color: var(--text-1);
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 0;
+  -moz-appearance: textfield;
+}
+.config__stepper-input::-webkit-outer-spin-button,
+.config__stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.config__quick-pills {
+  display: flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+  padding-bottom: var(--space-1);
+}
+.config__quick-pill {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  border: 0;
+  cursor: pointer;
+  min-height: 28px;
+}
+.config__quick-pill.is-active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
 .config__rules {
   width: 100%;
   padding: var(--space-3);

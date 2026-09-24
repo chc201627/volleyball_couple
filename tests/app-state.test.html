@@ -19,6 +19,8 @@
   <h1>App State — Test Suite</h1>
   <div id="results"></div>
   <script src="../js/pairing.js"></script>
+  <script src="../js/tournament.js"></script>
+  <script src="../js/tournament-format.js"></script>
   <script src="../js/app-state.js"></script>
   <script>
     const results = document.getElementById('results');
@@ -275,6 +277,7 @@
     // ===== Reset and Clear Purges =====
     heading('Reset and Clear Purges');
     state = seed(fresh(), 4);
+    state.generateTeams();
     state.startTournament();
     state.clearPlayers();
     assert(state.get().players.length === 0, 'clearPlayers empties roster');
@@ -282,12 +285,29 @@
     assert(localStorage.getItem(AppState.KEYS.tournament) === null, 'clearPlayers removes tournament from localStorage');
 
     state = seed(fresh(), 4);
+    state.generateTeams();
     state.startTournament();
     state.resetTournament();
     assert(state.get().tournament === null, 'resetTournament sets tournament to null');
     assert(localStorage.getItem(AppState.KEYS.tournament) === null, 'resetTournament removes tournament from localStorage');
     assert(state.get().teams === null, 'resetTournament clears teams');
     assert(state.get().players.length === 4, 'resetTournament preserves players for another run');
+
+    // ===== Format Customization =====
+    heading('Format Customization');
+    state = seed(fresh(), 4);
+    state.generateTeams();
+    state.setConfig({
+      formatPreset: 'groupsFinal',
+      formatOverrides: { group: { pointsTo: 9, overtime: true } },
+      customRules: 'Cambio cada 5',
+    });
+    assert(state.get().formatOverrides.group.pointsTo === 9, 'formatOverrides recorded in state');
+    assert(state.get().customRules === 'Cambio cada 5', 'customRules recorded in state');
+    state.startTournament();
+    assert(state.get().tournament.format.stagesById.group.pointsTo === 9, 'startTournament applies pointsTo override');
+    assert(state.get().tournament.format.stagesById.group.overtime === true, 'startTournament applies overtime override');
+    assert(state.get().tournament.format.customRules === 'Cambio cada 5', 'startTournament applies customRules');
 
     // ===== Summary =====
     const total = passed + failed;

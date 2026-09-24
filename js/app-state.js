@@ -96,6 +96,8 @@ var AppState;
       pairingMode: 'random',
       groupCount: 1,
       formatPreset: 'classic',
+      formatOverrides: {},
+      customRules: '',
       manualPairs: [],
       lastImport: null,
     };
@@ -119,6 +121,8 @@ var AppState;
         pairingMode: state.pairingMode,
         groupCount: state.groupCount,
         formatPreset: state.formatPreset,
+        formatOverrides: Object.assign({}, state.formatOverrides),
+        customRules: state.customRules,
         manualPairs: state.manualPairs.slice(),
         lastImport: state.lastImport,
         counts: counts(),
@@ -260,7 +264,17 @@ var AppState;
           state.groupCount = patch.groupCount; changed = true;
         }
         if (patch.formatPreset && patch.formatPreset !== state.formatPreset) {
-          state.formatPreset = patch.formatPreset; changed = true;
+          state.formatPreset = patch.formatPreset;
+          state.formatOverrides = {};
+          changed = true;
+        }
+        if (patch.formatOverrides !== undefined) {
+          state.formatOverrides = Object.assign({}, state.formatOverrides, patch.formatOverrides);
+          changed = true;
+        }
+        if (patch.customRules !== undefined) {
+          state.customRules = String(patch.customRules).slice(0, 500);
+          changed = true;
         }
         // Changing the team size invalidates existing teams: 2v2 pairs are not
         // 3v3 teams.
@@ -329,6 +343,22 @@ var AppState;
           return { ok: false, reason: 'presetUnavailable' };
         }
         if (format) {
+          if (state.formatOverrides) {
+            Object.keys(state.formatOverrides).forEach(function (stageId) {
+              if (format.stagesById && format.stagesById[stageId]) {
+                var ov = state.formatOverrides[stageId];
+                if (ov && ov.pointsTo !== undefined && Number.isInteger(ov.pointsTo) && ov.pointsTo >= 1 && ov.pointsTo <= 99) {
+                  format.stagesById[stageId].pointsTo = ov.pointsTo;
+                }
+                if (ov && typeof ov.overtime === 'boolean') {
+                  format.stagesById[stageId].overtime = ov.overtime;
+                }
+              }
+            });
+          }
+          if (state.customRules && state.customRules.trim()) {
+            format.customRules = state.customRules.trim();
+          }
           var validation = validateFormat(format, groups);
           if (!validation.valid) return { ok: false, reason: 'invalidFormat', errors: validation.errors };
         }
@@ -456,6 +486,8 @@ var AppState;
         removeKey(KEYS.king);
         state.teams = null;
         state.unmatched = [];
+        state.formatOverrides = {};
+        state.customRules = '';
         emit();
         return { ok: true };
       },

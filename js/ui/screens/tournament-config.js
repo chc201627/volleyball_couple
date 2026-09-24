@@ -7,7 +7,6 @@
   var C = UIComponents;
 
   var showEditor = false;
-  var customRules = '';
 
 
   // Titles and descriptions are keys, not literals: an explanation in the wrong
@@ -159,7 +158,84 @@
 
   /* --- Format editor (A6) ----------------------------------------------- */
 
-  function editorSection(ctx, format, groups, locked) {
+  function pointsField(currentPoints, locked, onUpdate) {
+    if (locked) {
+      return fieldRow(translate('format.field.pointsTo', 'Puntos por set'), String(currentPoints), true);
+    }
+    var quickValues = [9, 11, 15, 21, 25];
+    var inputEl = el('input', {
+      class: 'config__stepper-input',
+      attrs: { type: 'number', min: '1', max: '99', value: String(currentPoints) },
+      on: {
+        change: function (event) {
+          var num = parseInt(event.target.value, 10);
+          if (!isNaN(num) && num >= 1 && num <= 99) {
+            onUpdate(num);
+          } else {
+            event.target.value = String(currentPoints);
+          }
+        },
+      },
+    });
+
+    return el('div', { class: 'config__field-group' }, [
+      el('div', { class: 'config__field' }, [
+        el('p', { class: 'config__field-label', text: translate('format.field.pointsTo', 'Puntos por set') }),
+        el('div', { class: 'config__stepper' }, [
+          el('button', {
+            class: 'config__stepper-btn',
+            attrs: { type: 'button', 'aria-label': 'Restar punto' },
+            on: {
+              click: function () {
+                var next = Math.max(1, currentPoints - 1);
+                onUpdate(next);
+              },
+            },
+          }, [el('span', { text: '−' })]),
+          inputEl,
+          el('button', {
+            class: 'config__stepper-btn',
+            attrs: { type: 'button', 'aria-label': 'Sumar punto' },
+            on: {
+              click: function () {
+                var next = Math.min(99, currentPoints + 1);
+                onUpdate(next);
+              },
+            },
+          }, [el('span', { text: '+' })]),
+        ]),
+      ]),
+      el('div', { class: 'config__quick-pills' }, quickValues.map(function (val) {
+        return el('button', {
+          class: ['config__quick-pill', currentPoints === val && 'is-active'],
+          attrs: { type: 'button' },
+          on: { click: function () { onUpdate(val); } },
+        }, [el('span', { text: String(val) })]);
+      })),
+    ]);
+  }
+
+  function overtimeField(currentOvertime, locked, onUpdate) {
+    if (locked) {
+      return fieldRow(translate('format.field.overtime', 'Prórroga'),
+        currentOvertime ? translate('common.yes', 'Sí') : translate('common.no', 'No'), true);
+    }
+    return el('div', { class: 'config__field' }, [
+      el('p', { class: 'config__field-label', text: translate('format.field.overtime', 'Prórroga') }),
+      C.toggleGroup({
+        label: translate('format.field.overtime', 'Prórroga'),
+        options: [
+          { id: false, label: translate('format.field.overtimeNo', 'No'), active: !currentOvertime },
+          { id: true, label: translate('format.field.overtimeYes', 'Sí (+2)'), active: currentOvertime },
+        ],
+        onSelect: function (val) {
+          onUpdate(!!val);
+        },
+      }),
+    ]);
+  }
+
+  function editorSection(ctx, format, groups, locked, customRules) {
     if (!showEditor) return null;
 
     var stages = format && format.stagesById ? Object.keys(format.stagesById).map(function (id) {
@@ -170,14 +246,29 @@
       var stageLabel = stage.kind === 'roundRobin'
         ? translate('format.stage.groups', 'Etapa ' + stage.order + ' · Grupos', { order: stage.order })
         : translate('format.stage.knockout', 'Etapa ' + stage.order + ' · Eliminatoria', { order: stage.order });
-      return C.panel({ label: stageLabel }, [
-        fieldRow(translate('format.field.pointsTo', 'Puntos por set'), String(stage.pointsTo), locked),
-        fieldRow(translate('format.field.overtime', 'Prórroga'),
-          stage.overtime ? translate('common.yes', 'Sí') : translate('common.no', 'No'), locked),
-        stage.kind === 'knockout'
-          ? fieldRow(translate('format.field.pairs', 'Cruces'), String((stage.pairs || []).length), locked)
-          : null,
-      ].filter(Boolean));
+
+      function updateStage(patch) {
+        var update = {};
+        update[stage.id] = patch;
+        ctx.appState.setConfig({ formatOverrides: update });
+        if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+        else ctx.rerender();
+      }
+
+      var rows = [
+        pointsField(stage.pointsTo, locked, function (val) {
+          updateStage({ pointsTo: val });
+        }),
+        overtimeField(stage.overtime, locked, function (val) {
+          updateStage({ overtime: val });
+        }),
+      ];
+
+      if (stage.kind === 'knockout') {
+        rows.push(fieldRow(translate('format.field.pairs', 'Cruces'), String((stage.pairs || []).length), true));
+      }
+
+      return C.panel({ label: stageLabel }, rows);
     });
 
     if (!stages.length) {
@@ -198,13 +289,17 @@
         'aria-label': translate('tournament.format.customRules', 'Reglas de la casa'),
         disabled: locked,
       },
-      on: { input: function (event) { customRules = event.target.value; ctx.rerender(); } },
+      on: {
+        input: function (event) {
+          ctx.appState.setConfig({ customRules: event.target.value });
+        },
+      },
     });
-    rules.value = customRules;
+    rules.value = customRules || '';
 
     children.push(C.panel({
       label: translate('tournament.format.customRules', 'Reglas de la casa'),
-      meta: customRules.length + ' / 500',
+      meta: (customRules || '').length + ' / 500',
     }, [rules]));
 
     var validation = format ? validateFormat(format, groups) : { valid: true, errors: [] };
@@ -241,10 +336,22 @@
       var snapshot = ctx.appState.get();
       var teams = snapshot.teams || [];
       var groups = previewGroups(teams, snapshot.groupCount);
-      var locked = false; // a running tournament opens this read-only; wired in slice E
+      var locked = !!snapshot.tournament;
 
       var format = null;
       try { format = presetFormat(snapshot.formatPreset, groups); } catch (error) { format = null; }
+      if (format && snapshot.formatOverrides) {
+        Object.keys(snapshot.formatOverrides).forEach(function (stageId) {
+          if (format.stagesById && format.stagesById[stageId]) {
+            var ov = snapshot.formatOverrides[stageId];
+            if (ov && ov.pointsTo !== undefined) format.stagesById[stageId].pointsTo = ov.pointsTo;
+            if (ov && ov.overtime !== undefined) format.stagesById[stageId].overtime = ov.overtime;
+          }
+        });
+      }
+      if (format && snapshot.customRules) {
+        format.customRules = snapshot.customRules;
+      }
 
       var body = [
         groupsSection(ctx, snapshot, teams.length),
@@ -256,12 +363,18 @@
         el('button', {
           class: 'config__customize',
           attrs: { type: 'button' },
-          on: { click: function () { showEditor = !showEditor; ctx.rerender(); } },
+          on: {
+            click: function () {
+              showEditor = !showEditor;
+              if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
+              else ctx.rerender();
+            },
+          },
         }, [
           IconRegistry.icon(showEditor ? 'chevron-up' : 'chevron-down', { size: 16 }),
           el('span', { text: showEditor ? translate('tournament.format.hideEditor', 'Ocultar detalle') : translate('tournament.format.customize', 'Personalizar formato') }),
         ]),
-        editorSection(ctx, format, groups, locked),
+        editorSection(ctx, format, groups, locked, snapshot.customRules),
       ].filter(Boolean);
 
       body.push(el('div', { class: 'app__action-bar' }, [

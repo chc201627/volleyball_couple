@@ -1,5 +1,13 @@
 # Release Notes
  
+## v2.0.9 — Interactive Tournament Format Customization
+
+- **Direct editing of points per set and overtime**: in the "Personalizar formato" panel of Tournament Configuration, replaced static read-only text spans with interactive controls for each tournament stage.
+  - *Points per set*: interactive numeric stepper (`−` / `+`), direct keyboard input (`1–99`), and quick preset pills (`9`, `11`, `15`, `21`, `25`).
+  - *Overtime*: segmented toggle group (`No` / `Sí (+2)`) for each stage.
+- **Full lifecycle persistence & validation**: custom stage rules and "Reglas de la casa" are stored in application state, validated client-side with real-time feedback, and propagated directly into match generation and live scoring.
+- Static assets only; fully compliant with existing Firebase format validation rules.
+
 ## v2.0.8 — Styled Roster Clear & Clean Tournament Reset
 
 - **Modern styled bottom sheet for clearing players**: replaced native browser `window.confirm` popup with the application's standard styled modal bottom sheet (`confirmClear`). Accessible directly from the Setup screen roster header (`trash-2` button) as well as the Teams screen options panel.
