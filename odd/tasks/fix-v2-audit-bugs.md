@@ -81,8 +81,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - Forecast: approximately 650–900 authored changed lines, excluding generated output.
 - Chain strategy: `feature-branch-chain` (user-selected).
 - Review boundary: branch point `a5aa167fccb43bd27988680d3ca734ece5c86521`.
-- Running authored line count: 969.
-- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2 is `codex/fix-v2-audit-bugs-02-team-controls` with BUG-2 commit `b5d3e94ff2d71d494208a04548d933c9b778ebd5`. Slice 3 is `codex/fix-v2-audit-bugs-03-offline-scoring` with BUG-3 commit `27850afd5a6414a22c52296920242edee6d2fbe1`.
+- Running authored line count: 1115.
+- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2 is `codex/fix-v2-audit-bugs-02-team-controls` with BUG-2 commit `b5d3e94ff2d71d494208a04548d933c9b778ebd5`. Slice 3 is `codex/fix-v2-audit-bugs-03-offline-scoring` with BUG-3 commit `27850afd5a6414a22c52296920242edee6d2fbe1`. Slice 4 is `codex/fix-v2-audit-bugs-04-storage-mobile` with BUG-4 commit `d5163bf3d5133f6da3959aee183bc3049a010ee3`.
 
 ## Progress and Evidence
 
@@ -110,7 +110,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-4 focused checks (loopback server + headless Chrome): `tests/storage-mobile.test.html` 8/8 passed with `Storage.prototype.getItem` and `setItem` throwing; `tests/teams-ui.test.html` 12/12 passed; `tests/score-input.test.html` 38/38 passed. `node --check js/i18n.js` and `git diff --check` passed.
 - BUG-4 320×800 runtime verification (Chrome DevTools device metrics): viewport `320×800`; storage-stub harness 8/8 passed; `.c-lang` measured `44×44` with accessible name `Change language`; interactive `.c-match__hit` measured `280×44` and retains its native button text name `Ada and Ben versus Cia and Drew 21–19`; document scroll/client width was `320/320` (no horizontal overflow); reduced-motion query remained `false` and no motion CSS was changed.
 - BUG-4 rollback boundary: revert the BUG-4 work-unit commit to restore direct i18n storage access and the former smaller control sizing without affecting BUG-1 through BUG-3 or BUG-5.
-- BUG-4 delivery: slice branch `codex/fix-v2-audit-bugs-04-storage-mobile`; authored changes: 140 additions + 6 deletions = 146 lines; running total: 1115 lines; slice boundary: BUG-4 is an independent feature-branch-chain work unit after BUG-3; commit: `PENDING-COMMIT`.
+- BUG-4 delivery: slice branch `codex/fix-v2-audit-bugs-04-storage-mobile`; authored changes: 140 additions + 6 deletions = 146 lines; running total: 1115 lines; slice boundary: BUG-4 is an independent feature-branch-chain work unit after BUG-3; commit: `d5163bf3d5133f6da3959aee183bc3049a010ee3`.
+- BUG-4 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated the i18n syntax check plus `git diff --check` successfully. RDD remains disabled/unmanaged.
 - BUG-4 verification tier: RDD disabled/unmanaged; ordinary focused browser and runtime checks passed.
 
 ## Applicable Checks
@@ -123,4 +124,4 @@ The domain and Firebase suites pass, but the production composition layer drops 
 
 ## Next Step
 
-Delegate BUG-4 as the next work unit.
+Delegate BUG-5 as the final work unit, then run the complete release checks.
