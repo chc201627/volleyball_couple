@@ -82,7 +82,7 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - Chain strategy: `feature-branch-chain` (user-selected).
 - Review boundary: branch point `a5aa167fccb43bd27988680d3ca734ece5c86521`.
 - Running authored line count: 629.
-- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2 is `codex/fix-v2-audit-bugs-02-team-controls` with the BUG-2 work-unit commit `PENDING-COMMIT`.
+- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2 is `codex/fix-v2-audit-bugs-02-team-controls` with BUG-2 commit `b5d3e94ff2d71d494208a04548d933c9b778ebd5`.
 
 ## Progress and Evidence
 
@@ -98,7 +98,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-2 focused checks (loopback server + headless Chrome at 320px): `tests/teams-ui.test.html` 12/12 passed; `tests/workspace-view-machine.test.html` 88/88 passed; `tests/app-state.test.html` 63/63 passed. `node --check` passed for every changed JavaScript file and `git diff --check` passed. The production UI harness mounts the real components, Teams/mode-fork screens, and app orchestrator; its DOM assertions prove no nested interactive controls remain and its 2v2/3v3/4v4 fixtures render all nine names while preserving opaque properties.
 - BUG-2 runtime scenario: a Teams screen with pair-shaped legacy data still shows two members; 3v3 and 4v4 teams show every member; tapping locked Teams in the app bar or tab bar keeps navigation locked and announces the translated reason.
 - BUG-2 rollback boundary: revert the BUG-2 work-unit commit to restore two-name rows, card-wide mode selection, and silent locked navigation without affecting BUG-1 or BUG-3 through BUG-5.
-- BUG-2 delivery: slice branch `codex/fix-v2-audit-bugs-02-team-controls`; authored changes: 288 additions + 77 deletions = 365 lines; commit: `PENDING-COMMIT`.
+- BUG-2 delivery: slice branch `codex/fix-v2-audit-bugs-02-team-controls`; authored changes: 288 additions + 77 deletions = 365 lines; commit: `b5d3e94ff2d71d494208a04548d933c9b778ebd5`.
+- BUG-2 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated JavaScript syntax checks plus `git diff --check` successfully. RDD remains disabled/unmanaged.
 
 ## Applicable Checks
 
