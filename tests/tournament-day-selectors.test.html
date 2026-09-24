@@ -169,6 +169,33 @@
       assert(view.nextMatch.scorable === true, 'formatted: the selected next match is scorable');
     })();
 
+    heading('production tournament projection');
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      let matches = generateStageMatches(format, groups);
+      matches = playDecisively(matches, matches.filter((m) => m.stageId === 'group'));
+      const projection = tournamentDayProjection({ groups, matches, format });
+
+      assert(projection.resolution.bySlot['slot:A1'] === 't0' && projection.resolution.bySlot['slot:A2'] === 't1',
+        'production projection passes current standings to resolveFormat for group-to-final slots', JSON.stringify(projection.resolution.bySlot));
+      assert(projection.day.nextMatch && projection.day.nextMatch.matchId === 'k-final-1' && projection.hasNextMatch,
+        'production projection exposes the resolved final as the real next match', JSON.stringify(projection.day.nextMatch));
+      assert(projection.hasBracket === true, 'production projection exposes a bracket only when a knockout stage exists');
+      assert(projection.formatValidation && projection.formatValidation.valid === true,
+        'production projection derives persisted format validation from current groups');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsTo', groups);
+      const matches = generateStageMatches(format, groups);
+      const projection = tournamentDayProjection({ groups, matches, format });
+      assert(projection.hasBracket === false,
+        'production projection hides the Bracket tab for groups-only formats');
+    })();
+
     (function () {
       // Tamper one final slot so resolveFormat marks the stage invalid — every match in
       // it must be unscorable, so nextMatch must NOT select it even though group play is done.

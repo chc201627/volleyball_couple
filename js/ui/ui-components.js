@@ -434,14 +434,22 @@ var UIComponents;
     return el('div', { class: 'c-match' }, children);
   }
 
-  function coupleRow(options) {
+  /** A team may be a legacy two-player pair or a 2v2/3v3/4v4 team. Keep the
+   * legacy arguments at this UI boundary so old callers do not need to shed
+   * their player1/player2 shape just to render a row. */
+  function teamRow(options) {
     options = options || {};
+    var members = Array.isArray(options.players)
+      ? options.players
+      : [options.player1, options.player2].filter(Boolean);
     return el('div', { class: 'c-couple' }, [
       el('span', { class: 'c-couple__index', text: options.index }),
-      el('div', { class: 'c-couple__names' }, [
-        el('p', { class: 'c-couple__name', text: options.player1 }),
-        el('p', { class: 'c-couple__name', text: options.player2 }),
-      ]),
+      el('div', { class: 'c-couple__names' }, members.map(function (player) {
+        return el('p', {
+          class: 'c-couple__name',
+          text: player && typeof player === 'object' ? player.name : player,
+        });
+      })),
       chip({ label: options.typeLabel, tone: options.type === 'mixed' ? 'accent' : 'same-gender' }),
     ]);
   }
@@ -493,7 +501,9 @@ var UIComponents;
     input: input,
     chip: chip,
     matchRow: matchRow,
-    coupleRow: coupleRow,
+    teamRow: teamRow,
+    // Keep the old component name for integrations which still render pairs.
+    coupleRow: teamRow,
     personRow: personRow,
     list: list,
   };

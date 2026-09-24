@@ -432,7 +432,6 @@
   border-radius: var(--radius-cta);
   background: var(--surface-2);
   text-align: left;
-  cursor: pointer;
 }
 .fork__card.is-active {
   background: transparent;
@@ -442,6 +441,18 @@
 .fork__card.is-active .fork__icon,
 .fork__card.is-active .fork__check { color: var(--accent); }
 .fork__head { display: flex; align-items: center; gap: var(--space-3); }
+.fork__select {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .fork__icon { flex: none; color: var(--text-2); }
 .fork__text { flex: 1 1 auto; min-width: 0; }
 .fork__title { font-size: var(--font-h2); font-weight: 700; }

@@ -1,5 +1,13 @@
 # Release Notes
  
+## v2.0.11 — Audit Fixes (Prepared, Not Deployed)
+
+- **Formatted tournament progression and team rendering**: prepares the audit fixes that resolve knockout progression from current standings and render every member of 2v2, 3v3, and 4v4 teams while retaining legacy pair compatibility.
+- **Durable offline scoring and resilient boot**: prepares durable result-retry/conflict behavior plus storage-safe localization and mobile touch-target hardening.
+- **Deterministic browser verification**: adds `npm run test:browser`, a development-only loopback Chrome/Chromium runner for all standalone browser harnesses; it isolates browser storage and fails on assertion failures, timeouts, and console errors.
+- **Canonical contract**: documents optional player skill levels as `1–5` and the current split CSS/state/orchestrator/UI architecture.
+- **Release state**: v2.0.11 is prepared on the audit feature branch only. It has not been deployed to Railway or Firebase.
+
 ## v2.0.10 — Localized Knockout Match Placeholders
 
 - **Fix "null vs null" match titles**: pre-created knockout stage matches (such as finals or playoffs in `groupsFinal` and `crossover` presets) now render localized slot labels (e.g. "1º del grupo A vs 1º del grupo B" in Spanish or "Group A #1 vs Group B #1" in English) while group play is ongoing, rather than falling back to `null vs null`.

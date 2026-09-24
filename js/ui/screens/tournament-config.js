@@ -391,7 +391,7 @@
       return el('div', { class: 'overlay-screen' }, [
         C.subBar({
           title: translate('tournament.configTitle', 'Configurar torneo'),
-          sub: teams.length + ' ' + translate('workspace.summary.teamsWord', 'parejas') + ' · ' + snapshot.teamSize + 'vs' + snapshot.teamSize,
+          sub: teams.length + ' ' + translate('workspace.summary.teamsWord', 'equipos') + ' · ' + snapshot.teamSize + 'vs' + snapshot.teamSize,
           onBack: function () { ctx.closeOverlay(); },
         }),
         el('div', { class: 'overlay-screen__body' }, body),

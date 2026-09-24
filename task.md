@@ -21,7 +21,7 @@
 - **Description:** Create the base folder/file structure for the project.
 - **Requirements:** REQ-TECH-01
 - **Acceptance Criteria:**
-  - Project contains: `index.html`, `css/styles.css`, `js/app.js`, `js/pairing.js`
+  - Project contains: `index.html`, modular `css/`, `js/app-orchestrator.js`, `js/app-state.js`, and `js/pairing.js`
   - Files are committed to a Git repository
 - **Notes:** Keep `pairing.js` separate per REQ-TECH-02 (algorithm as reusable module).
 
@@ -44,7 +44,7 @@
 
 ### TASK-1.4 — Base CSS with color scheme and mobile-first foundation
 - [x] **Priority:** P0
-- **Description:** Set up `css/styles.css` with CSS custom properties for the recommended color scheme, a CSS reset/normalize, and mobile-first media queries.
+- **Description:** Set up modular `css/` stylesheets with CSS custom properties, a reset/normalize, and mobile-first media queries.
 - **Requirements:** REQ-NFR-03, REQ-NFR-05, REQ-TECH-05
 - **Acceptance Criteria:**
   - CSS variables defined:
@@ -352,7 +352,7 @@
 
 ### TASK-8.2 — Replace hardcoded strings in app.js with t() calls
 - [x] **Priority:** P1
-- **Description:** Update `js/app.js` to use `t()` for all user-facing strings (validation errors, player badges, couple labels, confirm dialogs). Expose `_onLanguageChange` callback for i18n to trigger re-renders.
+- **Description:** Update the UI composition modules to use `t()` for all user-facing strings (validation errors, player badges, couple labels, confirm dialogs). Expose `_onLanguageChange` callback for i18n to trigger re-renders.
 - **Requirements:** Languages section
 - **Acceptance Criteria:**
   - All dynamic strings use `t()` with appropriate keys
@@ -557,8 +557,8 @@ Delivered as SDD change `organizer-workspace` (see `sdd/organizer-workspace/{pro
 
 | Slice | Content | Requirements | PR | Status |
 |---|---|---|---|---|
-| A | `js/tournament-day.js` pure selectors + harness | REQ-UX-31/32/33/50/52 | [#50](https://github.com/chc201627/volleyball_couple/pull/50) | [x] Done, validated PASS |
-| B | `js/workspace.js` + view shell (`data-view`, nav, status strip) | REQ-UX-01–07, 10–13, 60–62 | [#51](https://github.com/chc201627/volleyball_couple/pull/51) | [x] Done, validated PASS |
+| A | `js/tournament-day-selectors.js` pure selectors + harness | REQ-UX-31/32/33/50/52 | [#50](https://github.com/chc201627/volleyball_couple/pull/50) | [x] Done, validated PASS |
+| B | `js/workspace-view-machine.js` + view shell (`data-view`, nav, status strip) | REQ-UX-01–07, 10–13, 60–62 | [#51](https://github.com/chc201627/volleyball_couple/pull/51) | [x] Done, validated PASS |
 | C | Setup workspace (readiness checklist, single CTA, format lock) | REQ-UX-10–13, 72, 73, 80 | [#52](https://github.com/chc201627/volleyball_couple/pull/52) | [x] Done, validated PASS |
 | D | Teams workspace (summary bar, cards, mode fork) | REQ-UX-20–23 | [#53](https://github.com/chc201627/volleyball_couple/pull/53) | [x] Done, validated PASS |
 | E | Tournament command center (Next Match, stacked lists, access requests) | REQ-UX-30–35, 62 | [#54](https://github.com/chc201627/volleyball_couple/pull/54) | [x] Done, validated PASS |
@@ -568,7 +568,7 @@ Delivered as SDD change `organizer-workspace` (see `sdd/organizer-workspace/{pro
 | I | Release v1.9.0 (asset/version bumps, docs) | REQ-UX-90/91 | #58 | [x] Done |
 | J | Remediation: center CTA performs its contextual action; Setup empty-state auto-focus; Deny label | REQ-UX-04, 34, 80 | #59 | [x] Done |
 
-**Acceptance criteria (spec §Acceptance):** four nav labels visible at 320×568 on first paint; Start impossible with an unmet readiness item; Next Match is the first content block above the fold at 320×568; owner approves a scorer without leaving Tournament; every scoring action ends in a visible state with in-view conflict Retry/Discard; champion/group-winners/tied-lead + standings visible on Results with no navigation; integration harness and `npm run test:rules` green; no untranslated key at 320px in EN or ES.
+**Acceptance criteria (spec §Acceptance):** four nav labels visible at 320×568 on first paint; Start impossible with an unmet readiness item; Next Match is the first content block above the fold at 320×568; owner approves a scorer without leaving Tournament; every scoring action ends in a visible state with in-view conflict Retry/Discard; champion/group-winners/tied-lead + standings visible on Results with no navigation; `npm run test:browser` and `npm run test:rules` green; no untranslated key at 320px in EN or ES.
 
 **Deferred/known items** (tracked, not release blockers): `.workspace-status` sticky per wireframe (currently `position: static`); share/export confirmation label restore from `data-i18n`; gender/level chip accent colors approximated from the mockup (contrast-verified, not organizer-pixel-confirmed); Results summary date (no reliable timestamp on local-only saves); a pre-existing CSS-specificity quirk where `:hover` outranks a selected `--active` chip on desktop pointers only (touch/production mobile unaffected).
 
@@ -596,3 +596,11 @@ Full presentation-layer rewrite against `design/volleyball-couple.pen` (35 artbo
 **Verified:** 13 browser suites (598+ asserts) and `npm run test:rules` (25/25) green; `node scripts/i18n-unused.js --strict` and `node scripts/css-unused.js --strict` both clean; full walkthrough (create tournament → score → standings → search → menu → change history) at a real 320×568 viewport against the Firebase emulator, zero console errors, zero horizontal overflow.
 
 **Deferred, not a release blocker:** P1 QR code in the tournament menu (board H1, `redesign-plan.md` §9.3). **Known merge blocker:** `main` shipped v1.9.2 with a match search built on `js/app.js`/`css/styles.css`, which this redesign deletes; the same feature is board C6 here (`allMatches` + `searchMatchViews`) — the merge must take v2's deletions, not recover v1's files.
+
+
+## v2.0.11 audit-release alignment (prepared, not deployed)
+
+- [x] Canonicalized documented optional skill levels as `1|2|3|4|5`, matching parsing, state validation, and balancing behavior.
+- [x] Replaced current-architecture references to removed `js/app.js` and `css/styles.css` with the split application state/orchestrator, UI, and CSS layers.
+- [x] Added `npm run test:browser` for all standalone browser harnesses, including Teams, offline scoring, and storage/mobile coverage.
+- [x] Prepared the v2.0.11 asset/footer/i18n/service-worker version alignment on the audit feature branch; deployment remains a release decision.

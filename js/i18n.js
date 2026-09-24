@@ -52,7 +52,7 @@ var t, translate, setLanguage, getLanguage;
       'tournament.newTournamentTitle': 'Start a new tournament?',
       'tournament.newTournamentDesc': 'What would you like to do with the current roster?',
       // Results
-      'results.heading': 'Pairs',
+      'results.heading': 'Teams',
       'results.typeMixed': 'Mixed',
       'results.typeSame': 'Same gender',
       // Tournament
@@ -62,7 +62,7 @@ var t, translate, setLanguage, getLanguage;
       'tournament.access.deny': 'No',
       'tournament.start': 'Start tournament',
       'tournament.group': 'Group {id}',
-      'tournament.col.team': 'PAIR',
+      'tournament.col.team': 'TEAM',
       'tournament.error.scoreEmpty': 'Please enter both scores',
       'tournament.error.scoreNegative': 'Scores must be 0 or higher',
       'tournament.error.scoreDraw': 'A draw: the rules reject a finished result with no winner. You can leave it live.',
@@ -103,7 +103,7 @@ var t, translate, setLanguage, getLanguage;
       // Pairing mode
       'pairing.modeRandom': 'Random',
       'pairing.modeManual': 'Manual',
-      'pairing.manualHint': 'The remaining {count} pairs are drawn at random',
+      'pairing.manualHint': 'The remaining {count} teams are drawn at random',
       // King of the Court
       'king.start':                'Start King of the Court',
       'king.reset':                'Reset King',
@@ -145,7 +145,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.setup.formatLocked.note': 'Locked — reset the tournament to change the format',
       // Teams workspace (REQ-UX-20..23)
       'workspace.teams.moreOptions': 'More options',
-      'workspace.teams.editPairs': 'Edit pairs by hand',
+      'workspace.teams.editPairs': 'Edit teams by hand',
       'workspace.teams.forkHeading': 'How do you want to play?',
       'workspace.teams.forkTournament': 'Tournament',
       'workspace.teams.forkKing': 'King of the Court',
@@ -167,7 +167,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'New tournament',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.10',
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.11',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': 'Who is playing today?',
@@ -191,13 +191,13 @@ var t, translate, setLanguage, getLanguage;
       'import.noLevel': 'no level',
 
       // Emparejar a mano (A4)
-      'pairing.manualTitle': 'Pair by hand',
-      'pairing.fixed': 'Fixed pairs',
-      'pairing.ofFixed': 'pairs fixed',
-      'pairing.unfix': 'Undo pair',
-      'pairing.unpaired': 'Unpaired',
+      'pairing.manualTitle': 'Build teams by hand',
+      'pairing.fixed': 'Fixed teams',
+      'pairing.ofFixed': 'teams fixed',
+      'pairing.unfix': 'Undo team',
+      'pairing.unpaired': 'Not on a team',
       'pairing.tapTwo': 'Tap {n}',
-      'pairing.allPaired': 'Everyone is paired',
+      'pairing.allPaired': 'Everyone is on a team',
       'pairing.fixSelected': 'Fix {names}',
       'pairing.pickMore': 'Pick {n} players',
       'pairing.done': 'Done',
@@ -210,14 +210,14 @@ var t, translate, setLanguage, getLanguage;
       'teams.orKing': 'or play King of the Court',
       'teams.forkTournamentDesc': 'Groups, a table and a final. Everyone plays the same.',
       'teams.forkKingDesc': 'The winner stays on court. Challengers queue up.',
-      'unmatched.text': 'has no pair',
+      'unmatched.text': 'has no team',
 
       // Configurar torneo (A5, A6)
       'tournament.configTitle': 'Configure tournament',
       'tournament.configShort': 'Tournament',
       'tournament.configureFirst': 'Adjust groups and format',
       'tournament.summaryLabel': 'What comes out',
-      'workspace.summary.teamsWord': 'pairs',
+      'workspace.summary.teamsWord': 'teams',
       'tournament.format.customize': 'Customise format',
       'tournament.format.hideEditor': 'Hide details',
       'tournament.format.valid': 'Valid format',
@@ -343,7 +343,7 @@ var t, translate, setLanguage, getLanguage;
       // Cierre y resultados (F1, F2, F3)
       'results.champion': 'Champion',
       'results.position': 'Position {rank}',
-      'results.pairs': 'pairs',
+      'results.pairs': 'teams',
       'results.matches': 'matches',
       'results.provisional': 'Provisional standings: {count} matches left to play',
       'results.emptyText': 'Once you start a tournament, the live table shows up here — and the champion when it ends.',
@@ -352,7 +352,7 @@ var t, translate, setLanguage, getLanguage;
       'history.forMatch': 'History for this match',
 
       // Reparametrizadas: el número vuelve al texto
-      'pairing.manualHint': 'The remaining {count} pairs are drawn at random',
+      'pairing.manualHint': 'The remaining {count} teams are drawn at random',
       'tournament.format.error.pointsTarget': 'The set is to {points} points',
 
       // Formato de torneo: presets y editor (A5, A6)
@@ -474,7 +474,7 @@ var t, translate, setLanguage, getLanguage;
       // Todos los partidos y su buscador (C6)
       'matches.title': 'Every match',
       'matches.progress': '{played} of {total} played',
-      'matches.search': 'Search by player, pair or group',
+      'matches.search': 'Search by player, team or group',
       'matches.clear': 'Clear the search',
       'matches.results': '{count} of {total} matches',
       'matches.noneTitle': 'No match found',
@@ -518,7 +518,7 @@ var t, translate, setLanguage, getLanguage;
       'tournament.newTournamentTitle': '¿Empezar un nuevo torneo?',
       'tournament.newTournamentDesc': '¿Qué deseas hacer con el plantel actual?',
       // Resultados
-      'results.heading': 'Parejas',
+      'results.heading': 'Equipos',
       'results.typeMixed': 'Mixta',
       'results.typeSame': 'Mismo género',
       // Torneo
@@ -528,7 +528,7 @@ var t, translate, setLanguage, getLanguage;
       'tournament.access.deny': 'No',
       'tournament.start': 'Empezar torneo',
       'tournament.group': 'Grupo {id}',
-      'tournament.col.team': 'PAREJA',
+      'tournament.col.team': 'EQUIPO',
       'tournament.error.scoreEmpty': 'Por favor ingresa ambos resultados',
       'tournament.error.scoreNegative': 'Los resultados deben ser 0 o mayores',
       'tournament.error.scoreDraw': 'Empate: las reglas rechazan un resultado terminado sin ganador. Puedes dejarlo en vivo.',
@@ -569,7 +569,7 @@ var t, translate, setLanguage, getLanguage;
       // Modo de emparejamiento
       'pairing.modeRandom': 'Aleatorio',
       'pairing.modeManual': 'Manual',
-      'pairing.manualHint': 'Las {count} parejas restantes se generan al azar',
+      'pairing.manualHint': 'Los {count} equipos restantes se generan al azar',
       // Rey de la Cancha
       'king.start':                'Empezar King of the Court',
       'king.reset':                'Reiniciar King',
@@ -611,7 +611,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.setup.formatLocked.note': 'Bloqueado — reinicia el torneo para cambiar el formato',
       // Espacio de equipos (REQ-UX-20..23)
       'workspace.teams.moreOptions': 'M\u00e1s opciones',
-      'workspace.teams.editPairs': 'Editar parejas a mano',
+      'workspace.teams.editPairs': 'Editar equipos a mano',
       'workspace.teams.forkHeading': '¿Cómo quieren jugar?',
       'workspace.teams.forkTournament': 'Torneo',
       'workspace.teams.forkKing': 'King of the Court',
@@ -633,7 +633,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Nuevo torneo',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.10',
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.11',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': '¿Quién juega hoy?',
@@ -657,13 +657,13 @@ var t, translate, setLanguage, getLanguage;
       'import.noLevel': 'sin nivel',
 
       // Emparejar a mano (A4)
-      'pairing.manualTitle': 'Emparejar a mano',
-      'pairing.fixed': 'Parejas fijadas',
-      'pairing.ofFixed': 'parejas fijadas',
-      'pairing.unfix': 'Deshacer pareja',
-      'pairing.unpaired': 'Sin emparejar',
+      'pairing.manualTitle': 'Armar equipos a mano',
+      'pairing.fixed': 'Equipos fijados',
+      'pairing.ofFixed': 'equipos fijados',
+      'pairing.unfix': 'Deshacer equipo',
+      'pairing.unpaired': 'Sin equipo',
       'pairing.tapTwo': 'Toca {n}',
-      'pairing.allPaired': 'Ya están todos emparejados',
+      'pairing.allPaired': 'Ya están todos en un equipo',
       'pairing.fixSelected': 'Fijar {names}',
       'pairing.pickMore': 'Elige {n} jugadores',
       'pairing.done': 'Listo',
@@ -676,14 +676,14 @@ var t, translate, setLanguage, getLanguage;
       'teams.orKing': 'o jugar King of the Court',
       'teams.forkTournamentDesc': 'Grupos, tabla y final. Todos juegan lo mismo.',
       'teams.forkKingDesc': 'El que gana se queda en la cancha. Cola de retadores.',
-      'unmatched.text': 'se queda sin pareja',
+      'unmatched.text': 'se queda sin equipo',
 
       // Configurar torneo (A5, A6)
       'tournament.configTitle': 'Configurar torneo',
       'tournament.configShort': 'Torneo',
       'tournament.configureFirst': 'Ajustar grupos y formato',
       'tournament.summaryLabel': 'Lo que sale',
-      'workspace.summary.teamsWord': 'parejas',
+      'workspace.summary.teamsWord': 'equipos',
       'tournament.format.customize': 'Personalizar formato',
       'tournament.format.hideEditor': 'Ocultar detalle',
       'tournament.format.valid': 'Formato válido',
@@ -809,7 +809,7 @@ var t, translate, setLanguage, getLanguage;
       // Cierre y resultados (F1, F2, F3)
       'results.champion': 'Campeón',
       'results.position': 'Puesto {rank}',
-      'results.pairs': 'parejas',
+      'results.pairs': 'equipos',
       'results.matches': 'partidos',
       'results.provisional': 'Posiciones provisionales: quedan {count} partidos por jugar',
       'results.emptyText': 'Cuando arranques un torneo verás aquí la tabla en vivo y, al terminar, el campeón.',
@@ -818,7 +818,7 @@ var t, translate, setLanguage, getLanguage;
       'history.forMatch': 'Historial de este partido',
 
       // Reparametrizadas: el número vuelve al texto
-      'pairing.manualHint': 'Las {count} parejas restantes se generan al azar',
+      'pairing.manualHint': 'Los {count} equipos restantes se generan al azar',
       'tournament.format.error.pointsTarget': 'El set es a {points} puntos',
 
       // Formato de torneo: presets y editor (A5, A6)
@@ -940,7 +940,7 @@ var t, translate, setLanguage, getLanguage;
       // Todos los partidos y su buscador (C6)
       'matches.title': 'Todos los partidos',
       'matches.progress': '{played} de {total} jugados',
-      'matches.search': 'Buscar por jugador, pareja o grupo',
+      'matches.search': 'Buscar por jugador, equipo o grupo',
       'matches.clear': 'Borrar la búsqueda',
       'matches.results': '{count} de {total} partidos',
       'matches.noneTitle': 'Ningún partido coincide',
@@ -952,8 +952,29 @@ var t, translate, setLanguage, getLanguage;
 
   var currentLang = 'es';
 
+  // Storage can throw when privacy settings block it or the quota is full.
+  // Language remains a session-only preference in that case, just like the
+  // application state helpers treat an unavailable storage backend.
+  function readStoredLanguage() {
+    try {
+      return typeof localStorage === 'undefined' ? null : localStorage.getItem(STORAGE_KEY);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function persistLanguage(lang) {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+      localStorage.setItem(STORAGE_KEY, lang);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   function detectLanguage() {
-    var stored = localStorage.getItem(STORAGE_KEY);
+    var stored = readStoredLanguage();
     if (stored && translations[stored]) return stored;
     var nav = (navigator.language || '').slice(0, 2).toLowerCase();
     return translations[nav] ? nav : 'es';
@@ -1006,7 +1027,7 @@ var t, translate, setLanguage, getLanguage;
   setLanguage = function (lang) {
     if (!translations[lang]) return;
     currentLang = lang;
-    localStorage.setItem(STORAGE_KEY, lang);
+    persistLanguage(lang);
     document.documentElement.lang = lang;
     applyTranslations();
     updateSwitcherButtons();

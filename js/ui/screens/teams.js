@@ -1,4 +1,4 @@
-/** Teams and the mode fork — boards B1, B2 and B3. A couple is one row, and the
+/** Teams and the mode fork — boards B1, B2 and B3. A team is one row, and the
  * organiser name is asked in the fork, where a tournament is first known of. */
 (function () {
   'use strict';
@@ -13,19 +13,20 @@
   var ownerDraft = null;
 
 
-  /* --- Couples ---------------------------------------------------------- */
+  /* --- Teams ------------------------------------------------------------ */
 
-  function couplesPanel(ctx, snapshot) {
+  function teamsPanel(ctx, snapshot) {
     var teams = snapshot.teams || [];
     return C.panel({
-      label: translate('results.heading', 'Parejas') + ' · ' + teams.length,
+      label: translate('results.heading', 'Equipos') + ' · ' + teams.length,
       action: { label: translate('actions.regenerate', 'Regenerar'), onClick: function () { ctx.generateTeams(); } },
     }, [
       C.list({}, teams.map(function (team, index) {
-        return C.coupleRow({
+        return C.teamRow({
           index: String(index + 1),
-          player1: team.player1 ? team.player1.name : '',
-          player2: team.player2 ? team.player2.name : '',
+          players: team.players,
+          player1: team.player1,
+          player2: team.player2,
           type: team.type === 'mixed' ? 'mixed' : 'same',
           typeLabel: team.type === 'mixed'
             ? translate('results.typeMixed', 'Mixta')
@@ -43,7 +44,7 @@
     return C.statusStrip({
       icon: 'triangle-alert',
       tone: 'warn',
-      text: names + ' ' + translate('unmatched.text', 'se queda sin pareja'),
+      text: names + ' ' + translate('unmatched.text', 'se queda sin equipo'),
       action: {
         label: translate('teams.addPlayer', 'Añadir'),
         onClick: function () { ctx.navigate('setup'); },
@@ -66,13 +67,13 @@
     var options = [
       {
         icon: 'shuffle',
-        title: translate('actions.regenerate', 'Regenerar parejas'),
+        title: translate('actions.regenerate', 'Regenerar equipos'),
         desc: translate('teams.regenerateDesc', 'Vuelve a repartir al azar'),
         onClick: function () { ctx.generateTeams(); },
       },
       {
         icon: 'pencil',
-        title: translate('workspace.teams.editPairs', 'Editar parejas a mano'),
+        title: translate('workspace.teams.editPairs', 'Editar equipos a mano'),
         desc: translate('teams.editDesc', 'Fija quién juega con quién'),
         onClick: function () {
           ctx.appState.setConfig({ pairingMode: 'manual' });
@@ -114,7 +115,7 @@
       var snapshot = ctx.appState.get();
       var body = [
         unmatchedStrip(ctx, snapshot),
-        couplesPanel(ctx, snapshot),
+        teamsPanel(ctx, snapshot),
         optionsPanel(ctx),
       ].filter(Boolean);
 
@@ -149,16 +150,18 @@
       IconRegistry.icon(options.active ? 'circle-check' : 'circle', { size: 20, class: 'fork__check' }),
     ]);
 
-    var children = [head];
+    var children = [el('button', {
+      class: 'fork__select',
+      attrs: { type: 'button', 'aria-pressed': options.active ? 'true' : 'false' },
+      on: { click: options.onClick },
+    }, [head])];
     if (options.active && options.extra) {
       children.push(el('div', { class: 'fork__divider' }));
       options.extra.forEach(function (node) { children.push(node); });
     }
 
-    return el('button', {
+    return el('div', {
       class: ['fork__card', options.active && 'is-active'],
-      attrs: { type: 'button', 'aria-pressed': options.active ? 'true' : 'false' },
-      on: { click: options.onClick },
     }, children);
   }
 
@@ -172,9 +175,6 @@
       maxLength: 50,
       onInput: function (event) { ownerDraft = event.target.value; },
     });
-    // The field lives inside a <button>; without this a tap to type would be
-    // read as a tap on the card and re-select the mode.
-    field.addEventListener('click', function (event) { event.stopPropagation(); });
     return el('div', { class: 'fork__field' }, [
       field,
       el('p', {
@@ -186,14 +186,10 @@
   }
 
   function kingSettings(ctx) {
-    function stop(node) {
-      node.addEventListener('click', function (event) { event.stopPropagation(); });
-      return node;
-    }
     return el('div', { class: 'fork__settings' }, [
       el('div', { class: 'fork__setting' }, [
         C.overline(translate('king.winConditionLabel', 'Gana por')),
-        stop(C.toggleGroup({
+        C.toggleGroup({
           label: translate('king.winConditionLabel', 'Gana por'),
           options: [
             { id: 'consecutive', label: translate('king.condConsecutive', 'Seguidas'), active: kingCondition === 'consecutive' },
@@ -204,11 +200,11 @@
             if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
             else ctx.rerender();
           },
-        })),
+        }),
       ]),
       el('div', { class: 'fork__setting' }, [
         C.overline(translate('king.targetLabel', 'Victorias para ganar')),
-        stop(C.toggleGroup({
+        C.toggleGroup({
           label: translate('king.targetLabel', 'Victorias para ganar'),
           options: [5, 7, 10].map(function (value) {
             return { id: value, label: String(value), active: kingTarget === value };
@@ -218,7 +214,7 @@
             if (typeof ctx.rerenderOverlay === 'function') ctx.rerenderOverlay();
             else ctx.rerender();
           },
-        })),
+        }),
       ]),
     ]);
   }

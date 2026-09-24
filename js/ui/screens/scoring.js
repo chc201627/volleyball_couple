@@ -246,6 +246,7 @@
         score: conflict.score1 + ' – ' + conflict.score2,
         active: true,
         onClick: function () {
+          if (ctx.discardPendingResult) ctx.discardPendingResult(match.id);
           ctx.appState.adoptResult(match.id, conflict);
           reset();
           ctx.closeOverlay();
@@ -258,6 +259,7 @@
         onClick: function () {
           // Retrying adopts the server's revision first, so the next save is
           // an edit on top of it rather than another losing race.
+          if (ctx.discardPendingResult) ctx.discardPendingResult(match.id);
           ctx.appState.adoptResult(match.id, conflict);
           conflict = null;
           save(ctx, true);
@@ -310,8 +312,8 @@
   function teamNameFor(ctx, match, side) {
     var tournament = ctx.appState.get().tournament;
     var teamId = side === 1 ? (match.team1Id || match.team1Slot) : (match.team2Id || match.team2Slot);
-    if (tournament && tournament.format && typeof resolveFormat === 'function' && typeof tournamentDayProjectedMatch === 'function') {
-      var resolution = resolveFormat(tournament.format, { groups: tournament.groups, matches: tournament.matches });
+    if (tournament && tournament.format && typeof tournamentDayProjection === 'function' && typeof tournamentDayProjectedMatch === 'function') {
+      var resolution = tournamentDayProjection(tournament).resolution;
       var projected = tournamentDayProjectedMatch(resolution, match.id);
       if (projected && projected.resolved) {
         teamId = side === 1 ? projected.team1Id : projected.team2Id;
@@ -329,6 +331,10 @@
         return C.sheet({ title: translate('tournament.noMatch', 'Partido no encontrado'), onDismiss: ctx.closeOverlay }, []);
       }
       ensureDraft(match);
+      // Retry outcomes can arrive while this sheet is closed. Restoring them at
+      // render time keeps the existing status strip and conflict card truthful.
+      if (!sync && ctx.pendingStatus) sync = ctx.pendingStatus(match.id);
+      if (!conflict && ctx.pendingConflict) conflict = ctx.pendingConflict(match.id);
 
       var tournament = ctx.appState.get().tournament;
       var rules = rulesForMatch(tournament.format, match.id);

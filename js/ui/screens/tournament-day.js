@@ -186,7 +186,7 @@
       preset
         ? translate('format.preset.' + preset + '.title', preset)
         : translate('format.preset.classic.title', 'Clásico'),
-      pairs + ' ' + translate('workspace.summary.teamsWord', 'parejas'),
+      pairs + ' ' + translate('workspace.summary.teamsWord', 'equipos'),
       teamSize + 'vs' + teamSize,
     ];
     return C.panel({ label: translate('tournament.format.presetLabel', 'Formato') }, [
@@ -356,17 +356,10 @@
         ]);
       }
 
-      var format = tournament.format || null;
-      var resolution = format
-        ? resolveFormat(format, { groups: tournament.groups, matches: tournament.matches })
-        : null;
-      var day = tournamentDay({
-        format: format,
-        resolution: resolution,
-        matches: tournament.matches,
-        groups: tournament.groups,
-        standings: calculateStandings(tournament.groups, tournament.matches, { extended: true }),
-      });
+      var projection = tournamentDayProjection(tournament);
+      var format = projection.format;
+      var resolution = projection.resolution;
+      var day = projection.day;
 
       var search = searchMatchViews(day.all, matchQuery, {
         teams: tournament.teams,
@@ -507,18 +500,11 @@
         })];
       }
 
-      var format = tournament.format || null;
-      var resolution = format
-        ? resolveFormat(format, { groups: tournament.groups, matches: tournament.matches })
-        : null;
-      var standings = calculateStandings(tournament.groups, tournament.matches, { extended: true });
-      var day = tournamentDay({
-        format: format,
-        resolution: resolution,
-        matches: tournament.matches,
-        groups: tournament.groups,
-        standings: standings,
-      });
+      var projection = tournamentDayProjection(tournament);
+      var format = projection.format;
+      var resolution = projection.resolution;
+      var standings = projection.standings;
+      var day = projection.day;
 
       var subView = ctx.view.subView || 'today';
       var body = [];

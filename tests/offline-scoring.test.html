@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Offline Scoring Integration Tests</title>
+<style>body{font-family:monospace;padding:20px;background:#1e1e1e;color:#d4d4d4}.pass{color:#4ec9b0}.fail{color:#f44747}.summary--pass{color:#4ec9b0}.summary--fail{color:#f44747}</style>
+</head><body><h1>Offline Scoring — Production Orchestration Seam</h1><div id="results"></div>
+<script src="../js/pairing.js"></script><script src="../js/tournament.js"></script><script src="../js/tournament-format.js"></script><script src="../js/result-sync-queue.js"></script><script src="../js/app-state.js"></script>
+<script>
+(async function () {
+  'use strict';
+  var out = document.getElementById('results'), passed = 0, failed = 0;
+  function assert(ok, name) { var p = document.createElement('p'); p.className = ok ? 'pass' : 'fail'; p.textContent = (ok ? '✓ ' : '✗ ') + name; out.appendChild(p); ok ? passed++ : failed++; }
+  function memoryStorage() { var values = {}; return { getItem: function (key) { return values[key] || null; }, setItem: function (key, value) { values[key] = String(value); }, removeItem: function (key) { delete values[key]; } }; }
+  function remote(score1, score2, revision) { return { role: 'owner', accessStatus: 'approved', connection: 'online', schemaVersion: 2, tournament: { teams: [], groups: [], matches: [{ id: 'm1', score1: score1, score2: score2, status: revision ? 'finished' : 'pending', played: !!revision, revision: revision, updatedBy: 'other', updatedAt: 1 }] } }; }
+  function localSave(state, queue, sessionId, score1, score2) {
+    var applied = state.applyResult('m1', score1, score2, 'finished');
+    return queue.enqueue(sessionId, applied.command);
+  }
+  try {
+    var storage = memoryStorage(), sessionId = 'shared-session';
+    var queue = ResultSyncQueue.create({ storage: storage });
+    var state = AppState.create();
+    state.adoptSession(sessionId, remote(null, null, 0), queue.list(sessionId));
+    var first = localSave(state, queue, sessionId, 21, 18);
+    // A second local correction replaces the payload but preserves server revision zero.
+    var second = localSave(state, queue, sessionId, 21, 19);
+    assert(queue.list(sessionId).length === 1 && second.command.expectedRevision === 0 && second.command.score2 === 19,
+      'one session/match intent coalesces newer local edits without inventing a revision');
+    var offlineCalls = 0;
+    await queue.flush(sessionId, function () { offlineCalls++; return { status: 'offline' }; });
+    assert(offlineCalls === 1 && queue.statusFor(sessionId, 'm1') === 'offline', 'offline save stays durable and visible');
+
+    // Simulate a reload receiving the older server snapshot before connectivity returns.
+    queue = ResultSyncQueue.create({ storage: storage });
+    state = AppState.create();
+    state.adoptSession(sessionId, remote(null, null, 0), queue.list(sessionId));
+    var visible = state.get().tournament.matches[0];
+    assert(visible.score1 === 21 && visible.score2 === 19 && visible.status === 'finished',
+      'a stale remote snapshot cannot erase the durable local score intent after reload');
+    var committed = null;
+    var retried = await queue.flush(sessionId, function (command) { committed = command; return { status: 'synced', result: { revision: 1 } }; });
+    assert(retried[0].outcome.status === 'synced' && committed.expectedRevision === 0 && queue.list(sessionId).length === 0,
+      'reconnect retries the preserved expected-revision command and clears only after confirmation');
+
+    var conflictQueue = ResultSyncQueue.create({ storage: memoryStorage() });
+    var conflictState = AppState.create();
+    conflictState.adoptSession(sessionId, remote(null, null, 0), conflictQueue.list(sessionId));
+    localSave(conflictState, conflictQueue, sessionId, 21, 18);
+    var serverResult = { score1: 21, score2: 17, status: 'finished', revision: 1, updatedBy: 'other' };
+    var conflictRun = await conflictQueue.flush(sessionId, function (command) {
+      return command.expectedRevision === 0 ? { status: 'conflict', current: serverResult } : { status: 'synced' };
+    });
+    assert(conflictRun[0].outcome.status === 'conflict' && conflictQueue.list(sessionId).length === 1,
+      'a newer server revision retains the local intent instead of forcing an overwrite');
+    assert(conflictQueue.conflictFor(sessionId, 'm1').revision === 1 && conflictQueue.statusFor(sessionId, 'm1') === 'conflict',
+      'the existing conflict flow receives the server result for an explicit human choice');
+  } catch (error) { assert(false, 'Harness error: ' + error.message); }
+  var total = passed + failed; out.innerHTML += '<div class="summary ' + (failed ? 'summary--fail' : 'summary--pass') + '">' + passed + '/' + total + ' tests passed' + (failed ? ' — FAILED' : ' — ALL PASSED') + '</div>';
+})();
+</script></body></html>

@@ -1,0 +1,142 @@
+# Feature: Fix v2.0.10 Audit Bugs
+
+## Objective
+
+Resolve the production integration, offline reliability, responsive accessibility, and contract-drift defects found in the v2.0.10 ODD audit.
+
+## Problem and Why
+
+The domain and Firebase suites pass, but the production composition layer drops required tournament context, hardcodes workspace state, assumes two-player teams, promises offline retry without implementing it, and leaves mobile/accessibility behavior unverified. These defects can block knockout scoring, hide players, lose scores, or prevent boot.
+
+## Authorized Scope
+
+- Fix the confirmed defects recorded by the v2.0.10 audit.
+- Add or extend focused browser/Firebase tests and documentation needed to prove each fix.
+- Do not push, open pull requests, deploy, or modify the pre-existing `.atl` changes.
+- Preserve schema-v1 read-only behavior, Firebase authorization, opaque player properties, and the current English/Spanish UI.
+
+## Constraints
+
+- Vanilla HTML/CSS/JavaScript; no production build step or framework.
+- Mobile-first: verify 320px first and preserve 44×44px interactive targets.
+- Script order remains contractual.
+- TDD mode: disabled, sourced from `sdd-init/volleyball_couple`; ordinary focused checks still apply. The stored init is architecturally stale, so only its explicit TDD decision is reused.
+- RDD: disabled globally; delivery is `disabled/unmanaged`.
+- Pre-existing local changes in `.atl/.skill-registry.cache.json` and `.atl/skill-registry.md` remain untouched.
+
+## Actionable Checklist
+
+- [x] **BUG-1 — Restore formatted-tournament progression**
+  - Pass standings into every production format-resolution caller.
+  - Derive bracket visibility and next-match availability from the resolved tournament projection instead of hardcoded workspace flags.
+  - Add production-composition regression coverage for group-to-knockout progression and next-match state.
+  - Route: delegated.
+  - Trigger evidence: production behavior spans `app-orchestrator.js` plus multiple tournament/results/scoring screens and tests.
+
+- [x] **BUG-2 — Render arbitrary team sizes and valid controls**
+  - Render every member in `team.players` for 2v2, 3v3, and 4v4.
+  - Preserve compatibility with pair-shaped legacy data.
+  - Remove nested interactive controls from team ownership rows and wire locked-navigation feedback.
+  - Add focused UI/component coverage.
+  - Route: delegated.
+  - Trigger evidence: non-trivial changes across Teams screen, shared UI components, orchestrator wiring, and tests.
+
+- [x] **BUG-3 — Make offline scoring honest and durable**
+  - Persist pending result writes locally and retry them after connectivity returns.
+  - Reconcile revisions without silently replacing confirmed local intent.
+  - Keep visible offline/conflict/denied states and update translations if behavior wording changes.
+  - Add repository/orchestrator regression coverage.
+  - Route: delegated.
+  - Trigger evidence: state, repository, orchestrator, i18n, and tests share the behavior.
+
+- [x] **BUG-4 — Harden boot and mobile accessibility**
+  - Guard i18n storage reads/writes when storage is unavailable.
+  - Bring language and match-hit controls to at least 44×44px at 320px.
+  - Add focused storage and responsive accessibility regression checks.
+  - Route: delegated.
+  - Trigger evidence: i18n, CSS, rendered components, and browser tests are coupled.
+
+- [x] **BUG-5 — Align executable verification and contracts**
+  - Establish the implemented `1–5` skill-level range as the canonical current contract unless source evidence contradicts it.
+  - Correct stale README/agent-facing architecture references and inaccurate harness claims.
+  - Add one deterministic command that runs all standalone browser harnesses, if achievable without adding a production runtime.
+  - Run the complete browser and Firebase Rules suites.
+  - Route: delegated.
+  - Trigger evidence: documentation, package scripts, harness infrastructure, and release consistency require coordinated verification.
+
+## Acceptance Criteria
+
+- Formatted tournaments resolve knockout participants once prerequisite group matches finish.
+- The workspace exposes the real next scorable match and does not show an empty bracket for groups-only formats.
+- 3v3 and 4v4 team screens display every player.
+- Offline score intent survives reload/reconnect and follows revision-conflict rules.
+- Blocking storage access does not prevent application boot or language switching.
+- All interactive controls meet the 44×44px mobile target and avoid nested interactive markup.
+- Level-range and architecture documentation match executable behavior.
+- Focused tests, all browser harnesses, and `npm run test:rules` pass.
+
+## Delivery Plan
+
+- Strategy: `ask-on-risk` (default).
+- Forecast: approximately 650–900 authored changed lines, excluding generated output.
+- Chain strategy: `feature-branch-chain` (user-selected).
+- Review boundary: branch point `a5aa167fccb43bd27988680d3ca734ece5c86521`.
+- Running authored line count: 1935.
+- Slice boundaries: keep the tracker branch as the integration target; each review slice branches from the previous slice and targets its immediate predecessor, while only the tracker ultimately targets `main`. Slice 1: `codex/fix-v2-audit-bugs-01-tournament-flow` / `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2: `codex/fix-v2-audit-bugs-02-team-controls` / `b5d3e94ff2d71d494208a04548d933c9b778ebd5`. Slice 3: `codex/fix-v2-audit-bugs-03-offline-scoring` / `27850afd5a6414a22c52296920242edee6d2fbe1`. Slice 4: `codex/fix-v2-audit-bugs-04-storage-mobile` / `d5163bf3d5133f6da3959aee183bc3049a010ee3`. Slice 5: `codex/fix-v2-audit-bugs-05-contract-release` / `38b134eda078eb03431e8449972342adffcaaf97`, corrected by `b52012efff6f0cdd7cef12938f2d4ac22988af69` and `f084e56358bc660b4bb502ca79aec25d664f12ee`.
+
+## Progress and Evidence
+
+- 2026-09-24: `origin/main` confirmed current at `a5aa167`; feature branch `codex/fix-v2-audit-bugs` created.
+- Baseline: Firebase Rules 25/25 passed; browser harnesses 709/709 passed while integration/accessibility defects remained uncovered.
+- 2026-09-24 BUG-1: centralized the production tournament projection so standings enter `resolveFormat` with every formatted screen and workspace computation. The projection now derives persisted format validation, bracket visibility, completion, and next-match availability from the current tournament.
+- BUG-1 focused checks (loopback server + headless Chrome): `tests/tournament-format.test.html` 50/50 passed; `tests/tournament-day-selectors.test.html` 81/81 passed; `tests/workspace-view-machine.test.html` 88/88 passed. Structural search finds the sole production `resolveFormat` call in `js/tournament-day-selectors.js`, with `groups`, `matches`, and `standings` supplied.
+- BUG-1 runtime scenario: completed `groupsFinal` group matches resolve `slot:A1` and `slot:A2`, expose `k-final-1` as the next scorable match, and retain the Bracket tab; groups-only projection hides that tab.
+- BUG-1 rollback boundary: revert the BUG-1 work-unit commit to restore the prior per-screen resolution calls and workspace flags without affecting BUG-2 through BUG-5.
+- BUG-1 delivery: slice branch `codex/fix-v2-audit-bugs-01-tournament-flow`; authored changes: 200 additions + 64 deletions = 264 lines; commit: `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`.
+- BUG-1 independent verification: PASS. A fresh verifier inspected the committed diff, confirmed the single production `resolveFormat` seam supplies standings, repeated the three focused harnesses (50/50, 81/81, 88/88), and found no product-code or scope-integrity defect. Native risk assessment was unavailable because its temporary `.git` index write was sandbox-denied; RDD remains disabled/unmanaged.
+- 2026-09-24 BUG-2: Teams now pass complete `team.players` arrays into a member-list row while retaining the legacy `player1`/`player2` compatibility adapter. The team-mode cards use a separate 44px selection button, so the owner input and King toggles are no longer nested inside an interactive control. Both shell navigations surface their existing lock reason through `onLocked` feedback.
+- BUG-2 focused checks (loopback server + headless Chrome at 320px): `tests/teams-ui.test.html` 12/12 passed; `tests/workspace-view-machine.test.html` 88/88 passed; `tests/app-state.test.html` 63/63 passed. `node --check` passed for every changed JavaScript file and `git diff --check` passed. The production UI harness mounts the real components, Teams/mode-fork screens, and app orchestrator; its DOM assertions prove no nested interactive controls remain and its 2v2/3v3/4v4 fixtures render all nine names while preserving opaque properties.
+- BUG-2 runtime scenario: a Teams screen with pair-shaped legacy data still shows two members; 3v3 and 4v4 teams show every member; tapping locked Teams in the app bar or tab bar keeps navigation locked and announces the translated reason.
+- BUG-2 rollback boundary: revert the BUG-2 work-unit commit to restore two-name rows, card-wide mode selection, and silent locked navigation without affecting BUG-1 or BUG-3 through BUG-5.
+- BUG-2 delivery: slice branch `codex/fix-v2-audit-bugs-02-team-controls`; authored changes: 288 additions + 77 deletions = 365 lines; commit: `b5d3e94ff2d71d494208a04548d933c9b778ebd5`.
+- BUG-2 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated JavaScript syntax checks plus `git diff --check` successfully. RDD remains disabled/unmanaged.
+- BUG-3: added `ResultSyncQueue`, the single durable seam for shared-score intent. It keys commands by session and match, coalesces newer edits while retaining the first server revision, and clears an entry only when that exact generation is confirmed. The orchestrator flushes the queue from the existing session connectivity subscription; AppState overlays pending intents over incoming remote snapshots; scoring restores durable offline/denied/conflict state and uses its existing explicit conflict choices.
+- BUG-3 focused checks (loopback server + headless Chrome): `tests/tournament-repository.test.html` 38/38 passed; `tests/app-state.test.html` 63/63 passed; `tests/offline-scoring.test.html` 6/6 passed; `tests/match-history.test.html` 39/39 passed; `tests/teams-ui.test.html` 12/12 passed; `tests/workspace-view-machine.test.html` 88/88 passed. `node --check` passed for `js/result-sync-queue.js`, `js/app-state.js`, `js/app-orchestrator.js`, and `js/ui/screens/scoring.js`; `git diff --check` passed.
+- BUG-3 runtime scenarios: a fake repository recorded an offline 21–18 save followed by a newer local 21–19 correction; a fresh queue/state instance reloaded, preserved 21–19 over a stale revision-zero remote snapshot, and retried the original expected revision on reconnect before clearing only after `synced`. A fake server at revision 1 returned `conflict`; the local intent remained durable and supplied the existing conflict card with the server result, with no force overwrite.
+- BUG-3 rollback boundary: revert the BUG-3 work-unit commit to remove durable shared-score retry, provisional remote-snapshot overlay, and persisted retry/conflict presentation without affecting BUG-1, BUG-2, or BUG-4 through BUG-5.
+- BUG-3 delivery: slice branch `codex/fix-v2-audit-bugs-03-offline-scoring`; authored changes: 322 additions + 18 deletions = 340 lines; running total: 969 lines; slice boundary: BUG-3 is an independent feature-branch-chain work unit after BUG-2; commit: `27850afd5a6414a22c52296920242edee6d2fbe1`.
+- BUG-3 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated JavaScript syntax checks plus `git diff --check` successfully. RDD remains disabled/unmanaged.
+- BUG-4: i18n now treats unavailable or throwing storage as a non-persistent preference: reads fall back to browser/default language selection and writes do not interrupt language switching. The production language button and interactive match hit area now each have a 44px minimum touch dimension.
+- BUG-4 focused checks (loopback server + headless Chrome): `tests/storage-mobile.test.html` 8/8 passed with `Storage.prototype.getItem` and `setItem` throwing; `tests/teams-ui.test.html` 12/12 passed; `tests/score-input.test.html` 38/38 passed. `node --check js/i18n.js` and `git diff --check` passed.
+- BUG-4 320×800 runtime verification (Chrome DevTools device metrics): viewport `320×800`; storage-stub harness 8/8 passed; `.c-lang` measured `44×44` with accessible name `Change language`; interactive `.c-match__hit` measured `280×44` and retains its native button text name `Ada and Ben versus Cia and Drew 21–19`; document scroll/client width was `320/320` (no horizontal overflow); reduced-motion query remained `false` and no motion CSS was changed.
+- BUG-4 rollback boundary: revert the BUG-4 work-unit commit to restore direct i18n storage access and the former smaller control sizing without affecting BUG-1 through BUG-3 or BUG-5.
+- BUG-4 delivery: slice branch `codex/fix-v2-audit-bugs-04-storage-mobile`; authored changes: 140 additions + 6 deletions = 146 lines; running total: 1115 lines; slice boundary: BUG-4 is an independent feature-branch-chain work unit after BUG-3; commit: `d5163bf3d5133f6da3959aee183bc3049a010ee3`.
+- BUG-4 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated the i18n syntax check plus `git diff --check` successfully. RDD remains disabled/unmanaged.
+- BUG-4 verification tier: RDD disabled/unmanaged; ordinary focused browser and runtime checks passed.
+- BUG-5: established `1|2|3|4|5` as the documented optional skill-level contract, replaced current architecture references to removed monolith files with the split state/orchestrator, UI, and CSS layers, and corrected the obsolete missing-integration-harness claim. Added development-only `npm run test:browser`, which starts an isolated loopback server and Chrome/Chromium CDP session, clears browser storage before each `tests/*.test.html` harness, and fails on assertion failures, timeouts, or browser console errors. The browser executable can be overridden with `BROWSER`.
+- BUG-5 full-suite evidence: `npm run test:browser` passed 16/16 harnesses with 740/740 assertions: app-state 63/63, king-of-court 56/56, match-history 39/39, offline-scoring 6/6, pairing 84/84, player-import 53/53, score-input 38/38, session-access 16/16, standings-view 27/27, storage-mobile 8/8, teams-ui 12/12, tournament-day-selectors 81/81, tournament-format 50/50, tournament-repository 38/38, tournament 81/81, workspace-view-machine 88/88. `npm run test:rules` passed 25/25; expected permission-denied warnings exercised Firebase Rules rejections.
+- BUG-5 release consistency: 40 local asset queries in `index.html`, the visible footer, both `footer.copyright` translations, `service-worker.js`, AGENTS/CLAUDE, and RELEASE_NOTES align on v2.0.11. v2.0.11 is prepared on this branch only; it was not deployed to Railway or Firebase.
+- BUG-5 documentation sweep: no stale current-contract `1|2|3` restriction, removed-current-architecture `js/app.js`/`css/styles.css`, missing `tests/integration.test.html`, or legacy selector/view-machine module reference remains. Remaining removed-file mentions are explicitly historical deletion notes.
+- BUG-5 checks: `node --check scripts/run-browser-tests.js`, `npm run test:browser`, `npm run test:rules`, release consistency scan, documentation sweep, and `git diff --check` passed.
+- BUG-5 rollback boundary: revert this work-unit commit to remove the deterministic browser runner, contract/release documentation, and v2.0.11 cache stamps together, without changing BUG-1 through BUG-4 runtime behavior.
+- BUG-5 delivery: slice branch `codex/fix-v2-audit-bugs-05-contract-release`; authored changes: 341 additions + 136 deletions = 477 lines; running total: 1592 lines; slice boundary: final independent feature-branch-chain work unit after BUG-4; commit: `38b134eda078eb03431e8449972342adffcaaf97`. RDD remains disabled/unmanaged.
+- BUG-5 verifier correction: bounded the single browser-suite deadline across DevToolsActivePort readiness, loopback HTTP JSON, CDP connection, every CDP command (including navigation and runtime evaluation), and summary polling. Each stuck request destroys its HTTP socket or rejects its CDP command at the deadline. Chrome cleanup now sends SIGTERM, confirms exit after a grace period, escalates to SIGKILL when necessary, confirms that exit, then removes the temporary profile.
+- BUG-5 verifier findings closed with `node --test tests/browser-runner.test.js`: a fake wedged HTTP endpoint times out; assertion, `console.error`, and missing-summary fixtures all reject; an override browser path containing spaces resolves; and a SIGTERM-resistant child reaches the force-kill fallback without remaining alive. `BROWSER='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm run test:browser` passed through an explicit path containing spaces. Full `npm run test:browser` still passed 16/16 and 740/740. `npm run test:rules` was not rerun because no rules/product behavior changed.
+- BUG-5 corrective delivery: same slice branch; authored changes: 182 additions + 98 deletions = 280 lines; running total: 1872 lines; slice boundary: bounded runner correction attached to slice 5 after `38b134eda078eb03431e8449972342adffcaaf97`; corrective commit: `b52012efff6f0cdd7cef12938f2d4ac22988af69`. Rollback boundary: revert this corrective commit to restore the former runner only; revert `38b134eda078eb03431e8449972342adffcaaf97` as well to remove the entire BUG-5 work unit.
+- BUG-5 final runner correction: Chrome spawn now awaits and retains ChildProcess `error` events (including EACCES from a non-executable `BROWSER` path), entering its existing cleanup path to remove the temporary profile rather than emitting an unhandled event. The stubborn-child test waits for the installed SIGTERM handler's ready signal, then proves `signalCode === 'SIGKILL'` and that its PID no longer exists. Final checks: `node --check scripts/run-browser-tests.js`; `node --test tests/browser-runner.test.js` 5/5, including the non-executable BROWSER/profile-cleanup fixture; `npm run test:browser` 16/16 and 740/740; `git diff --check` passed.
+- BUG-5 final corrective delivery: same slice branch; authored changes: 58 additions + 5 deletions = 63 lines; running total: 1935 lines; slice boundary: final spawn-error correction attached to slice 5 after `b52012efff6f0cdd7cef12938f2d4ac22988af69`; corrective commit: `f084e56358bc660b4bb502ca79aec25d664f12ee`. Rollback boundary: revert this corrective commit to restore prior spawn-error behavior only; revert `b52012efff6f0cdd7cef12938f2d4ac22988af69` and `38b134eda078eb03431e8449972342adffcaaf97` to remove all BUG-5 changes.
+- BUG-5 terminal independent verification: PASS after two bounded corrections. Runner tests passed 5/5; direct EACCES cleanup left zero profiles; synchronized cleanup proved SIGKILL with no remaining PID; browser harnesses passed 16/16 with 740/740 assertions; diff checks passed. Native assessment was `high` because the development runner crosses a process boundary; RDD remains disabled/unmanaged.
+- Final parent verification: `npm run test:browser` passed 16/16 harnesses and 740/740 assertions; `npm run test:rules` passed 25/25. No deployment, push, or pull request was performed.
+
+## Applicable Checks
+
+- Focused browser harnesses for each work unit.
+- All standalone `tests/*.test.html` harnesses through the established browser runner.
+- `npm run test:rules`.
+- `node --test tests/browser-runner.test.js` for runner failure and cleanup paths.
+- 320px visual/interaction verification with accessible-name and 44×44px checks.
+- Release/version consistency check if shipped asset content changes.
+
+## Next Step
+
+User-owned delivery remains: push the five slice branches and open the feature-branch-chain pull requests, or keep the verified work local.

@@ -29,6 +29,9 @@
 
   var appState = AppState.create();
   var repository = null;
+  // One queue owns durable offline intent; screens only ask to save.
+  var resultSyncQueue = typeof ResultSyncQueue !== 'undefined' ? ResultSyncQueue.create() : null;
+  var retryingSessions = {};
   var sessionId = null;
   var unsubscribeSession = null;
   var unsubscribeHistory = null;
@@ -43,6 +46,7 @@
   function workspaceInput() {
     var snapshot = appState.get();
     var session = snapshot.session;
+    var projection = snapshot.tournament ? tournamentDayProjection(snapshot.tournament) : null;
     return {
       role: session ? session.role : 'owner',
       sessionState: session ? session.state : 'ok',
@@ -52,12 +56,12 @@
       teamCount: snapshot.teams ? snapshot.teams.length : 0,
       unmatchedCount: snapshot.unmatched.length,
       groupCount: snapshot.groupCount,
-      formatValidation: null,
+      formatValidation: projection ? projection.formatValidation : null,
       hasTournament: !!snapshot.tournament,
       hasKingGame: !!snapshot.king,
-      hasBracket: !!(snapshot.tournament && snapshot.tournament.format),
-      complete: isComplete(snapshot),
-      hasNextMatch: false,
+      hasBracket: projection ? projection.hasBracket : false,
+      complete: snapshot.king ? !!snapshot.king.winner : (projection ? projection.complete : false),
+      hasNextMatch: projection ? projection.hasNextMatch : false,
       pendingRequestCount: SessionAccess.pendingCount(appState.get().session),
       firebaseConnected: session ? session.connection !== 'offline' : undefined,
       // Same test v1's initFirebase() applies, so both entry points agree on
@@ -75,27 +79,6 @@
 
   /** The contextual primary action, performed: it acts and navigates, rather
    * than only moving there (REQ-UX-04). */
-  /** Read from the same selectors the screens use, so completion cannot be
-   * tracked separately and drift. A King round is complete once it has a winner. */
-  function isComplete(snapshot) {
-    if (snapshot.king) return !!snapshot.king.winner;
-    if (!snapshot.tournament) return false;
-    try {
-      var format = snapshot.tournament.format || null;
-      var resolution = format
-        ? resolveFormat(format, { groups: snapshot.tournament.groups, matches: snapshot.tournament.matches })
-        : null;
-      return tournamentDay({
-        format: format,
-        resolution: resolution,
-        matches: snapshot.tournament.matches,
-        groups: snapshot.tournament.groups,
-      }).complete;
-    } catch (error) {
-      return false;
-    }
-  }
-
   function runPrimaryAction(action) {
     if (!action || action.enabled === false) return;
     if (action.id === 'generateTeams') { generateTeams(); return; }
@@ -136,20 +119,57 @@
 
   /** The link exists from the first second rather than waiting for a Share tap.
    * Failure is silent: the tournament is already playable locally. */
-  /** Local write first, network second: the court does not wait for signal, and
-   * the server's answer only decides which state strip is shown afterwards. */
+  function flushPendingResults(id) {
+    if (!resultSyncQueue || !repository || !id) return Promise.resolve([]);
+    if (retryingSessions[id]) return retryingSessions[id];
+    var attempt = resultSyncQueue.flush(id, function (pendingCommand) {
+      return repository.saveResult(id, pendingCommand);
+    });
+    retryingSessions[id] = attempt.then(function (outcomes) {
+      delete retryingSessions[id];
+      // Firebase can emit its authoritative snapshot before the update promise
+      // settles. Confirm the local projection here as well, after the queue has
+      // acknowledged the exact generation, so no provisional overlay lingers.
+      if (sessionId === id) {
+        outcomes.forEach(function (item) {
+          if (item.outcome.status === 'synced' && item.outcome.result) {
+            appState.adoptResult(item.entry.matchId, item.outcome.result);
+          }
+        });
+      }
+      return outcomes;
+    }, function () {
+      delete retryingSessions[id];
+      return [];
+    });
+    return retryingSessions[id];
+  }
+
+  function outcomeFor(entry, outcomes) {
+    var found = (outcomes || []).filter(function (item) {
+      return item.entry.matchId === entry.matchId && item.entry.generation === entry.generation;
+    })[0];
+    return found ? found.outcome : null;
+  }
+
+  /** Local write first, then one durable intent per session/match. A reconnect
+   * replays the exact expected-revision transaction; a conflict remains a choice,
+   * never an automatic overwrite. */
   function saveResult(command) {
     var applied = appState.applyResult(command.matchId, command.score1, command.score2, command.status);
     if (!applied.ok) return Promise.resolve({ status: 'invalid' });
-    if (!repository || !sessionId) return Promise.resolve({ status: 'synced' });
+    if (!repository || !sessionId || !resultSyncQueue) return Promise.resolve({ status: 'synced' });
 
-    var payload = Object.assign({}, applied.command, { afterConflict: !!command.afterConflict });
-    return repository.saveResult(sessionId, payload).then(function (outcome) {
-      return outcome || { status: 'synced' };
-    }).catch(function () {
-      // An unreachable server leaves the local result in place; the strip says
-      // offline rather than pretending the save failed entirely.
-      return { status: 'offline' };
+    var entry = resultSyncQueue.enqueue(sessionId,
+      Object.assign({}, applied.command, { afterConflict: !!command.afterConflict }));
+    return flushPendingResults(sessionId).then(function (outcomes) {
+      var outcome = outcomeFor(entry, outcomes);
+      // A new local edit can arrive while a prior retry is active. Flush its own
+      // generation once the first attempt releases the per-session slot.
+      if (outcome) return outcome;
+      return flushPendingResults(sessionId).then(function (nextOutcomes) {
+        return outcomeFor(entry, nextOutcomes) || { status: resultSyncQueue.statusFor(sessionId, entry.matchId) || 'offline' };
+      });
     });
   }
 
@@ -177,9 +197,13 @@
     sessionId = id;
     lastRole = null;
     unsubscribeSession = repository.watchSession(id, function (snapshot) {
-      appState.adoptSession(id, snapshot);
+      var pending = resultSyncQueue ? resultSyncQueue.list(id) : [];
+      appState.adoptSession(id, snapshot, pending);
       announceRoleChange(snapshot && snapshot.role);
       render();
+      // The subscription is the connectivity signal. It also fires after reload,
+      // so durable intents retry without requiring the scorer to reopen a match.
+      if (snapshot && snapshot.connection === 'online' && pending.length) flushPendingResults(id);
     });
     if (unsubscribeHistory) unsubscribeHistory();
     historyEntries = [];
@@ -330,6 +354,11 @@
 
   function renderChrome(view) {
     var items = destinationItems(view);
+    // UIComponents already protects locked destinations. The shell owns the
+    // reason, so both breakpoints can explain the same unavailable destination.
+    function onLocked(item) {
+      if (item && item.lockReason) toast({ title: item.lockReason });
+    }
 
     // Same gate as the kebab: only once there is a tournament, and only on
     // Torneo, where a schedule long enough to search for a match exists.
@@ -337,7 +366,7 @@
     var searchAction = hasTournament ? [{
       icon: 'search',
       tone: 'muted',
-      label: translate('matches.search', 'Buscar por jugador, pareja o grupo'),
+      label: translate('matches.search', 'Buscar por jugador, equipo o grupo'),
       onClick: function () { openOverlay('allMatches'); },
     }] : [];
 
@@ -354,7 +383,7 @@
     DomHelpers.mount(nodes.bar, C.appBar({
       title: translate('workspace.nav.' + view.view, view.view),
       // Shown from 600px up, where the fixed tab bar is dropped.
-      nav: { active: view.view, items: items, onSelect: navigate },
+      nav: { active: view.view, items: items, onSelect: navigate, onLocked: onLocked },
       actions: searchAction.concat(menuAction),
       lang: {
         code: state.lang.toUpperCase(),
@@ -367,6 +396,7 @@
       active: view.view,
       items: items,
       onSelect: navigate,
+      onLocked: onLocked,
     }));
 
     if (nodes.footerText) {
@@ -392,6 +422,15 @@
       startTournament: startTournament,
       startKing: startKing,
       saveResult: saveResult,
+      pendingStatus: function (matchId) {
+        return resultSyncQueue && sessionId ? resultSyncQueue.statusFor(sessionId, matchId) : null;
+      },
+      pendingConflict: function (matchId) {
+        return resultSyncQueue && sessionId ? resultSyncQueue.conflictFor(sessionId, matchId) : null;
+      },
+      discardPendingResult: function (matchId) {
+        return resultSyncQueue && sessionId ? resultSyncQueue.discard(sessionId, matchId) : false;
+      },
       toast: toast,
       requestAccess: requestAccess,
       setAccess: setAccess,

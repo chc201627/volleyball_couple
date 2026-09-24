@@ -2,11 +2,56 @@
  * the state lists, stage progress, the outcome, and finding a match by name.
  */
 
-/* exported tournamentDay, formatTournamentSummary, searchMatchViews, TOURNAMENT_DAY_COLLAPSE_AFTER */
+/* exported tournamentDay, tournamentDayProjection, formatTournamentSummary, searchMatchViews, TOURNAMENT_DAY_COLLAPSE_AFTER */
 
 /** Sections longer than this collapse behind "Show all" (REQ-UX-32). Full arrays
  * are always returned; collapsing is the screen's decision. */
 var TOURNAMENT_DAY_COLLAPSE_AFTER = 5;
+
+/**
+ * Build the single current-state projection consumed by production tournament
+ * screens and workspace chrome. Keeping standings beside resolveFormat is
+ * essential: knockout slot descriptors resolve from the completed group
+ * standings, not from the raw matches alone.
+ *
+ * @param {{ groups?: Array, matches?: Array, format?: object|null, king?: object|null }} tournament
+ * @returns {{ format: object|null, standings: Map, resolution: object|null,
+ *   day: object, formatValidation: object|null, hasBracket: boolean,
+ *   hasNextMatch: boolean, complete: boolean }}
+ */
+function tournamentDayProjection(tournament) {
+  tournament = tournament || {};
+  var groups = Array.isArray(tournament.groups) ? tournament.groups : [];
+  var matches = Array.isArray(tournament.matches) ? tournament.matches : [];
+  var format = tournament.format || null;
+  var standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+  var resolution = format
+    ? resolveFormat(format, { groups: groups, matches: matches, standings: standings })
+    : null;
+  var day = tournamentDay({
+    format: format,
+    resolution: resolution,
+    matches: matches,
+    groups: groups,
+    standings: standings,
+    king: tournament.king || null,
+  });
+  var formatValidation = format ? validateFormat(format, groups) : null;
+  var hasBracket = !!(resolution && resolution.stages.some(function (stage) {
+    return stage.kind === 'knockout';
+  }));
+
+  return {
+    format: format,
+    standings: standings,
+    resolution: resolution,
+    day: day,
+    formatValidation: formatValidation,
+    hasBracket: hasBracket,
+    hasNextMatch: !!day.nextMatch,
+    complete: day.complete,
+  };
+}
 
 /** A stage's sort weight: the format's stage `order`, or 1 when there is no
  * format (classic sessions have a single implicit stage). */

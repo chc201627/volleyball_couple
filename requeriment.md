@@ -608,8 +608,8 @@ Four guided destinations (Setup → Teams → Tournament → Results) behind a p
 
 ### release-and-verification
 
-- **REQ-UX-90:** `tests/integration.test.html` mirrors the new markup and asserts nav role-scoping, default-view derivation, Next Match above the fold, 320px no-overflow, ≥44×44 targets, and in-view conflict surfacing; two new pure-module harnesses cover `workspace.js` and `tournament-day.js`; `npm run test:rules` stays green.
-- **REQ-UX-91:** Release bump to v1.9.0 per the CLAUDE.md checklist (all `?v=`, footer, both `footer.copyright` strings, CLAUDE.md stale version corrected, RELEASE_NOTES, requeriment/task).
+- **REQ-UX-90:** `npm run test:browser` runs every standalone `tests/*.test.html` harness through loopback Chrome/Chromium with isolated browser storage and fails on assertion failures, timeouts, or console errors. Coverage includes workspace/view-machine behavior, tournament-day selectors, Teams 2v2/3v3/4v4 rendering, offline scoring, and storage/mobile regressions; `npm run test:rules` stays green.
+- **REQ-UX-91:** Every release bump uses `node scripts/bump-version.js X.Y.Z`, keeping all local `?v=` asset queries, the visible footer, both `footer.copyright` translations, and the service-worker asset version aligned; update AGENTS/CLAUDE, RELEASE_NOTES, requeriment, and task documentation in the same work unit.
 
 ## Tech Stack
 
