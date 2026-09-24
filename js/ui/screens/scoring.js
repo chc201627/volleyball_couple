@@ -246,6 +246,7 @@
         score: conflict.score1 + ' – ' + conflict.score2,
         active: true,
         onClick: function () {
+          if (ctx.discardPendingResult) ctx.discardPendingResult(match.id);
           ctx.appState.adoptResult(match.id, conflict);
           reset();
           ctx.closeOverlay();
@@ -258,6 +259,7 @@
         onClick: function () {
           // Retrying adopts the server's revision first, so the next save is
           // an edit on top of it rather than another losing race.
+          if (ctx.discardPendingResult) ctx.discardPendingResult(match.id);
           ctx.appState.adoptResult(match.id, conflict);
           conflict = null;
           save(ctx, true);
@@ -329,6 +331,10 @@
         return C.sheet({ title: translate('tournament.noMatch', 'Partido no encontrado'), onDismiss: ctx.closeOverlay }, []);
       }
       ensureDraft(match);
+      // Retry outcomes can arrive while this sheet is closed. Restoring them at
+      // render time keeps the existing status strip and conflict card truthful.
+      if (!sync && ctx.pendingStatus) sync = ctx.pendingStatus(match.id);
+      if (!conflict && ctx.pendingConflict) conflict = ctx.pendingConflict(match.id);
 
       var tournament = ctx.appState.get().tournament;
       var rules = rulesForMatch(tournament.format, match.id);

@@ -29,6 +29,9 @@
 
   var appState = AppState.create();
   var repository = null;
+  // One queue owns durable offline intent; screens only ask to save.
+  var resultSyncQueue = typeof ResultSyncQueue !== 'undefined' ? ResultSyncQueue.create() : null;
+  var retryingSessions = {};
   var sessionId = null;
   var unsubscribeSession = null;
   var unsubscribeHistory = null;
@@ -116,20 +119,57 @@
 
   /** The link exists from the first second rather than waiting for a Share tap.
    * Failure is silent: the tournament is already playable locally. */
-  /** Local write first, network second: the court does not wait for signal, and
-   * the server's answer only decides which state strip is shown afterwards. */
+  function flushPendingResults(id) {
+    if (!resultSyncQueue || !repository || !id) return Promise.resolve([]);
+    if (retryingSessions[id]) return retryingSessions[id];
+    var attempt = resultSyncQueue.flush(id, function (pendingCommand) {
+      return repository.saveResult(id, pendingCommand);
+    });
+    retryingSessions[id] = attempt.then(function (outcomes) {
+      delete retryingSessions[id];
+      // Firebase can emit its authoritative snapshot before the update promise
+      // settles. Confirm the local projection here as well, after the queue has
+      // acknowledged the exact generation, so no provisional overlay lingers.
+      if (sessionId === id) {
+        outcomes.forEach(function (item) {
+          if (item.outcome.status === 'synced' && item.outcome.result) {
+            appState.adoptResult(item.entry.matchId, item.outcome.result);
+          }
+        });
+      }
+      return outcomes;
+    }, function () {
+      delete retryingSessions[id];
+      return [];
+    });
+    return retryingSessions[id];
+  }
+
+  function outcomeFor(entry, outcomes) {
+    var found = (outcomes || []).filter(function (item) {
+      return item.entry.matchId === entry.matchId && item.entry.generation === entry.generation;
+    })[0];
+    return found ? found.outcome : null;
+  }
+
+  /** Local write first, then one durable intent per session/match. A reconnect
+   * replays the exact expected-revision transaction; a conflict remains a choice,
+   * never an automatic overwrite. */
   function saveResult(command) {
     var applied = appState.applyResult(command.matchId, command.score1, command.score2, command.status);
     if (!applied.ok) return Promise.resolve({ status: 'invalid' });
-    if (!repository || !sessionId) return Promise.resolve({ status: 'synced' });
+    if (!repository || !sessionId || !resultSyncQueue) return Promise.resolve({ status: 'synced' });
 
-    var payload = Object.assign({}, applied.command, { afterConflict: !!command.afterConflict });
-    return repository.saveResult(sessionId, payload).then(function (outcome) {
-      return outcome || { status: 'synced' };
-    }).catch(function () {
-      // An unreachable server leaves the local result in place; the strip says
-      // offline rather than pretending the save failed entirely.
-      return { status: 'offline' };
+    var entry = resultSyncQueue.enqueue(sessionId,
+      Object.assign({}, applied.command, { afterConflict: !!command.afterConflict }));
+    return flushPendingResults(sessionId).then(function (outcomes) {
+      var outcome = outcomeFor(entry, outcomes);
+      // A new local edit can arrive while a prior retry is active. Flush its own
+      // generation once the first attempt releases the per-session slot.
+      if (outcome) return outcome;
+      return flushPendingResults(sessionId).then(function (nextOutcomes) {
+        return outcomeFor(entry, nextOutcomes) || { status: resultSyncQueue.statusFor(sessionId, entry.matchId) || 'offline' };
+      });
     });
   }
 
@@ -157,9 +197,13 @@
     sessionId = id;
     lastRole = null;
     unsubscribeSession = repository.watchSession(id, function (snapshot) {
-      appState.adoptSession(id, snapshot);
+      var pending = resultSyncQueue ? resultSyncQueue.list(id) : [];
+      appState.adoptSession(id, snapshot, pending);
       announceRoleChange(snapshot && snapshot.role);
       render();
+      // The subscription is the connectivity signal. It also fires after reload,
+      // so durable intents retry without requiring the scorer to reopen a match.
+      if (snapshot && snapshot.connection === 'online' && pending.length) flushPendingResults(id);
     });
     if (unsubscribeHistory) unsubscribeHistory();
     historyEntries = [];
@@ -378,6 +422,15 @@
       startTournament: startTournament,
       startKing: startKing,
       saveResult: saveResult,
+      pendingStatus: function (matchId) {
+        return resultSyncQueue && sessionId ? resultSyncQueue.statusFor(sessionId, matchId) : null;
+      },
+      pendingConflict: function (matchId) {
+        return resultSyncQueue && sessionId ? resultSyncQueue.conflictFor(sessionId, matchId) : null;
+      },
+      discardPendingResult: function (matchId) {
+        return resultSyncQueue && sessionId ? resultSyncQueue.discard(sessionId, matchId) : false;
+      },
       toast: toast,
       requestAccess: requestAccess,
       setAccess: setAccess,

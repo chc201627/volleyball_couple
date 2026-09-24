@@ -41,7 +41,7 @@ The domain and Firebase suites pass, but the production composition layer drops 
   - Route: delegated.
   - Trigger evidence: non-trivial changes across Teams screen, shared UI components, orchestrator wiring, and tests.
 
-- [ ] **BUG-3 — Make offline scoring honest and durable**
+- [x] **BUG-3 — Make offline scoring honest and durable**
   - Persist pending result writes locally and retry them after connectivity returns.
   - Reconcile revisions without silently replacing confirmed local intent.
   - Keep visible offline/conflict/denied states and update translations if behavior wording changes.
@@ -100,6 +100,11 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-2 rollback boundary: revert the BUG-2 work-unit commit to restore two-name rows, card-wide mode selection, and silent locked navigation without affecting BUG-1 or BUG-3 through BUG-5.
 - BUG-2 delivery: slice branch `codex/fix-v2-audit-bugs-02-team-controls`; authored changes: 288 additions + 77 deletions = 365 lines; commit: `b5d3e94ff2d71d494208a04548d933c9b778ebd5`.
 - BUG-2 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated JavaScript syntax checks plus `git diff --check` successfully. RDD remains disabled/unmanaged.
+- BUG-3: added `ResultSyncQueue`, the single durable seam for shared-score intent. It keys commands by session and match, coalesces newer edits while retaining the first server revision, and clears an entry only when that exact generation is confirmed. The orchestrator flushes the queue from the existing session connectivity subscription; AppState overlays pending intents over incoming remote snapshots; scoring restores durable offline/denied/conflict state and uses its existing explicit conflict choices.
+- BUG-3 focused checks (loopback server + headless Chrome): `tests/tournament-repository.test.html` 38/38 passed; `tests/app-state.test.html` 63/63 passed; `tests/offline-scoring.test.html` 6/6 passed; `tests/match-history.test.html` 39/39 passed; `tests/teams-ui.test.html` 12/12 passed; `tests/workspace-view-machine.test.html` 88/88 passed. `node --check` passed for `js/result-sync-queue.js`, `js/app-state.js`, `js/app-orchestrator.js`, and `js/ui/screens/scoring.js`; `git diff --check` passed.
+- BUG-3 runtime scenarios: a fake repository recorded an offline 21–18 save followed by a newer local 21–19 correction; a fresh queue/state instance reloaded, preserved 21–19 over a stale revision-zero remote snapshot, and retried the original expected revision on reconnect before clearing only after `synced`. A fake server at revision 1 returned `conflict`; the local intent remained durable and supplied the existing conflict card with the server result, with no force overwrite.
+- BUG-3 rollback boundary: revert the BUG-3 work-unit commit to remove durable shared-score retry, provisional remote-snapshot overlay, and persisted retry/conflict presentation without affecting BUG-1, BUG-2, or BUG-4 through BUG-5.
+- BUG-3 delivery: slice branch `codex/fix-v2-audit-bugs-03-offline-scoring`; authored changes: 322 additions + 18 deletions = 340 lines; running total: 969 lines; slice boundary: BUG-3 is an independent feature-branch-chain work unit after BUG-2. `PENDING-COMMIT`.
 
 ## Applicable Checks
 

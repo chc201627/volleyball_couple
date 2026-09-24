@@ -442,9 +442,10 @@ var AppState;
         return { ok: true };
       },
 
-      /** The remote copy wins outright: a local edit that survived a merge would be
-       * a result nobody else can see. An unreadable session still records why. */
-      adoptSession: function (sessionId, snapshot) {
+      /** Remote state is authoritative except for an unconfirmed local score intent.
+       * The caller supplies durable per-session entries from ResultSyncQueue, so a
+       * stale snapshot cannot erase a score that still needs its first transaction. */
+      adoptSession: function (sessionId, snapshot, pendingResults) {
         if (!snapshot) {
           state.session = { id: sessionId, state: 'notFound', role: 'spectator', accessStatus: null, requests: null, connection: 'offline', legacy: false };
           emit();
@@ -466,8 +467,32 @@ var AppState;
         };
 
         if (snapshot.tournament) {
-          state.tournament = snapshot.tournament;
-          state.teams = (snapshot.tournament.teams || []).map(normaliseTeam);
+          var visibleTournament = snapshot.tournament;
+          (pendingResults || []).forEach(function (entry) {
+            var command = entry && entry.command;
+            if (!command || !command.matchId) return;
+            var resultMap = {};
+            visibleTournament.matches.forEach(function (item) {
+              if (item.status && item.status !== 'pending') resultMap[item.id] = item;
+            });
+            // A durable intent remains visible until its exact transaction is
+            // confirmed. Its revision is provisional; expectedRevision remains
+            // in the queue for the eventual repository transaction.
+            resultMap[command.matchId] = {
+              id: command.matchId,
+              score1: command.score1,
+              score2: command.score2,
+              status: command.status,
+              revision: command.expectedRevision + 1,
+              updatedBy: null,
+              updatedAt: null,
+            };
+            visibleTournament = Object.assign({}, visibleTournament, {
+              matches: projectMatchResults(visibleTournament.matches, resultMap),
+            });
+          });
+          state.tournament = visibleTournament;
+          state.teams = (visibleTournament.teams || []).map(normaliseTeam);
           writeJSON(KEYS.tournament, state.tournament);
         }
         emit();
