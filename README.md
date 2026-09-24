@@ -44,17 +44,21 @@ open index.html
 ## Estructura del Proyecto
 
 ```
-index.html              Aplicación de página única
-css/styles.css          Estilos BEM mobile-first con variables CSS
-js/pairing.js           Módulo independiente del algoritmo de emparejamiento
-js/player-import.js     Parser y validador puro para listas pegadas
-js/i18n.js              Internacionalización (ES/EN)
-js/app.js               Lógica de UI (IIFE, depende de pairing.js + i18n.js)
-tests/
-  pairing.test.html     Tests unitarios del algoritmo (6 escenarios + casos límite)
-  player-import.test.html Tests del contrato de importación masiva
-  integration.test.html Tests de integración del flujo completo
+index.html                    Aplicación de página única y orden contractual de scripts
+css/                          Tokens, reset, shell, componentes, pantallas y animaciones
+js/pairing.js                 Algoritmo puro de generación y balance de niveles 1–5
+js/player-import.js           Parser, normalizador y validador puro de listas pegadas
+js/app-state.js               Estado y persistencia local; no depende del DOM
+js/app-orchestrator.js        Composición de estado, navegación, pantallas y repositorios
+js/tournament*.js             Dominio, formatos y selectores de torneos
+js/ui/                        Componentes, registro de pantallas y pantallas por módulo
+scripts/run-browser-tests.js  Runner determinista de los harnesses del navegador
+tests/                        Harnesses browser y pruebas de reglas Firebase
 ```
+
+El orden de scripts de `index.html` es parte del contrato: Firebase carga antes
+que los módulos de dominio, estos antes de UI, y `app-orchestrator.js` cierra la
+composición. No existe un monolito `js/app.js` ni una hoja `css/styles.css`.
 
 ## Algoritmo de Emparejamiento
 
@@ -73,14 +77,22 @@ npm install
 npm run test:rules
 ```
 
-Abre los archivos de test directamente en el navegador:
+Ejecute todos los harnesses browser de forma determinista:
 
-- `tests/pairing.test.html` — Tests unitarios (6 escenarios, casos límite 0/1/200 jugadores, aleatorización, unicidad)
-- `tests/player-import.test.html` — Formatos de lista, normalización EN/ES, validación y límite de 200 jugadores
-- `tests/integration.test.html` — Flujo completo (agregar jugadores, validar, generar, regenerar, limpiar todo)
-- `tests/tournament.test.html` — calendario, estados y clasificación
-- `tests/tournament-repository.test.html` — repositorio, conflictos y compatibilidad v1/v2
-- `tests/king-of-court.test.html` — modo King of the Court
+```bash
+npm run test:browser
+```
+
+`test:browser` sirve los archivos solo en `127.0.0.1`, encuentra Chrome o
+Chromium en rutas habituales (o en `BROWSER=/ruta/al/navegador`), aísla el
+almacenamiento de cada harness y falla por aserciones, timeouts o errores de
+consola. Es tooling de desarrollo: no agrega un runtime de producción.
+
+Incluye los 16 harnesses actuales: `app-state`, `king-of-court`,
+`match-history`, `offline-scoring`, `pairing`, `player-import`, `score-input`,
+`session-access`, `standings-view`, `storage-mobile`, `teams-ui`,
+`tournament-day-selectors`, `tournament-format`, `tournament-repository`,
+`tournament` y `workspace-view-machine`.
 
 Para probar la aplicación contra los emuladores sin tocar producción:
 
@@ -93,51 +105,15 @@ Abra `http://127.0.0.1:4173/?firebaseEmulator=1`. El parámetro solamente se
 activa en `localhost` o `127.0.0.1`. Consulte `firebase-plan.md` para despliegue,
 migración y rollback.
 
-### Ejecutar los harnesses en modo headless
-
-```bash
-python3 -m http.server 4173 --bind 127.0.0.1
-# En otra terminal, con Chrome/Chromium instalado:
-google-chrome --headless --disable-gpu --dump-dom \
-  http://127.0.0.1:4173/tests/integration.test.html
-```
-
-Cualquier navegador headless que ejecute JavaScript sirve — inspeccione el
-recuento final de aserciones (`PASSED`/`FAILED`) en la salida o en el DOM
-volcado. `tests/integration.test.html` es una copia (mirror) del marcado de
-`index.html`: cualquier cambio estructural en `index.html` debe reflejarse
-byte a byte en el harness en el mismo cambio, o el harness prueba un DOM
-obsoleto.
-
 ### Verificar 320px con una ventana real
 
-`#app-frame` en `tests/integration.test.html` simula 320px fijando su ancho
-en línea, lo cual restringe el layout pero **no** activa `@media
-(min-width/max-width)` — las media queries siguen la ventana real del
-navegador. En Chrome 151+, `--window-size=320,568` en modo headless se
-recorta a un mínimo de ~500px sin importar los flags, por lo que una
-ejecución headless simple omite silenciosamente el CSS real de 320px. Para
-verificar breakpoints en una ventana genuina de 320px, use Playwright
-contra el Chrome del sistema:
-
-```bash
-npm install playwright --no-save   # en un directorio de scratch, no en el repo
-node -e "
-const { chromium } = require('playwright');
-(async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-  await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('http://127.0.0.1:4173/tests/integration.test.html');
-  console.log(await page.evaluate(() => window.innerWidth)); // debe ser 320
-  await browser.close();
-})();
-"
-```
-
-Las aserciones protegidas por ventana registran `SKIPPED` en la consola en
-vez de pasar silenciosamente cuando la ventana real no coincide con el
-tamaño que necesitan.
+Los harnesses verifican contratos de UI, almacenamiento y controles; la
+validación de breakpoints sigue requiriendo un viewport real de 320px. En
+Chrome 151+, `--window-size=320,568` en modo headless se recorta a un mínimo de
+~500px, por lo que una ejecución headless simple omite silenciosamente el CSS
+real de 320px. Para verificar breakpoints, use Playwright contra el Chrome del
+sistema en un directorio temporal y compruebe `window.innerWidth === 320` antes
+de medir objetivos y overflow.
 
 ## Flujo de marcadores colaborativos
 
@@ -151,7 +127,7 @@ tamaño que necesitan.
 
 ## Importar una lista
 
-Seleccione **Pegar lista**, pegue una persona por línea y revise antes de importar. Formato: `Nombre, Género, Nivel`; género y nivel son opcionales, y el nivel admite `1`, `2` o `3`. En español, `H` significa hombre y `M` mujer. La acción **Deshacer importación** elimina solamente el último lote agregado.
+Seleccione **Pegar lista**, pegue una persona por línea y revise antes de importar. Formato: `Nombre, Género, Nivel`; género y nivel son opcionales, y el nivel admite valores enteros de `1` a `5`. En español, `H` significa hombre y `M` mujer. La acción **Deshacer importación** elimina solamente el último lote agregado.
 
 ## Navegadores Soportados
 

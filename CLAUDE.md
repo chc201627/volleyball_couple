@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Repository guidance for coding agents. The production application is currently **v2.0.9**.
+Repository guidance for coding agents. The current release preparation is **v2.0.11**; this branch is not deployed by that preparation.
 
 ## Project
 
@@ -29,11 +29,16 @@ npm install
 npm run test:rules
 ```
 
-Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a browser or headless Chrome and inspect their pass/fail output. To exercise the app against local emulators, run the emulator command documented in `README.md` and open `http://127.0.0.1:4173/?firebaseEmulator=1`.
+Browser suites remain standalone `tests/*.test.html` harnesses. Run every harness deterministically with `npm run test:browser`; it uses loopback Chrome/Chromium, isolates browser storage per harness, and fails on assertions, timeouts, or console errors. To exercise the app against local emulators, run the emulator command documented in `README.md` and open `http://127.0.0.1:4173/?firebaseEmulator=1`.
 
 ### Testing at 320px
 
-`tests/integration.test.html` simulates 320px by setting `#app-frame`'s inline width, which constrains layout but does **not** drive `@media (min-width/max-width)` evaluation — media queries follow the real browser window. On Chrome 151+, headless `--window-size=320,568` (and similar small values) clamps to a ~500px minimum window regardless of flags, so a plain headless run silently skips true-320px CSS. To verify breakpoint-gated CSS at a genuine 320px viewport, drive system Chrome with Playwright and `page.setViewportSize({ width: 320, height: 568 })` (CDP device-metrics override), asserting `window.innerWidth === 320` before measuring. Guarded assertions in the harness log `SKIPPED` rather than silently passing when the real window does not match the size they need.
+`npm run test:browser` verifies the standalone UI contracts but does not claim a
+true 320px media-query viewport. Chrome 151+ clamps headless
+`--window-size=320,568` to roughly 500px. Verify breakpoint-gated CSS with
+system Chrome driven through CDP device metrics (for example Playwright in a
+temporary directory), assert `window.innerWidth === 320`, then measure targets
+and overflow.
 
 ## Architecture
 
@@ -45,21 +50,23 @@ Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a b
 | `js/i18n.js` | Flat EN/ES dictionaries; `t(key)` falls back to English, then the key. |
 | `js/tournament.js` | Group creation, schedule, match states, scores, and standings. |
 | `js/tournament-format.js` | Pure tournament-format engine: presets, validation, knockout stage generation with slot descriptors, deterministic client-side resolution, and per-match rules. |
-| `js/tournament-day.js` | Pure, DOM-free selectors for the Tournament command center and Results screen: next match, live/pending/recently-finished lists, stage progress, and champion/outcome resolution. |
+| `js/tournament-day-selectors.js` | Pure, DOM-free selectors for the Tournament command center and Results screen: next match, lists, stage progress, and outcomes. |
 | `js/tournament-repository.js` | Repository boundary for shared tournaments: schema codecs, in-memory tests, Firebase subscriptions, access requests, and transactional result saves. |
 | `js/king-of-court.js` | Throne/challenger queue and win conditions. |
 | `js/match-history.js` | Pure, DOM-free selectors over the change history: the diff against the previous revision, day grouping, filters by event, one match's timeline, and the legacy view for sessions that predate `resultHistory`. |
-| `js/workspace.js` | Pure, DOM-free view machine for the four-destination organizer workspace: resolved destination, role-scoped nav, single contextual primary action, and readiness checklist. |
-| `js/app.js` | IIFE-based application state, rendering, events, localStorage, localization, and repository orchestration. |
+| `js/workspace-view-machine.js` | Pure, DOM-free view machine for the four-destination organizer workspace: resolved destination, role-scoped nav, primary action, and readiness checklist. |
+| `js/app-state.js` | DOM-free application state and resilient local persistence. |
+| `js/app-orchestrator.js` | Composes state, repository, navigation chrome, localization, and screen rendering. |
+| `js/ui/` | Shared DOM components, screen registry, and one module per screen. |
 | `js/firebase-config.js` | Firebase initialization and loopback-only emulator selection. |
 | `firebase-rules.json` | Least-privilege Realtime Database authorization and validation. |
-| `css/styles.css` | Mobile-first BEM styles and design tokens; breakpoints at 600px and 960px. |
+| `css/` | Mobile-first design tokens, reset, shell, components, screens, and animations; breakpoints at 600px and 960px. |
 | `scripts/bump-version.js` | The one command that moves the release version across `index.html`, the service worker and `js/i18n.js`. |
 | `scripts/i18n-unused.js` | Translation sweep: missing keys, keys present in one language only, unsubstituted `{placeholders}`, and orphans. `--strict` exits non-zero. |
 
 Script order is contractual. Firebase CDN SDKs load first, followed by:
 
-`firebase-config.js` → `pairing.js` → `player-import.js` → `i18n.js` → `tournament.js` → `tournament-format.js` → `tournament-day.js` → `tournament-repository.js` → `king-of-court.js` → `workspace.js` → `app.js`.
+`firebase-config.js` → domain/state modules → UI helpers and screen modules → `app-orchestrator.js`. The exact list in `index.html` is contractual; current selector/state module names include `tournament-day-selectors.js`, `workspace-view-machine.js`, and `app-state.js`.
 
 ## Collaborative scoring model
 
@@ -74,7 +81,7 @@ Script order is contractual. Firebase CDN SDKs load first, followed by:
 ## Product invariants
 
 - Player IDs use `Date.now() + Math.random()`.
-- Optional levels are omitted when unset; never write `undefined` to Firebase. Only `1|2|3` are valid.
+- Optional levels are omitted when unset; never write `undefined` to Firebase. Only `1|2|3|4|5` are valid.
 - Level balancing is a post-generation, same-gender swap pass that preserves team type and balances average level.
 - Duplicate player names are allowed by REQ-VAL-06.
 - Escape all user-provided text with `escapeHTML()` before inserting HTML.

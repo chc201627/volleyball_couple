@@ -56,7 +56,7 @@ The domain and Firebase suites pass, but the production composition layer drops 
   - Route: delegated.
   - Trigger evidence: i18n, CSS, rendered components, and browser tests are coupled.
 
-- [ ] **BUG-5 — Align executable verification and contracts**
+- [x] **BUG-5 — Align executable verification and contracts**
   - Establish the implemented `1–5` skill-level range as the canonical current contract unless source evidence contradicts it.
   - Correct stale README/agent-facing architecture references and inaccurate harness claims.
   - Add one deterministic command that runs all standalone browser harnesses, if achievable without adding a production runtime.
@@ -113,6 +113,13 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-4 delivery: slice branch `codex/fix-v2-audit-bugs-04-storage-mobile`; authored changes: 140 additions + 6 deletions = 146 lines; running total: 1115 lines; slice boundary: BUG-4 is an independent feature-branch-chain work unit after BUG-3; commit: `d5163bf3d5133f6da3959aee183bc3049a010ee3`.
 - BUG-4 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated the i18n syntax check plus `git diff --check` successfully. RDD remains disabled/unmanaged.
 - BUG-4 verification tier: RDD disabled/unmanaged; ordinary focused browser and runtime checks passed.
+- BUG-5: established `1|2|3|4|5` as the documented optional skill-level contract, replaced current architecture references to removed monolith files with the split state/orchestrator, UI, and CSS layers, and corrected the obsolete missing-integration-harness claim. Added development-only `npm run test:browser`, which starts an isolated loopback server and Chrome/Chromium CDP session, clears browser storage before each `tests/*.test.html` harness, and fails on assertion failures, timeouts, or browser console errors. The browser executable can be overridden with `BROWSER`.
+- BUG-5 full-suite evidence: `npm run test:browser` passed 16/16 harnesses with 740/740 assertions: app-state 63/63, king-of-court 56/56, match-history 39/39, offline-scoring 6/6, pairing 84/84, player-import 53/53, score-input 38/38, session-access 16/16, standings-view 27/27, storage-mobile 8/8, teams-ui 12/12, tournament-day-selectors 81/81, tournament-format 50/50, tournament-repository 38/38, tournament 81/81, workspace-view-machine 88/88. `npm run test:rules` passed 25/25; expected permission-denied warnings exercised Firebase Rules rejections.
+- BUG-5 release consistency: 40 local asset queries in `index.html`, the visible footer, both `footer.copyright` translations, `service-worker.js`, AGENTS/CLAUDE, and RELEASE_NOTES align on v2.0.11. v2.0.11 is prepared on this branch only; it was not deployed to Railway or Firebase.
+- BUG-5 documentation sweep: no stale current-contract `1|2|3` restriction, removed-current-architecture `js/app.js`/`css/styles.css`, missing `tests/integration.test.html`, or legacy selector/view-machine module reference remains. Remaining removed-file mentions are explicitly historical deletion notes.
+- BUG-5 checks: `node --check scripts/run-browser-tests.js`, `npm run test:browser`, `npm run test:rules`, release consistency scan, documentation sweep, and `git diff --check` passed.
+- BUG-5 rollback boundary: revert this work-unit commit to remove the deterministic browser runner, contract/release documentation, and v2.0.11 cache stamps together, without changing BUG-1 through BUG-4 runtime behavior.
+- BUG-5 delivery: slice branch `codex/fix-v2-audit-bugs-05-contract-release`; authored changes: 341 additions + 136 deletions = 477 lines; running total: 1592 lines; slice boundary: final independent feature-branch-chain work unit after BUG-4; commit: PENDING-COMMIT. RDD remains disabled/unmanaged.
 
 ## Applicable Checks
 
@@ -124,4 +131,4 @@ The domain and Firebase suites pass, but the production composition layer drops 
 
 ## Next Step
 
-Delegate BUG-5 as the final work unit, then run the complete release checks.
+Final parent reconciliation and complete verification of the BUG-5 work-unit commit; deployment, push, and pull request creation remain out of scope.

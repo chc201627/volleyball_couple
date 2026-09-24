@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Repository guidance for coding agents. The production application is currently **v2.0.10**.
+Repository guidance for coding agents. The current release preparation is **v2.0.11**; this branch is not deployed by that preparation.
 
 ## Project
 
@@ -29,7 +29,7 @@ npm install
 npm run test:rules
 ```
 
-Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a browser or headless Chrome and inspect their pass/fail output. To exercise the app against local emulators, run the emulator command documented in `README.md` and open `http://127.0.0.1:4173/?firebaseEmulator=1`.
+Browser suites remain standalone `tests/*.test.html` harnesses. Run every harness deterministically with `npm run test:browser`; it uses loopback Chrome/Chromium, isolates browser storage per harness, and fails on assertions, timeouts, or console errors. To exercise the app against local emulators, run the emulator command documented in `README.md` and open `http://127.0.0.1:4173/?firebaseEmulator=1`.
 
 ## Architecture
 
@@ -43,14 +43,16 @@ Browser suites remain standalone `tests/*.test.html` harnesses. Open them in a b
 | `js/tournament-format.js` | Pure tournament-format engine: presets, validation, knockout stage generation with slot descriptors, deterministic client-side resolution, and per-match rules. |
 | `js/tournament-repository.js` | Repository boundary for shared tournaments: schema codecs, in-memory tests, Firebase subscriptions, access requests, and transactional result saves. |
 | `js/king-of-court.js` | Throne/challenger queue and win conditions. |
-| `js/app.js` | IIFE-based application state, rendering, events, localStorage, localization, and repository orchestration. |
+| `js/app-state.js` | DOM-free application state and resilient local persistence. |
+| `js/app-orchestrator.js` | Composes state, repository, navigation chrome, localization, and screen rendering. |
+| `js/ui/` | Shared DOM components, screen registry, and one module per screen. |
 | `js/firebase-config.js` | Firebase initialization and loopback-only emulator selection. |
 | `firebase-rules.json` | Least-privilege Realtime Database authorization and validation. |
-| `css/styles.css` | Mobile-first BEM styles and design tokens; breakpoints at 600px and 960px. |
+| `css/` | Mobile-first design tokens, reset, shell, components, screens, and animations; breakpoints at 600px and 960px. |
 
 Script order is contractual. Firebase CDN SDKs load first, followed by:
 
-`firebase-config.js` → `pairing.js` → `player-import.js` → `i18n.js` → `tournament.js` → `tournament-format.js` → `tournament-repository.js` → `king-of-court.js` → `app.js`.
+`firebase-config.js` → `pairing.js` → `player-import.js` → `i18n.js` → `tournament.js` → `tournament-format.js` → `tournament-day-selectors.js` → `tournament-repository.js` → `session-access.js` → `king-of-court.js` → `workspace-view-machine.js` → `standings-view.js` → `score-input.js` → `match-history.js` → `result-sync-queue.js` → `app-state.js` → UI helpers/screens → `app-orchestrator.js`.
 
 ## Collaborative scoring model
 
@@ -65,7 +67,7 @@ Script order is contractual. Firebase CDN SDKs load first, followed by:
 ## Product invariants
 
 - Player IDs use `Date.now() + Math.random()`.
-- Optional levels are omitted when unset; never write `undefined` to Firebase. Only `1|2|3` are valid.
+- Optional levels are omitted when unset; never write `undefined` to Firebase. Only `1|2|3|4|5` are valid.
 - Level balancing is a post-generation, same-gender swap pass that preserves team type and balances average level.
 - Duplicate player names are allowed by REQ-VAL-06.
 - Escape all user-provided text with `escapeHTML()` before inserting HTML.
@@ -81,12 +83,11 @@ Script order is contractual. Firebase CDN SDKs load first, followed by:
 
 Static assets and Firebase Rules form one release and must be deployed and verified together.
 
-1. Run browser suites and `npm run test:rules`.
-2. Bump every local asset `?v=X.Y.Z` in `index.html`.
-3. Bump the footer version in `index.html` and both `footer.copyright` translations in `js/i18n.js`.
-4. Update release and requirements/task documentation when behavior changes.
-5. Deploy static assets through Railway and rules with `firebase deploy --only database`.
-6. Verify the production URL on a 320px mobile viewport and confirm Firebase permissions with separate devices/profiles.
+1. Run `npm run test:browser` and `npm run test:rules`.
+2. Bump with `node scripts/bump-version.js X.Y.Z`; it updates every local asset query in `index.html`, the visible footer, both footer translations, and the service-worker asset version together.
+3. Update release and requirements/task documentation when behavior changes.
+4. Deploy static assets through Railway and rules with `firebase deploy --only database`.
+5. Verify the production URL on a 320px mobile viewport and confirm Firebase permissions with separate devices/profiles.
 
 The query-string bump is mandatory because the static host does not provide reliable cache invalidation for local assets.
 
