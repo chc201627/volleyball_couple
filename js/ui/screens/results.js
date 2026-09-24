@@ -69,19 +69,10 @@
         })];
       }
 
-      var format = tournament.format || null;
-      var resolution = format
-        ? resolveFormat(format, { groups: tournament.groups, matches: tournament.matches })
-        : null;
-      var standings = calculateStandings(tournament.groups, tournament.matches, { extended: true });
-      var day = tournamentDay({
-        format: format,
-        resolution: resolution,
-        matches: tournament.matches,
-        groups: tournament.groups,
-        standings: standings,
-        king: snapshot.king,
-      });
+      var projection = tournamentDayProjection(Object.assign({}, tournament, { king: snapshot.king }));
+      var format = projection.format;
+      var standings = projection.standings;
+      var day = projection.day;
 
       var body = [];
       var champion = championCard(tournament, day.outcome);

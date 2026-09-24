@@ -43,6 +43,7 @@
   function workspaceInput() {
     var snapshot = appState.get();
     var session = snapshot.session;
+    var projection = snapshot.tournament ? tournamentDayProjection(snapshot.tournament) : null;
     return {
       role: session ? session.role : 'owner',
       sessionState: session ? session.state : 'ok',
@@ -52,12 +53,12 @@
       teamCount: snapshot.teams ? snapshot.teams.length : 0,
       unmatchedCount: snapshot.unmatched.length,
       groupCount: snapshot.groupCount,
-      formatValidation: null,
+      formatValidation: projection ? projection.formatValidation : null,
       hasTournament: !!snapshot.tournament,
       hasKingGame: !!snapshot.king,
-      hasBracket: !!(snapshot.tournament && snapshot.tournament.format),
-      complete: isComplete(snapshot),
-      hasNextMatch: false,
+      hasBracket: projection ? projection.hasBracket : false,
+      complete: snapshot.king ? !!snapshot.king.winner : (projection ? projection.complete : false),
+      hasNextMatch: projection ? projection.hasNextMatch : false,
       pendingRequestCount: SessionAccess.pendingCount(appState.get().session),
       firebaseConnected: session ? session.connection !== 'offline' : undefined,
       // Same test v1's initFirebase() applies, so both entry points agree on
@@ -75,27 +76,6 @@
 
   /** The contextual primary action, performed: it acts and navigates, rather
    * than only moving there (REQ-UX-04). */
-  /** Read from the same selectors the screens use, so completion cannot be
-   * tracked separately and drift. A King round is complete once it has a winner. */
-  function isComplete(snapshot) {
-    if (snapshot.king) return !!snapshot.king.winner;
-    if (!snapshot.tournament) return false;
-    try {
-      var format = snapshot.tournament.format || null;
-      var resolution = format
-        ? resolveFormat(format, { groups: snapshot.tournament.groups, matches: snapshot.tournament.matches })
-        : null;
-      return tournamentDay({
-        format: format,
-        resolution: resolution,
-        matches: snapshot.tournament.matches,
-        groups: snapshot.tournament.groups,
-      }).complete;
-    } catch (error) {
-      return false;
-    }
-  }
-
   function runPrimaryAction(action) {
     if (!action || action.enabled === false) return;
     if (action.id === 'generateTeams') { generateTeams(); return; }
