@@ -81,8 +81,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - Forecast: approximately 650–900 authored changed lines, excluding generated output.
 - Chain strategy: `feature-branch-chain` (user-selected).
 - Review boundary: branch point `a5aa167fccb43bd27988680d3ca734ece5c86521`.
-- Running authored line count: 0.
-- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`.
+- Running authored line count: 264.
+- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`.
 
 ## Progress and Evidence
 
@@ -92,7 +92,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-1 focused checks (loopback server + headless Chrome): `tests/tournament-format.test.html` 50/50 passed; `tests/tournament-day-selectors.test.html` 81/81 passed; `tests/workspace-view-machine.test.html` 88/88 passed. Structural search finds the sole production `resolveFormat` call in `js/tournament-day-selectors.js`, with `groups`, `matches`, and `standings` supplied.
 - BUG-1 runtime scenario: completed `groupsFinal` group matches resolve `slot:A1` and `slot:A2`, expose `k-final-1` as the next scorable match, and retain the Bracket tab; groups-only projection hides that tab.
 - BUG-1 rollback boundary: revert the BUG-1 work-unit commit to restore the prior per-screen resolution calls and workspace flags without affecting BUG-2 through BUG-5.
-- BUG-1 delivery: slice branch `codex/fix-v2-audit-bugs-01-tournament-flow`; authored changes: 200 additions + 64 deletions = 264 lines; commit: `PENDING-COMMIT`.
+- BUG-1 delivery: slice branch `codex/fix-v2-audit-bugs-01-tournament-flow`; authored changes: 200 additions + 64 deletions = 264 lines; commit: `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`.
+- BUG-1 independent verification: PASS. A fresh verifier inspected the committed diff, confirmed the single production `resolveFormat` seam supplies standings, repeated the three focused harnesses (50/50, 81/81, 88/88), and found no product-code or scope-integrity defect. Native risk assessment was unavailable because its temporary `.git` index write was sandbox-denied; RDD remains disabled/unmanaged.
 
 ## Applicable Checks
 
