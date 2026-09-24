@@ -81,8 +81,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - Forecast: approximately 650–900 authored changed lines, excluding generated output.
 - Chain strategy: `feature-branch-chain` (user-selected).
 - Review boundary: branch point `a5aa167fccb43bd27988680d3ca734ece5c86521`.
-- Running authored line count: 629.
-- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2 is `codex/fix-v2-audit-bugs-02-team-controls` with BUG-2 commit `b5d3e94ff2d71d494208a04548d933c9b778ebd5`.
+- Running authored line count: 969.
+- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2 is `codex/fix-v2-audit-bugs-02-team-controls` with BUG-2 commit `b5d3e94ff2d71d494208a04548d933c9b778ebd5`. Slice 3 is `codex/fix-v2-audit-bugs-03-offline-scoring` with BUG-3 commit `27850afd5a6414a22c52296920242edee6d2fbe1`.
 
 ## Progress and Evidence
 
@@ -104,7 +104,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-3 focused checks (loopback server + headless Chrome): `tests/tournament-repository.test.html` 38/38 passed; `tests/app-state.test.html` 63/63 passed; `tests/offline-scoring.test.html` 6/6 passed; `tests/match-history.test.html` 39/39 passed; `tests/teams-ui.test.html` 12/12 passed; `tests/workspace-view-machine.test.html` 88/88 passed. `node --check` passed for `js/result-sync-queue.js`, `js/app-state.js`, `js/app-orchestrator.js`, and `js/ui/screens/scoring.js`; `git diff --check` passed.
 - BUG-3 runtime scenarios: a fake repository recorded an offline 21–18 save followed by a newer local 21–19 correction; a fresh queue/state instance reloaded, preserved 21–19 over a stale revision-zero remote snapshot, and retried the original expected revision on reconnect before clearing only after `synced`. A fake server at revision 1 returned `conflict`; the local intent remained durable and supplied the existing conflict card with the server result, with no force overwrite.
 - BUG-3 rollback boundary: revert the BUG-3 work-unit commit to remove durable shared-score retry, provisional remote-snapshot overlay, and persisted retry/conflict presentation without affecting BUG-1, BUG-2, or BUG-4 through BUG-5.
-- BUG-3 delivery: slice branch `codex/fix-v2-audit-bugs-03-offline-scoring`; authored changes: 322 additions + 18 deletions = 340 lines; running total: 969 lines; slice boundary: BUG-3 is an independent feature-branch-chain work unit after BUG-2. `PENDING-COMMIT`.
+- BUG-3 delivery: slice branch `codex/fix-v2-audit-bugs-03-offline-scoring`; authored changes: 322 additions + 18 deletions = 340 lines; running total: 969 lines; slice boundary: BUG-3 is an independent feature-branch-chain work unit after BUG-2; commit: `27850afd5a6414a22c52296920242edee6d2fbe1`.
+- BUG-3 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated JavaScript syntax checks plus `git diff --check` successfully. RDD remains disabled/unmanaged.
 
 ## Applicable Checks
 
@@ -116,4 +117,4 @@ The domain and Firebase suites pass, but the production composition layer drops 
 
 ## Next Step
 
-Delegate BUG-3 as the next work unit after reconciling the BUG-2 commit identity.
+Delegate BUG-4 as the next work unit.
