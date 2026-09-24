@@ -16,6 +16,7 @@
   var matchTitle = TournamentText.matchTitle;
   var scoreText = TournamentText.score;
   var scoreTone = TournamentText.scoreTone;
+  var slotLabel = TournamentText.slotLabel;
 
   /** A spectator sees the same score and cannot touch it: the row stops being
    * interactive rather than showing a control that refuses on tap. */
@@ -24,7 +25,7 @@
   }
 
   function matchRowFor(ctx, tournament, view) {
-    var scoring = canScore(ctx);
+    var scoring = canScore(ctx) && view.scorable !== false;
     return C.matchRow({
       teams: matchTitle(tournament, view),
       score: scoreText(view),
@@ -252,26 +253,6 @@
         onSeeAll: function () { ctx.openOverlay('allMatches'); },
       }),
     ].filter(Boolean);
-  }
-
-  /** `slot:A1` and `winner:k-sf-2` are how the engine writes a pairing before the
-   * teams exist. Parsed here, because players do not read engine vocabulary. */
-  var SLOT_TOKEN = /^slot:([A-Z])(\d+)$/;
-  var WINNER_TOKEN = /^winner:k-([a-z][a-z0-9]{0,11})-(\d+)$/;
-
-  function slotLabel(token) {
-    var slot = SLOT_TOKEN.exec(token || '');
-    if (slot) {
-      return translate('bracket.slot.group', slot[2] + 'º del grupo ' + slot[1],
-        { rank: slot[2], group: slot[1] });
-    }
-    var winner = WINNER_TOKEN.exec(token || '');
-    if (winner) {
-      var stage = translate('bracket.stage.' + winner[1], winner[1].toUpperCase());
-      return translate('bracket.slot.winner', 'Ganador de ' + stage + winner[2],
-        { stage: stage, n: winner[2] });
-    }
-    return token;
   }
 
   /* --- Grupos (C3) ------------------------------------------------------ */

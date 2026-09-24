@@ -309,7 +309,15 @@
 
   function teamNameFor(ctx, match, side) {
     var tournament = ctx.appState.get().tournament;
-    return TournamentText.teamName(tournament, side === 1 ? match.team1Id : match.team2Id);
+    var teamId = side === 1 ? (match.team1Id || match.team1Slot) : (match.team2Id || match.team2Slot);
+    if (tournament && tournament.format && typeof resolveFormat === 'function' && typeof tournamentDayProjectedMatch === 'function') {
+      var resolution = resolveFormat(tournament.format, { groups: tournament.groups, matches: tournament.matches });
+      var projected = tournamentDayProjectedMatch(resolution, match.id);
+      if (projected && projected.resolved) {
+        teamId = side === 1 ? projected.team1Id : projected.team2Id;
+      }
+    }
+    return TournamentText.teamName(tournament, teamId);
   }
 
   /* --- Screen ----------------------------------------------------------- */

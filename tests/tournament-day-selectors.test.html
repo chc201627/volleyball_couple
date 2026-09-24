@@ -18,9 +18,11 @@
 <body>
   <h1>Tournament Day Module — Test Suite</h1>
   <div id="results"></div>
+  <script src="../js/i18n.js"></script>
   <script src="../js/tournament.js"></script>
   <script src="../js/tournament-format.js"></script>
   <script src="../js/tournament-day-selectors.js"></script>
+  <script src="../js/ui/tournament-text.js"></script>
   <script>
     const results = document.getElementById('results');
     let passed = 0;
@@ -118,6 +120,40 @@
       const view = tournamentDay({ matches, groups, format, resolution, standings });
       assert(view.nextMatch !== null && view.nextMatch.stageId === 'group', 'formatted: next match is a scorable round-robin match before the final resolves');
       assert(view.nextMatchReason === 'ok', 'formatted: nextMatchReason is "ok" while round-robin matches remain');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 4 });
+      const format = presetFormat('groupsFinal', groups);
+      const matches = generateStageMatches(format, groups);
+      const standings = calculateStandings(groups, matches, { extendedTiebreak: true });
+      const resolution = resolveFormat(format, { groups, matches, standings });
+      const view = tournamentDay({ matches, groups, format, resolution, standings });
+
+      const finalMatch = view.pending.find((m) => m.stageId === 'final' || m.matchId === 'k-final-1');
+      assert(finalMatch && finalMatch.scorable === false, 'before groups finish, final match scorable === false');
+      assert(finalMatch && finalMatch.team1Id === null, 'before groups finish, final match team1Id === null');
+      assert(finalMatch && finalMatch.team1Slot === 'slot:A1', 'before groups finish, final match team1Slot === "slot:A1"');
+
+      const tournament = {
+        teams: groups.reduce((acc, g) => acc.concat(g.teams), []),
+        matches,
+        groups,
+        format,
+      };
+
+      const title = TournamentText.matchTitle(tournament, finalMatch);
+      assert(
+        title.indexOf('del grupo') !== -1 || title.indexOf('Group') !== -1,
+        'TournamentText.matchTitle renders localized slot labels (contains "del grupo" or "Group")',
+        title
+      );
+      assert(title.indexOf('null') === -1, 'TournamentText.matchTitle does NOT contain "null"', title);
+
+      assert(TournamentText.teamName(tournament, null) === '', 'TournamentText.teamName(tournament, null) returns "" (not null)');
+
+      const searchRes = searchMatchViews(view.pending, 'slot:A1');
+      assert(searchRes.results.length > 0, 'searchMatchViews indexes slot token when teamId is null');
     })();
 
     (function () {

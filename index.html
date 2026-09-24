@@ -10,12 +10,12 @@
   <!-- The redesigned entry point. Lives alongside index.html for the whole slice chain so every
        step stays runnable and comparable against the current UI; slice L
        promotes it to index.html and deletes the v1 assets. -->
-  <link rel="stylesheet" href="css/design-tokens.css?v=2.0.9">
-  <link rel="stylesheet" href="css/reset.css?v=2.0.9">
-  <link rel="stylesheet" href="css/app-shell.css?v=2.0.9">
-  <link rel="stylesheet" href="css/animations.css?v=2.0.9">
-  <link rel="stylesheet" href="css/components.css?v=2.0.9">
-  <link rel="stylesheet" href="css/screens.css?v=2.0.9">
+  <link rel="stylesheet" href="css/design-tokens.css?v=2.0.10">
+  <link rel="stylesheet" href="css/reset.css?v=2.0.10">
+  <link rel="stylesheet" href="css/app-shell.css?v=2.0.10">
+  <link rel="stylesheet" href="css/animations.css?v=2.0.10">
+  <link rel="stylesheet" href="css/components.css?v=2.0.10">
+  <link rel="stylesheet" href="css/screens.css?v=2.0.10">
 </head>
 <body>
   <!-- Only the active screen is ever in the DOM. There are no hidden siblings
@@ -24,7 +24,7 @@
     <div id="app-bar"></div>
     <main class="app__main" id="app-main"></main>
     <footer class="app__footer" id="app-footer">
-      <p id="app-footer-text">&copy; 2026 Emparejamiento de V&oacute;ley Playa &mdash; v2.0.9</p>
+      <p id="app-footer-text">&copy; 2026 Emparejamiento de V&oacute;ley Playa &mdash; v2.0.10</p>
     </footer>
     <div class="app__tab-bar" id="app-tabbar"></div>
   </div>
@@ -39,41 +39,41 @@
   <!-- Script order is contractual: domain modules, then the UI layer, then the
        orchestrator. Every local asset carries ?v= — use scripts/bump-version.js
        rather than editing them by hand. -->
-  <script src="js/firebase-config.js?v=2.0.9"></script>
+  <script src="js/firebase-config.js?v=2.0.10"></script>
 
-  <script src="js/pairing.js?v=2.0.9"></script>
-  <script src="js/player-import.js?v=2.0.9"></script>
-  <script src="js/i18n.js?v=2.0.9"></script>
-  <script src="js/tournament.js?v=2.0.9"></script>
-  <script src="js/tournament-format.js?v=2.0.9"></script>
-  <script src="js/tournament-day-selectors.js?v=2.0.9"></script>
-  <script src="js/tournament-repository.js?v=2.0.9"></script>
-  <script src="js/session-access.js?v=2.0.9"></script>
-  <script src="js/king-of-court.js?v=2.0.9"></script>
-  <script src="js/workspace-view-machine.js?v=2.0.9"></script>
-  <script src="js/standings-view.js?v=2.0.9"></script>
-  <script src="js/score-input.js?v=2.0.9"></script>
-  <script src="js/match-history.js?v=2.0.9"></script>
-  <script src="js/app-state.js?v=2.0.9"></script>
+  <script src="js/pairing.js?v=2.0.10"></script>
+  <script src="js/player-import.js?v=2.0.10"></script>
+  <script src="js/i18n.js?v=2.0.10"></script>
+  <script src="js/tournament.js?v=2.0.10"></script>
+  <script src="js/tournament-format.js?v=2.0.10"></script>
+  <script src="js/tournament-day-selectors.js?v=2.0.10"></script>
+  <script src="js/tournament-repository.js?v=2.0.10"></script>
+  <script src="js/session-access.js?v=2.0.10"></script>
+  <script src="js/king-of-court.js?v=2.0.10"></script>
+  <script src="js/workspace-view-machine.js?v=2.0.10"></script>
+  <script src="js/standings-view.js?v=2.0.10"></script>
+  <script src="js/score-input.js?v=2.0.10"></script>
+  <script src="js/match-history.js?v=2.0.10"></script>
+  <script src="js/app-state.js?v=2.0.10"></script>
 
-  <script src="js/ui/dom-helpers.js?v=2.0.9"></script>
-  <script src="js/ui/icon-registry.js?v=2.0.9"></script>
-  <script src="js/ui/ui-components.js?v=2.0.9"></script>
-  <script src="js/ui/tournament-text.js?v=2.0.9"></script>
-  <script src="js/ui/standings-table.js?v=2.0.9"></script>
-  <script src="js/ui/screen-registry.js?v=2.0.9"></script>
-  <script src="js/ui/screens/setup.js?v=2.0.9"></script>
-  <script src="js/ui/screens/import.js?v=2.0.9"></script>
-  <script src="js/ui/screens/manual-pairing.js?v=2.0.9"></script>
-  <script src="js/ui/screens/tournament-config.js?v=2.0.9"></script>
-  <script src="js/ui/screens/teams.js?v=2.0.9"></script>
-  <script src="js/ui/screens/tournament-day.js?v=2.0.9"></script>
-  <script src="js/ui/screens/scoring.js?v=2.0.9"></script>
-  <script src="js/ui/screens/king.js?v=2.0.9"></script>
-  <script src="js/ui/screens/results.js?v=2.0.9"></script>
-  <script src="js/ui/screens/collaboration.js?v=2.0.9"></script>
-  <script src="js/ui/screens/history.js?v=2.0.9"></script>
+  <script src="js/ui/dom-helpers.js?v=2.0.10"></script>
+  <script src="js/ui/icon-registry.js?v=2.0.10"></script>
+  <script src="js/ui/ui-components.js?v=2.0.10"></script>
+  <script src="js/ui/tournament-text.js?v=2.0.10"></script>
+  <script src="js/ui/standings-table.js?v=2.0.10"></script>
+  <script src="js/ui/screen-registry.js?v=2.0.10"></script>
+  <script src="js/ui/screens/setup.js?v=2.0.10"></script>
+  <script src="js/ui/screens/import.js?v=2.0.10"></script>
+  <script src="js/ui/screens/manual-pairing.js?v=2.0.10"></script>
+  <script src="js/ui/screens/tournament-config.js?v=2.0.10"></script>
+  <script src="js/ui/screens/teams.js?v=2.0.10"></script>
+  <script src="js/ui/screens/tournament-day.js?v=2.0.10"></script>
+  <script src="js/ui/screens/scoring.js?v=2.0.10"></script>
+  <script src="js/ui/screens/king.js?v=2.0.10"></script>
+  <script src="js/ui/screens/results.js?v=2.0.10"></script>
+  <script src="js/ui/screens/collaboration.js?v=2.0.10"></script>
+  <script src="js/ui/screens/history.js?v=2.0.10"></script>
 
-  <script src="js/app-orchestrator.js?v=2.0.9"></script>
+  <script src="js/app-orchestrator.js?v=2.0.10"></script>
 </body>
 </html>

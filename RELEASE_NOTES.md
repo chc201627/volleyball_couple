@@ -1,5 +1,12 @@
 # Release Notes
  
+## v2.0.10 — Localized Knockout Match Placeholders
+
+- **Fix "null vs null" match titles**: pre-created knockout stage matches (such as finals or playoffs in `groupsFinal` and `crossover` presets) now render localized slot labels (e.g. "1º del grupo A vs 1º del grupo B" in Spanish or "Group A #1 vs Group B #1" in English) while group play is ongoing, rather than falling back to `null vs null`.
+- **Centralized slot token resolution**: added `TournamentText.slotLabel()` to parse group rank (`slot:A1`) and stage winner (`winner:k-sf-1`) descriptor tokens into localized labels across bracket and match list views.
+- **Unscorable match interaction guard**: unscorable pending knockout matches are no longer interactive in match lists and do not trigger scoring overlays when clicked.
+- **Match search integration**: slot tokens are indexed in match search so pending knockout matches can be found by stage or group terms.
+
 ## v2.0.9 — Interactive Tournament Format Customization
 
 - **Direct editing of points per set and overtime**: in the "Personalizar formato" panel of Tournament Configuration, replaced static read-only text spans with interactive controls for each tournament stage.

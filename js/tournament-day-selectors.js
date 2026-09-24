@@ -335,7 +335,7 @@ function searchMatchViews(views, query, options) {
   }
 
   var results = all.filter(function (view) {
-    var terms = teamTerms(view.team1Id).concat(teamTerms(view.team2Id));
+    var terms = teamTerms(view.team1Id || view.team1Slot).concat(teamTerms(view.team2Id || view.team2Slot));
     if (view.groupId) terms.push(view.groupId);
     if (typeof options.termsFor === 'function') {
       terms = terms.concat(options.termsFor(view) || []);
