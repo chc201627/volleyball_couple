@@ -952,8 +952,29 @@ var t, translate, setLanguage, getLanguage;
 
   var currentLang = 'es';
 
+  // Storage can throw when privacy settings block it or the quota is full.
+  // Language remains a session-only preference in that case, just like the
+  // application state helpers treat an unavailable storage backend.
+  function readStoredLanguage() {
+    try {
+      return typeof localStorage === 'undefined' ? null : localStorage.getItem(STORAGE_KEY);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function persistLanguage(lang) {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+      localStorage.setItem(STORAGE_KEY, lang);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   function detectLanguage() {
-    var stored = localStorage.getItem(STORAGE_KEY);
+    var stored = readStoredLanguage();
     if (stored && translations[stored]) return stored;
     var nav = (navigator.language || '').slice(0, 2).toLowerCase();
     return translations[nav] ? nav : 'es';
@@ -1006,7 +1027,7 @@ var t, translate, setLanguage, getLanguage;
   setLanguage = function (lang) {
     if (!translations[lang]) return;
     currentLang = lang;
-    localStorage.setItem(STORAGE_KEY, lang);
+    persistLanguage(lang);
     document.documentElement.lang = lang;
     applyTranslations();
     updateSwitcherButtons();

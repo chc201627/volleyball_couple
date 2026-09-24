@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Storage and Mobile Accessibility Tests</title>
+  <link rel="stylesheet" href="../css/design-tokens.css">
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/app-shell.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    .fixture { max-width: 100%; overflow: hidden; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+  </style>
+</head>
+<body>
+  <h1>Storage and Mobile Accessibility — Production Surface Suite</h1>
+  <div id="results"></div>
+  <p id="translated" data-i18n="form.heading">Add player</p>
+  <div id="fixture-mount" class="fixture"></div>
+  <script>
+    (function () {
+      var storage = window.localStorage;
+      window.__restoreThrowingStorage = function () {
+        Storage.prototype.getItem = storage.getItem;
+        Storage.prototype.setItem = storage.setItem;
+      };
+      Storage.prototype.getItem = function () { throw new Error('storage blocked'); };
+      Storage.prototype.setItem = function () { throw new Error('storage blocked'); };
+    })();
+  </script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/ui/dom-helpers.js"></script>
+  <script src="../js/ui/icon-registry.js"></script>
+  <script src="../js/ui/ui-components.js"></script>
+  <script>
+    (function () {
+      var results = document.getElementById('results');
+      var passed = 0;
+      var failed = 0;
+
+      function assert(condition, name) {
+        if (condition) {
+          passed++;
+          results.innerHTML += '<p class="pass">✓ ' + name + '</p>';
+        } else {
+          failed++;
+          results.innerHTML += '<p class="fail">✗ ' + name + '</p>';
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        try {
+          assert(['en', 'es'].indexOf(getLanguage()) !== -1,
+            'Boot falls back to a supported language when storage reads throw');
+          assert(document.documentElement.lang === getLanguage(),
+            'Boot keeps the document language synchronized when storage reads throw');
+
+          var switched = true;
+          try { setLanguage('en'); } catch (error) { switched = false; }
+          assert(switched && getLanguage() === 'en' && document.documentElement.lang === 'en',
+            'Language switching completes when storage writes throw');
+          assert(document.getElementById('translated').textContent === 'Add player',
+            'Language switching still translates the production document surface');
+
+          var mount = document.getElementById('fixture-mount');
+          mount.appendChild(UIComponents.appBar({
+            title: 'Tournament',
+            lang: { code: 'EN', label: 'Change language', onClick: function () {} },
+          }));
+          mount.appendChild(UIComponents.matchRow({
+            teams: 'Ada and Ben versus Cia and Drew',
+            score: '21–19',
+            onClick: function () {},
+          }));
+          var language = mount.querySelector('.c-lang');
+          var matchHit = mount.querySelector('.c-match__hit.is-interactive');
+          var languageBox = language.getBoundingClientRect();
+          var matchBox = matchHit.getBoundingClientRect();
+          assert(languageBox.width >= 44 && languageBox.height >= 44,
+            'Rendered language control has a 44 by 44 pixel touch target');
+          assert(matchBox.width >= 44 && matchBox.height >= 44,
+            'Rendered interactive match control has a 44 by 44 pixel touch target');
+          assert(language.getAttribute('aria-label') === 'Change language' && matchHit.tagName === 'BUTTON',
+            'Language and match controls retain their accessible names and semantics');
+          assert(document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+            'Production controls do not introduce horizontal overflow');
+        } finally {
+          window.__restoreThrowingStorage();
+        }
+
+        var total = passed + failed;
+        results.innerHTML += '<div class="summary ' + (failed ? 'summary--fail' : 'summary--pass') + '">' +
+          passed + '/' + total + ' tests passed' + (failed ? ' — FAILED' : ' — ALL PASSED') + '</div>';
+      });
+    })();
+  </script>
+</body>
+</html>

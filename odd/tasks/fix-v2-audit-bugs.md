@@ -49,7 +49,7 @@ The domain and Firebase suites pass, but the production composition layer drops 
   - Route: delegated.
   - Trigger evidence: state, repository, orchestrator, i18n, and tests share the behavior.
 
-- [ ] **BUG-4 — Harden boot and mobile accessibility**
+- [x] **BUG-4 — Harden boot and mobile accessibility**
   - Guard i18n storage reads/writes when storage is unavailable.
   - Bring language and match-hit controls to at least 44×44px at 320px.
   - Add focused storage and responsive accessibility regression checks.
@@ -106,6 +106,12 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-3 rollback boundary: revert the BUG-3 work-unit commit to remove durable shared-score retry, provisional remote-snapshot overlay, and persisted retry/conflict presentation without affecting BUG-1, BUG-2, or BUG-4 through BUG-5.
 - BUG-3 delivery: slice branch `codex/fix-v2-audit-bugs-03-offline-scoring`; authored changes: 322 additions + 18 deletions = 340 lines; running total: 969 lines; slice boundary: BUG-3 is an independent feature-branch-chain work unit after BUG-2; commit: `27850afd5a6414a22c52296920242edee6d2fbe1`.
 - BUG-3 verification tier: native assessment `medium` / `under_budget`; writer self-verification passed, and the parent spot-check repeated JavaScript syntax checks plus `git diff --check` successfully. RDD remains disabled/unmanaged.
+- BUG-4: i18n now treats unavailable or throwing storage as a non-persistent preference: reads fall back to browser/default language selection and writes do not interrupt language switching. The production language button and interactive match hit area now each have a 44px minimum touch dimension.
+- BUG-4 focused checks (loopback server + headless Chrome): `tests/storage-mobile.test.html` 8/8 passed with `Storage.prototype.getItem` and `setItem` throwing; `tests/teams-ui.test.html` 12/12 passed; `tests/score-input.test.html` 38/38 passed. `node --check js/i18n.js` and `git diff --check` passed.
+- BUG-4 320×800 runtime verification (Chrome DevTools device metrics): viewport `320×800`; storage-stub harness 8/8 passed; `.c-lang` measured `44×44` with accessible name `Change language`; interactive `.c-match__hit` measured `280×44` and retains its native button text name `Ada and Ben versus Cia and Drew 21–19`; document scroll/client width was `320/320` (no horizontal overflow); reduced-motion query remained `false` and no motion CSS was changed.
+- BUG-4 rollback boundary: revert the BUG-4 work-unit commit to restore direct i18n storage access and the former smaller control sizing without affecting BUG-1 through BUG-3 or BUG-5.
+- BUG-4 delivery: slice branch `codex/fix-v2-audit-bugs-04-storage-mobile`; authored changes: 140 additions + 6 deletions = 146 lines; running total: 1115 lines; slice boundary: BUG-4 is an independent feature-branch-chain work unit after BUG-3; commit: `PENDING-COMMIT`.
+- BUG-4 verification tier: RDD disabled/unmanaged; ordinary focused browser and runtime checks passed.
 
 ## Applicable Checks
 
