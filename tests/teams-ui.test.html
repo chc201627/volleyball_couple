@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teams UI Integration Tests</title>
+  <link rel="stylesheet" href="../css/design-tokens.css">
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/app-shell.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/screens.css">
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #569cd6; }
+    h2 { color: #c586c0; margin-top: 24px; margin-bottom: 4px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    .summary { margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 1.1em; }
+    .summary--pass { background: #1e3a2f; color: #4ec9b0; }
+    .summary--fail { background: #3a1e1e; color: #f44747; }
+  </style>
+</head>
+<body>
+  <h1>Teams UI — Production Integration Suite</h1>
+  <div id="results"></div>
+  <div id="app-bar"></div>
+  <main id="app-main"></main>
+  <div id="app-tabbar"></div>
+  <footer><p id="app-footer-text"></p></footer>
+  <div id="app-overlay"></div>
+  <div id="app-toast"></div>
+  <div id="fixture-mount"></div>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/pairing.js"></script>
+  <script src="../js/player-import.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/tournament.js"></script>
+  <script src="../js/tournament-format.js"></script>
+  <script src="../js/tournament-day-selectors.js"></script>
+  <script src="../js/tournament-repository.js"></script>
+  <script src="../js/session-access.js"></script>
+  <script src="../js/king-of-court.js"></script>
+  <script src="../js/workspace-view-machine.js"></script>
+  <script src="../js/standings-view.js"></script>
+  <script src="../js/score-input.js"></script>
+  <script src="../js/match-history.js"></script>
+  <script src="../js/app-state.js"></script>
+  <script src="../js/ui/dom-helpers.js"></script>
+  <script src="../js/ui/icon-registry.js"></script>
+  <script src="../js/ui/ui-components.js"></script>
+  <script src="../js/ui/tournament-text.js"></script>
+  <script src="../js/ui/standings-table.js"></script>
+  <script src="../js/ui/screen-registry.js"></script>
+  <script src="../js/ui/screens/setup.js"></script>
+  <script src="../js/ui/screens/import.js"></script>
+  <script src="../js/ui/screens/manual-pairing.js"></script>
+  <script src="../js/ui/screens/tournament-config.js"></script>
+  <script src="../js/ui/screens/teams.js"></script>
+  <script src="../js/ui/screens/tournament-day.js"></script>
+  <script src="../js/ui/screens/scoring.js"></script>
+  <script src="../js/ui/screens/king.js"></script>
+  <script src="../js/ui/screens/results.js"></script>
+  <script src="../js/ui/screens/collaboration.js"></script>
+  <script src="../js/ui/screens/history.js"></script>
+  <script src="../js/app-orchestrator.js"></script>
+  <script>
+    (function () {
+      var results = document.getElementById('results');
+      var passed = 0;
+      var failed = 0;
+
+      function assert(condition, name) {
+        if (condition) {
+          passed++;
+          results.innerHTML += '<p class="pass">✓ ' + name + '</p>';
+        } else {
+          failed++;
+          results.innerHTML += '<p class="fail">✗ ' + name + '</p>';
+        }
+      }
+
+      function heading(name) { results.innerHTML += '<h2>' + name + '</h2>'; }
+      function names(root) {
+        return Array.prototype.map.call(root.querySelectorAll('.c-couple__name'), function (node) {
+          return node.textContent;
+        });
+      }
+
+      function screenContext(snapshot) {
+        return {
+          appState: { get: function () { return snapshot; } },
+          generateTeams: function () {},
+          navigate: function () {},
+          openOverlay: function () {},
+          closeOverlay: function () {},
+          startTournament: function () {},
+          startKing: function () {},
+          rerender: function () {},
+          rerenderOverlay: function () {},
+        };
+      }
+
+      function renderTeams(snapshot) {
+        var root = document.createElement('section');
+        DomHelpers.append(root, UIScreens.teams.render(screenContext(snapshot)));
+        return root;
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        try {
+        setLanguage('en');
+        heading('Production Teams screen');
+        var fixture = {
+          teams: [
+            { type: 'mixed', players: [{ name: 'Ada', opaque: { seed: 1 } }, { name: 'Ben' }] },
+            { type: 'same', players: [{ name: 'Cia' }, { name: 'Drew' }, { name: 'Eli', opaque: true }] },
+            { type: 'mixed', players: [{ name: 'Fay' }, { name: 'Gus' }, { name: 'Hope' }, { name: 'Ian', opaque: ['keep'] }] },
+          ],
+          unmatched: [],
+          ownerLabel: '',
+        };
+        var before = JSON.stringify(fixture);
+        var teamsRoot = renderTeams(fixture);
+        assert(teamsRoot.querySelector('.c-panel .c-overline').textContent.indexOf('Teams') !== -1,
+          'Teams screen uses team terminology');
+        assert(teamsRoot.querySelectorAll('.c-couple').length === 3,
+          '2v2, 3v3 and 4v4 fixtures produce one row each');
+        assert(names(teamsRoot).join(',') === 'Ada,Ben,Cia,Drew,Eli,Fay,Gus,Hope,Ian',
+          '2v2, 3v3 and 4v4 fixtures render every player name in order');
+        assert(JSON.stringify(fixture) === before && fixture.teams[2].players[3].opaque[0] === 'keep',
+          'Rendering preserves opaque player properties without mutation');
+
+        var legacyRoot = renderTeams({
+          teams: [{ type: 'mixed', player1: { name: 'Legacy One', opaque: 1 }, player2: { name: 'Legacy Two', opaque: 2 } }],
+          unmatched: [], ownerLabel: '',
+        });
+        assert(names(legacyRoot).join(',') === 'Legacy One,Legacy Two',
+          'Pair-shaped legacy teams remain renderable');
+
+        heading('Mode-fork interactive structure');
+        var fixtureMount = document.getElementById('fixture-mount');
+        var forkRoot = UIScreens.modeFork.render(screenContext({ ownerLabel: '' }));
+        fixtureMount.appendChild(forkRoot);
+        assert(forkRoot.querySelectorAll('button button, button input, button select, button textarea').length === 0,
+          'Tournament owner controls are not nested inside an interactive control');
+        assert(forkRoot.querySelector('.fork__select') && forkRoot.querySelector('.fork__select').getBoundingClientRect().height >= 44,
+          'Mode selection keeps a 44px touch target');
+        forkRoot.querySelectorAll('.fork__select')[1].click();
+        var kingRoot = UIScreens.modeFork.render(screenContext({ ownerLabel: '' }));
+        DomHelpers.mount(fixtureMount, kingRoot);
+        assert(kingRoot.querySelectorAll('button button, button input, button select, button textarea').length === 0,
+          'King settings controls are not nested inside an interactive control');
+        assert(Array.prototype.every.call(kingRoot.querySelectorAll('.fork__select, .fork__settings button'), function (node) {
+          return node.getBoundingClientRect().height >= 44;
+        }), 'Mode and King controls keep 44px touch targets');
+
+        heading('Production app chrome wiring');
+        var lockedTab = Array.prototype.filter.call(document.querySelectorAll('#app-tabbar .c-tab.is-locked'), function (node) {
+          return node.textContent.indexOf('Teams') !== -1 || node.textContent.indexOf('Equipos') !== -1;
+        })[0];
+        var lockedRail = Array.prototype.filter.call(document.querySelectorAll('#app-bar .c-nav-rail__item.is-locked'), function (node) {
+          return node.textContent.indexOf('Teams') !== -1 || node.textContent.indexOf('Equipos') !== -1;
+        })[0];
+        assert(!!lockedTab,
+          'Production tab bar renders the locked Teams destination');
+        if (lockedTab) lockedTab.click();
+        assert(!!lockedTab && document.querySelector('#app-toast .c-toast__title').textContent === lockedTab.title,
+          'Locked tab explains why navigation is unavailable through onLocked');
+        if (lockedRail) lockedRail.click();
+        assert(!!lockedRail && document.querySelector('#app-toast .c-toast__title').textContent === lockedRail.title,
+          'Locked app-bar navigation uses the same onLocked feedback');
+
+        var total = passed + failed;
+        results.innerHTML += '<div class="summary ' + (failed ? 'summary--fail' : 'summary--pass') + '">' +
+          passed + '/' + total + ' tests passed' + (failed ? ' — FAILED' : ' — ALL PASSED') + '</div>';
+        } catch (error) {
+          results.innerHTML += '<p class="fail">Harness error: ' + error.message + '</p>';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

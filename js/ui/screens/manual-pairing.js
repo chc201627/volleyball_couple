@@ -32,7 +32,7 @@
 
   function fixedPairs(ctx, pairs) {
     if (!pairs.length) return null;
-    return C.panel({ label: translate('pairing.fixed', 'Parejas fijadas') + ' · ' + pairs.length }, [
+    return C.panel({ label: translate('pairing.fixed', 'Equipos fijados') + ' · ' + pairs.length }, [
       C.list({}, pairs.map(function (pair, index) {
         return el('div', { class: 'pairing__fixed' }, [
           el('div', { class: 'pairing__fixed-left' }, [
@@ -133,7 +133,7 @@
           icon: 'info',
           tone: 'neutral',
           text: translate('pairing.manualHint',
-            'Las ' + remaining + ' parejas restantes se generan al azar', { count: remaining }),
+            'Los ' + remaining + ' equipos restantes se generan al azar', { count: remaining }),
         }) : null,
       ].filter(Boolean);
 
@@ -170,8 +170,8 @@
 
       return el('div', { class: 'overlay-screen' }, [
         C.subBar({
-          title: translate('pairing.manualTitle', 'Emparejar a mano'),
-          sub: pairs.length + ' ' + translate('pairing.ofFixed', 'parejas fijadas'),
+          title: translate('pairing.manualTitle', 'Armar equipos a mano'),
+          sub: pairs.length + ' ' + translate('pairing.ofFixed', 'equipos fijados'),
           onBack: function () {
             selected = [];
             if (pairs.length > 0) {

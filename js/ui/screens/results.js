@@ -82,7 +82,7 @@
         class: 'results__format',
         text: [
           translate('tournament.format.preset.' + (format ? format.preset : 'classic'), 'Clásico'),
-          tournament.teams.length + ' ' + translate('results.pairs', 'parejas'),
+          tournament.teams.length + ' ' + translate('results.pairs', 'equipos'),
           day.progress.played + ' / ' + day.progress.total + ' ' + translate('results.matches', 'partidos'),
         ].join(' · '),
       }));

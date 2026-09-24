@@ -35,7 +35,7 @@ var StandingsTable;
   function headerRow() {
     return el('div', { class: 'table__row table__row--head' }, [
       el('span', { class: 'table__rank', text: '#' }),
-      el('span', { class: 'table__team', text: translate('tournament.col.team', 'PAREJA') }),
+      el('span', { class: 'table__team', text: translate('tournament.col.team', 'EQUIPO') }),
     ].concat(COLUMNS.map(function (column) {
       return el('span', {
         class: ['table__cell', column.key === 'points' && 'is-points'],

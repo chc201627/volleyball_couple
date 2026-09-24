@@ -33,7 +33,7 @@ The domain and Firebase suites pass, but the production composition layer drops 
   - Route: delegated.
   - Trigger evidence: production behavior spans `app-orchestrator.js` plus multiple tournament/results/scoring screens and tests.
 
-- [ ] **BUG-2 — Render arbitrary team sizes and valid controls**
+- [x] **BUG-2 — Render arbitrary team sizes and valid controls**
   - Render every member in `team.players` for 2v2, 3v3, and 4v4.
   - Preserve compatibility with pair-shaped legacy data.
   - Remove nested interactive controls from team ownership rows and wire locked-navigation feedback.
@@ -81,8 +81,8 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - Forecast: approximately 650–900 authored changed lines, excluding generated output.
 - Chain strategy: `feature-branch-chain` (user-selected).
 - Review boundary: branch point `a5aa167fccb43bd27988680d3ca734ece5c86521`.
-- Running authored line count: 264.
-- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`.
+- Running authored line count: 629.
+- Slice boundaries: keep the tracker branch as the integration target; each review slice will branch from the previous slice and target its immediate predecessor, while only the tracker branch ultimately targets `main`. Slice 1 is `codex/fix-v2-audit-bugs-01-tournament-flow` with BUG-1 commit `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`. Slice 2 is `codex/fix-v2-audit-bugs-02-team-controls` with the BUG-2 work-unit commit `PENDING-COMMIT`.
 
 ## Progress and Evidence
 
@@ -94,6 +94,11 @@ The domain and Firebase suites pass, but the production composition layer drops 
 - BUG-1 rollback boundary: revert the BUG-1 work-unit commit to restore the prior per-screen resolution calls and workspace flags without affecting BUG-2 through BUG-5.
 - BUG-1 delivery: slice branch `codex/fix-v2-audit-bugs-01-tournament-flow`; authored changes: 200 additions + 64 deletions = 264 lines; commit: `b4ba47fa5028cbfdf23dcd145d813e1b4bd35da8`.
 - BUG-1 independent verification: PASS. A fresh verifier inspected the committed diff, confirmed the single production `resolveFormat` seam supplies standings, repeated the three focused harnesses (50/50, 81/81, 88/88), and found no product-code or scope-integrity defect. Native risk assessment was unavailable because its temporary `.git` index write was sandbox-denied; RDD remains disabled/unmanaged.
+- 2026-09-24 BUG-2: Teams now pass complete `team.players` arrays into a member-list row while retaining the legacy `player1`/`player2` compatibility adapter. The team-mode cards use a separate 44px selection button, so the owner input and King toggles are no longer nested inside an interactive control. Both shell navigations surface their existing lock reason through `onLocked` feedback.
+- BUG-2 focused checks (loopback server + headless Chrome at 320px): `tests/teams-ui.test.html` 12/12 passed; `tests/workspace-view-machine.test.html` 88/88 passed; `tests/app-state.test.html` 63/63 passed. `node --check` passed for every changed JavaScript file and `git diff --check` passed. The production UI harness mounts the real components, Teams/mode-fork screens, and app orchestrator; its DOM assertions prove no nested interactive controls remain and its 2v2/3v3/4v4 fixtures render all nine names while preserving opaque properties.
+- BUG-2 runtime scenario: a Teams screen with pair-shaped legacy data still shows two members; 3v3 and 4v4 teams show every member; tapping locked Teams in the app bar or tab bar keeps navigation locked and announces the translated reason.
+- BUG-2 rollback boundary: revert the BUG-2 work-unit commit to restore two-name rows, card-wide mode selection, and silent locked navigation without affecting BUG-1 or BUG-3 through BUG-5.
+- BUG-2 delivery: slice branch `codex/fix-v2-audit-bugs-02-team-controls`; authored changes: 288 additions + 77 deletions = 365 lines; commit: `PENDING-COMMIT`.
 
 ## Applicable Checks
 
@@ -105,4 +110,4 @@ The domain and Firebase suites pass, but the production composition layer drops 
 
 ## Next Step
 
-Delegate BUG-2 as the next work unit after reconciling the BUG-1 commit identity.
+Delegate BUG-3 as the next work unit after reconciling the BUG-2 commit identity.

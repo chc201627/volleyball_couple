@@ -186,7 +186,7 @@
       preset
         ? translate('format.preset.' + preset + '.title', preset)
         : translate('format.preset.classic.title', 'Clásico'),
-      pairs + ' ' + translate('workspace.summary.teamsWord', 'parejas'),
+      pairs + ' ' + translate('workspace.summary.teamsWord', 'equipos'),
       teamSize + 'vs' + teamSize,
     ];
     return C.panel({ label: translate('tournament.format.presetLabel', 'Formato') }, [

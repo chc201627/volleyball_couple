@@ -310,6 +310,11 @@
 
   function renderChrome(view) {
     var items = destinationItems(view);
+    // UIComponents already protects locked destinations. The shell owns the
+    // reason, so both breakpoints can explain the same unavailable destination.
+    function onLocked(item) {
+      if (item && item.lockReason) toast({ title: item.lockReason });
+    }
 
     // Same gate as the kebab: only once there is a tournament, and only on
     // Torneo, where a schedule long enough to search for a match exists.
@@ -317,7 +322,7 @@
     var searchAction = hasTournament ? [{
       icon: 'search',
       tone: 'muted',
-      label: translate('matches.search', 'Buscar por jugador, pareja o grupo'),
+      label: translate('matches.search', 'Buscar por jugador, equipo o grupo'),
       onClick: function () { openOverlay('allMatches'); },
     }] : [];
 
@@ -334,7 +339,7 @@
     DomHelpers.mount(nodes.bar, C.appBar({
       title: translate('workspace.nav.' + view.view, view.view),
       // Shown from 600px up, where the fixed tab bar is dropped.
-      nav: { active: view.view, items: items, onSelect: navigate },
+      nav: { active: view.view, items: items, onSelect: navigate, onLocked: onLocked },
       actions: searchAction.concat(menuAction),
       lang: {
         code: state.lang.toUpperCase(),
@@ -347,6 +352,7 @@
       active: view.view,
       items: items,
       onSelect: navigate,
+      onLocked: onLocked,
     }));
 
     if (nodes.footerText) {
