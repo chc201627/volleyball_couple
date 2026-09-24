@@ -18,3 +18,8 @@ Engram mirror: `odd/fix-unresolved-match-title/tasks` (pending: Engram tools una
 - [x] TASK-2: In `js/ui/screens/tournament-day.js` and `js/ui/screens/scoring.js`, delegate slot labeling to `TournamentText.slotLabel`, guard `matchRowFor` scoring click with `view.scorable !== false`, and project resolved teams in `scoring.js`.
 - [x] TASK-3: In `js/tournament-day-selectors.js`, include `team1Slot`/`team2Slot` in `searchMatchViews` terms.
 - [x] TASK-4: Add automated tests verifying unresolved knockout matches render localized placeholder titles and are not scorable. Verify all browser/Node suites pass.
+
+## Evidence
+- Commit: `d4476ce1b7185d7c03f5410e8a65a89259c627d3`
+- Tests: 76/76 in `tournament-day-selectors.test.html`, regression suite 100% pass across all 9 suites.
+
