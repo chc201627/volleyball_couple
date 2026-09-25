@@ -72,5 +72,5 @@ body:
     attributes:
       label: Confirmation
       options:
-        - label: I verified that this issue is reproducible on the latest available version.
+        - label: The issue is reproducible on the latest available version.
           required: true
