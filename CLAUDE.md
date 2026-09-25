@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Repository guidance for coding agents. The current release preparation is **v2.0.11**; this branch is not deployed by that preparation.
+Repository guidance for coding agents. The current release preparation is **v2.0.12**; this branch is not deployed by that preparation.
 
 ## Project
 

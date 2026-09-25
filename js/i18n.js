@@ -167,7 +167,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'New tournament',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.11',
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.12',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': 'Who is playing today?',
@@ -633,7 +633,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Nuevo torneo',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.11',
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.12',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': '¿Quién juega hoy?',
