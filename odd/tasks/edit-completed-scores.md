@@ -65,9 +65,9 @@ The lower save path already supports monotonic result revisions, but the tournam
 - Checks: `npm run test:browser` PASS — completed-score-edit 7/7; tournament-day-selectors 84/84; score-input 38/38; offline-scoring 6/6; match-history 39/39; workspace-view-machine 88/88; full suite 17/17 harnesses, 750/750 assertions. `node --check js/tournament-day-selectors.js` PASS. `node --check js/ui/screens/tournament-day.js` PASS. `git diff --check` PASS.
 - Rollback boundary: revert the completed-result editability projection, tournament-day entrypoint gate, focused production regression, and v2.0.11 evidence together; existing revisioned save, offline queue, conflict, and history paths are untouched.
 - Authored lines: 313 (306 additions + 7 deletions, including this work unit's code, regression, and evidence).
-- Assessment: disabled/unmanaged (RDD disabled).
-- Commit: PENDING-COMMIT.
+- Assessment: native `medium` / `under_budget`; RDD disabled/unmanaged. Writer verification passed, and the parent repeated the full 17-harness suite, JavaScript syntax checks, and diff check successfully.
+- Commit: `31cbadb` (`fix(scoring): allow completed result corrections`).
 
 ## Next Step
 
-Commit the completed SCORE-1 work unit; its commit identity remains pending parent reconciliation.
+User-owned delivery remains: push `fix/edit-completed-scores` and create a PR when the repository's approved-issue workflow is available.
