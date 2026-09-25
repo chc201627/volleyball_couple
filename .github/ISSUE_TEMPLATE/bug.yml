@@ -1,0 +1,76 @@
+name: Bug report
+description: Report reproducible behavior that differs from the application's documented contract.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please provide enough evidence to reproduce and verify it.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the user-visible problem in one or two sentences.
+      placeholder: Completed match scores cannot be reopened for correction.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: List the smallest sequence that reproduces the problem.
+      placeholder: |
+        1. Finish a match.
+        2. Open Tournament.
+        3. Select the completed match.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Explain what should happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Explain what happens instead, including any visible error.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: Select the closest user impact.
+      options:
+        - Blocks a core workflow
+        - Breaks a non-core workflow
+        - Accessibility or usability problem
+        - Documentation or verification problem
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Add relevant version, browser, screenshots, logs, or code references. Do not include secrets.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I verified that this issue is reproducible on the latest available version.
+          required: true
