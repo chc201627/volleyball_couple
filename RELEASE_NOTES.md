@@ -1,5 +1,9 @@
 # Release Notes
  
+## v2.0.12 — Cache Invalidation for Completed-Result Corrections
+
+- **Version bump only**: `31cbadb` ("Completed-result corrections") landed after the v2.0.11 asset stamp, so the service worker kept serving the pre-fix `js/tournament-day.js` and `js/tournament-day-selectors.js` cache-first to anyone who had already opened the app — the reopen-a-finished-match tap silently did nothing for them. This release re-stamps every asset so returning visitors fetch the fixed build.
+
 ## v2.0.11 — Audit Fixes (Prepared, Not Deployed)
 
 - **Formatted tournament progression and team rendering**: prepares the audit fixes that resolve knockout progression from current standings and render every member of 2v2, 3v3, and 4v4 teams while retaining legacy pair compatibility.

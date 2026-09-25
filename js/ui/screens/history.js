@@ -35,6 +35,16 @@
       : author.label;
   }
 
+  /** Which version stood after a conflict: named when the viewer can tell who
+   * it belonged to, generic when the author is unknown. */
+  function conflictKeptText(author) {
+    if (author && author.isYou) return translate('history.conflictKept', 'se quedó tu versión');
+    if (author && !author.unknown && author.label) {
+      return translate('history.conflictKeptBy', 'se quedó la versión de ' + author.label, { name: author.label });
+    }
+    return translate('history.conflictKeptUnknown', 'se quedó esta versión');
+  }
+
   function timeText(at) {
     if (!at || at.unknown) return translate('history.unknownTime', 'sin hora');
     if (at.relative) {
@@ -317,7 +327,7 @@
         // usually checking what the score IS, not how it got there.
         body.push(C.panel({
           label: translate('history.current', 'Resultado actual'),
-          meta: translate('history.revision', 'rev ' + view.current.revision, { n: view.current.revision }),
+          meta: translate('history.revision', 'Edición ' + view.current.revision, { n: view.current.revision }),
         }, [
           // The teams are already under the title; repeating them here would
           // make the panel restate its own heading.
@@ -342,7 +352,7 @@
             el('div', { class: 'history__head' }, [
               el('span', {
                 class: 'history__revision',
-                text: translate('history.revision', 'rev ' + row.revision, { n: row.revision }),
+                text: translate('history.revision', 'Edición ' + row.revision, { n: row.revision }),
               }),
               el('span', {
                 class: ['history__action', 'history__action--' + row.action],
@@ -354,9 +364,7 @@
             el('p', {
               class: 'history__meta',
               text: authorText(row.author) +
-                (row.action === 'conflictResolved'
-                  ? ' · ' + translate('history.conflictKept', 'se quedó esta versión')
-                  : ''),
+                (row.action === 'conflictResolved' ? ' · ' + conflictKeptText(row.author) : ''),
             }),
           ]);
         }))));

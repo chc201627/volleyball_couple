@@ -167,7 +167,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'New tournament',
       // Footer
 
-      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.11',
+      'footer.copyright': '\u00a9 2026 Beach Volleyball Couple Matching \u2014 v2.0.12',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': 'Who is playing today?',
@@ -465,10 +465,12 @@ var t, translate, setLanguage, getLanguage;
       'history.matchEmptyTitle': 'No changes recorded',
       'history.matchEmptyText': 'This result was saved before the history existed, or the tournament is not shared.',
       'history.current': 'Current result',
-      'history.revision': 'rev {n}',
+      'history.revision': 'Edition {n}',
       'history.savedBy': 'Saved by',
       'history.timeline': 'Timeline',
-      'history.conflictKept': 'this version stood',
+      'history.conflictKept': 'your version stood',
+      'history.conflictKeptBy': '{name}’s version stood',
+      'history.conflictKeptUnknown': 'this version stood',
       'history.fullTitle': 'Change history',
 
       // Todos los partidos y su buscador (C6)
@@ -633,7 +635,7 @@ var t, translate, setLanguage, getLanguage;
       'workspace.results.startAnother': 'Nuevo torneo',
       // Pie de p\u00e1gina
 
-      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.11',
+      'footer.copyright': '\u00a9 2026 Emparejamiento de V\u00f3ley Playa \u2014 v2.0.12',
 
       // Alta y plantel (A1, A2)
       'setup.empty.title': '¿Quién juega hoy?',
@@ -931,10 +933,12 @@ var t, translate, setLanguage, getLanguage;
       'history.matchEmptyTitle': 'Sin cambios registrados',
       'history.matchEmptyText': 'Este resultado se guardó antes de que existiera el historial, o el torneo no está compartido.',
       'history.current': 'Resultado actual',
-      'history.revision': 'rev {n}',
+      'history.revision': 'Edición {n}',
       'history.savedBy': 'Guardado por',
       'history.timeline': 'Línea de tiempo',
-      'history.conflictKept': 'se quedó esta versión',
+      'history.conflictKept': 'se quedó tu versión',
+      'history.conflictKeptBy': 'se quedó la versión de {name}',
+      'history.conflictKeptUnknown': 'se quedó esta versión',
       'history.fullTitle': 'Historial de cambios',
 
       // Todos los partidos y su buscador (C6)
