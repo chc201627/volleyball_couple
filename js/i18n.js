@@ -465,10 +465,12 @@ var t, translate, setLanguage, getLanguage;
       'history.matchEmptyTitle': 'No changes recorded',
       'history.matchEmptyText': 'This result was saved before the history existed, or the tournament is not shared.',
       'history.current': 'Current result',
-      'history.revision': 'rev {n}',
+      'history.revision': 'Edition {n}',
       'history.savedBy': 'Saved by',
       'history.timeline': 'Timeline',
-      'history.conflictKept': 'this version stood',
+      'history.conflictKept': 'your version stood',
+      'history.conflictKeptBy': '{name}’s version stood',
+      'history.conflictKeptUnknown': 'this version stood',
       'history.fullTitle': 'Change history',
 
       // Todos los partidos y su buscador (C6)
@@ -931,10 +933,12 @@ var t, translate, setLanguage, getLanguage;
       'history.matchEmptyTitle': 'Sin cambios registrados',
       'history.matchEmptyText': 'Este resultado se guardó antes de que existiera el historial, o el torneo no está compartido.',
       'history.current': 'Resultado actual',
-      'history.revision': 'rev {n}',
+      'history.revision': 'Edición {n}',
       'history.savedBy': 'Guardado por',
       'history.timeline': 'Línea de tiempo',
-      'history.conflictKept': 'se quedó esta versión',
+      'history.conflictKept': 'se quedó tu versión',
+      'history.conflictKeptBy': 'se quedó la versión de {name}',
+      'history.conflictKeptUnknown': 'se quedó esta versión',
       'history.fullTitle': 'Historial de cambios',
 
       // Todos los partidos y su buscador (C6)
