@@ -28,15 +28,16 @@ function tournamentDayProjection(tournament) {
   var resolution = format
     ? resolveFormat(format, { groups: groups, matches: matches, standings: standings })
     : null;
+  var formatValidation = format ? validateFormat(format, groups) : null;
   var day = tournamentDay({
     format: format,
     resolution: resolution,
+    formatValid: !formatValidation || formatValidation.valid,
     matches: matches,
     groups: groups,
     standings: standings,
     king: tournament.king || null,
   });
-  var formatValidation = format ? validateFormat(format, groups) : null;
   var hasBracket = !!(resolution && resolution.stages.some(function (stage) {
     return stage.kind === 'knockout';
   }));
@@ -79,14 +80,29 @@ function tournamentDayProjectedMatch(resolution, matchId) {
   return null;
 }
 
+/** Finds the stage that owns a projected match. A resolved pair alone is not
+ * enough to edit: a malformed stage fails closed even when one match happens
+ * to retain resolvable team ids. */
+function tournamentDayProjectedStage(resolution, matchId) {
+  if (!resolution || !Array.isArray(resolution.stages)) return null;
+  for (var i = 0; i < resolution.stages.length; i++) {
+    var stage = resolution.stages[i];
+    if ((stage.matches || []).some(function (item) { return item.matchId === matchId; })) return stage;
+  }
+  return null;
+}
+
 /** One MatchView: the raw match plus its set rules and, for formatted sessions,
  * the resolveFormat() projection. Classic matches are resolved by construction. */
-function tournamentDayBuildMatchView(match, format, resolution) {
+function tournamentDayBuildMatchView(match, format, resolution, formatValid) {
   var stageId = match.stageId || match.groupId;
   var rules = rulesForMatch(format, match.id);
 
   var resolved = true;
   var scorable = !match.played;
+  // `scorable` is deliberately first-entry-only. `editable` describes whether
+  // a known, resolved result may be corrected; callers still apply session role.
+  var editable = true;
   var team1Id = match.team1Id;
   var team2Id = match.team2Id;
   var team1Slot = match.team1Id;
@@ -94,9 +110,12 @@ function tournamentDayBuildMatchView(match, format, resolution) {
 
   if (format) {
     var projected = tournamentDayProjectedMatch(resolution, match.id);
+    var projectedStage = tournamentDayProjectedStage(resolution, match.id);
     if (projected) {
       resolved = projected.resolved;
       scorable = projected.scorable;
+      editable = !!(projected.resolved && formatValid !== false &&
+        projectedStage && projectedStage.status !== 'invalid');
       team1Id = projected.team1Id;
       team2Id = projected.team2Id;
       team1Slot = projected.team1Slot;
@@ -104,6 +123,7 @@ function tournamentDayBuildMatchView(match, format, resolution) {
     } else {
       resolved = false;
       scorable = false;
+      editable = false;
       team1Id = null;
       team2Id = null;
     }
@@ -127,6 +147,7 @@ function tournamentDayBuildMatchView(match, format, resolution) {
     team2Slot: team2Slot,
     resolved: resolved,
     scorable: scorable,
+    editable: editable,
     rules: { pointsTo: rules.pointsTo, overtime: rules.overtime },
   };
 }
@@ -230,12 +251,14 @@ function tournamentDay(input) {
   input = input || {};
   var format = input.format || null;
   var resolution = input.resolution || null;
+  var formatValid = input.formatValid;
   var rawMatches = input.matches || [];
   var groups = input.groups || [];
   var standings = input.standings || null;
   var king = input.king || null;
 
-  var views = rawMatches.map(function (m) { return tournamentDayBuildMatchView(m, format, resolution); });
+  if (format && formatValid == null) formatValid = validateFormat(format, groups).valid;
+  var views = rawMatches.map(function (m) { return tournamentDayBuildMatchView(m, format, resolution, formatValid); });
   var cmp = tournamentDayCompareMatches(format);
 
   var live = views.filter(function (v) { return v.status === 'live'; }).sort(cmp);

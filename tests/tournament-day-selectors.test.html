@@ -185,6 +185,8 @@
       assert(projection.hasBracket === true, 'production projection exposes a bracket only when a knockout stage exists');
       assert(projection.formatValidation && projection.formatValidation.valid === true,
         'production projection derives persisted format validation from current groups');
+      assert(projection.day.nextMatch.editable === true,
+        'a resolved formatted match is editable as well as scorable before its first result');
     })();
 
     (function () {
@@ -210,6 +212,18 @@
       const view = tournamentDay({ matches, groups, format, resolution, standings });
       assert(view.nextMatch === null, 'formatted: an invalid stage never produces a scorable next match');
       assert(view.nextMatchReason === 'awaitingStage', 'formatted: nextMatchReason is "awaitingStage" when pending matches exist but none are scorable');
+      var invalidFinal = view.pending.filter(function (match) { return match.matchId === 'k-final-1'; })[0];
+      assert(invalidFinal && invalidFinal.editable === false,
+        'formatted: an invalid stage never exposes its resolved-looking result for editing');
+    })();
+
+    (function () {
+      const groups = makeGroups({ A: 2 });
+      let matches = generateMatches(groups);
+      matches = play(matches, matches[0].id, 21, 18);
+      const view = tournamentDay({ matches, groups });
+      assert(view.recentlyFinished[0].scorable === false && view.recentlyFinished[0].editable === true,
+        'a completed classic result stops being first-time scorable but remains editable');
     })();
 
     // ─── classic vs formatted stage progress ───────────────────────────────
