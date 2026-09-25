@@ -604,3 +604,4 @@ Full presentation-layer rewrite against `design/volleyball-couple.pen` (35 artbo
 - [x] Replaced current-architecture references to removed `js/app.js` and `css/styles.css` with the split application state/orchestrator, UI, and CSS layers.
 - [x] Added `npm run test:browser` for all standalone browser harnesses, including Teams, offline scoring, and storage/mobile coverage.
 - [x] Prepared the v2.0.11 asset/footer/i18n/service-worker version alignment on the audit feature branch; deployment remains a release decision.
+- [x] Restored revision-safe completed-result corrections for owners and approved scorers while retaining spectator, legacy-session, unresolved-bracket, and invalid-format denial.

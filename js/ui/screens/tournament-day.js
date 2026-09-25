@@ -20,12 +20,13 @@
 
   /** A spectator sees the same score and cannot touch it: the row stops being
    * interactive rather than showing a control that refuses on tap. */
-  function canScore(ctx) {
-    return SessionAccess.canScore(ctx.appState.get().session);
+  function canEditResults(ctx) {
+    var session = ctx.appState.get().session;
+    return SessionAccess.canScore(session) && !(session && (session.legacy || session.schemaVersion === 1));
   }
 
   function matchRowFor(ctx, tournament, view) {
-    var scoring = canScore(ctx) && view.scorable !== false;
+    var scoring = canEditResults(ctx) && view.editable !== false;
     return C.matchRow({
       teams: matchTitle(tournament, view),
       score: scoreText(view),
@@ -87,7 +88,7 @@
       el('p', { class: 'day__hero-teams', text: matchTitle(tournament, view) }),
     ];
 
-    if (canScore(ctx)) {
+    if (canEditResults(ctx)) {
       children.push(C.button({
         label: translate('workspace.tournament.nextMatch.scoreBtn', 'Anotar este partido'),
         onClick: function () { ctx.openOverlay('scoring', { matchId: view.matchId }); },

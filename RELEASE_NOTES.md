@@ -4,6 +4,7 @@
 
 - **Formatted tournament progression and team rendering**: prepares the audit fixes that resolve knockout progression from current standings and render every member of 2v2, 3v3, and 4v4 teams while retaining legacy pair compatibility.
 - **Durable offline scoring and resilient boot**: prepares durable result-retry/conflict behavior plus storage-safe localization and mobile touch-target hardening.
+- **Completed-result corrections**: owners and approved scorers can reopen resolved completed matches and save the next revision; spectators, legacy sessions, unresolved knockout slots, and invalid format stages remain read-only.
 - **Deterministic browser verification**: adds `npm run test:browser`, a development-only loopback Chrome/Chromium runner for all standalone browser harnesses; it isolates browser storage and fails on assertion failures, timeouts, and console errors.
 - **Canonical contract**: documents optional player skill levels as `1–5` and the current split CSS/state/orchestrator/UI architecture.
 - **Release state**: v2.0.11 is prepared on the audit feature branch only. It has not been deployed to Railway or Firebase.

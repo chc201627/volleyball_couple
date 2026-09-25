@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Completed Score Editing Production UI Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    .pass { color: #4ec9b0; } .fail { color: #f44747; font-weight: bold; }
+    .summary--pass { color: #4ec9b0; } .summary--fail { color: #f44747; }
+  </style>
+</head>
+<body>
+  <h1>Completed Score Editing — Production UI Regression</h1>
+  <div id="results"></div>
+  <script src="../js/pairing.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/tournament.js"></script>
+  <script src="../js/tournament-format.js"></script>
+  <script src="../js/tournament-day-selectors.js"></script>
+  <script src="../js/session-access.js"></script>
+  <script src="../js/standings-view.js"></script>
+  <script src="../js/score-input.js"></script>
+  <script src="../js/app-state.js"></script>
+  <script src="../js/ui/dom-helpers.js"></script>
+  <script src="../js/ui/icon-registry.js"></script>
+  <script src="../js/ui/ui-components.js"></script>
+  <script src="../js/ui/tournament-text.js"></script>
+  <script src="../js/ui/standings-table.js"></script>
+  <script src="../js/ui/screen-registry.js"></script>
+  <script src="../js/ui/screens/tournament-day.js"></script>
+  <script src="../js/ui/screens/scoring.js"></script>
+  <script>
+    (async function () {
+      'use strict';
+      var results = document.getElementById('results');
+      var passed = 0;
+      var failed = 0;
+
+      function assert(ok, name) {
+        var node = document.createElement('p');
+        node.className = ok ? 'pass' : 'fail';
+        node.textContent = (ok ? '✓ ' : '✗ ') + name;
+        results.appendChild(node);
+        if (ok) passed++; else failed++;
+      }
+
+      function teams(count) {
+        var items = [];
+        for (var i = 1; i <= count; i++) {
+          items.push({ id: 't' + i, type: 'mixed', players: [{ name: 'Player ' + i + 'A' }, { name: 'Player ' + i + 'B' }] });
+        }
+        return items;
+      }
+
+      function completedTournament() {
+        var items = teams(2);
+        return {
+          teams: items,
+          groups: [{ id: 'A', teams: items }],
+          matches: [{
+            id: 'm1', groupId: 'A', order: 1, team1Id: 't1', team2Id: 't2',
+            score1: 21, score2: 18, status: 'finished', played: true, revision: 1,
+          }],
+        };
+      }
+
+      function context(appState, opened) {
+        return {
+          appState: appState,
+          state: { overlayMatchId: 'm1' },
+          view: { subView: 'today', subViewItems: [] },
+          layout: 'phone',
+          openOverlay: function (id, options) { opened.push({ id: id, matchId: options && options.matchId }); },
+          closeOverlay: function () {},
+          navigate: function () {}, selectSubView: function () {}, rerender: function () {}, rerenderOverlay: function () {},
+          toast: function () {}, pendingStatus: function () { return null; }, pendingConflict: function () { return null; },
+        };
+      }
+
+      function stateFor(session) {
+        var state = AppState.create();
+        state.adoptSession('shared-session', { sessionId: 'shared-session', schemaVersion: session.schemaVersion || 2,
+          legacy: !!session.legacy, role: session.role, tournament: completedTournament() }, []);
+        return state;
+      }
+
+      function renderedTournament(state, opened) {
+        var root = document.createElement('section');
+        DomHelpers.append(root, UIScreens.tournament.render(context(state, opened)));
+        return root;
+      }
+
+      function matchHit(root, title) {
+        return Array.prototype.filter.call(root.querySelectorAll('.c-match'), function (row) {
+          return row.querySelector('.c-match__teams').textContent === title;
+        })[0].querySelector('.c-match__hit');
+      }
+
+      try {
+        setLanguage('en');
+
+        var ownerOpened = [];
+        var ownerState = stateFor({ role: 'owner' });
+        var ownerRoot = renderedTournament(ownerState, ownerOpened);
+        var ownerHit = ownerRoot.querySelector('.c-match__hit');
+        ownerHit.click();
+        assert(ownerHit.tagName === 'BUTTON' && ownerOpened[0] && ownerOpened[0].id === 'scoring' && ownerOpened[0].matchId === 'm1',
+          'owner opens the production scoring overlay from a completed result');
+
+        var savedCommand = null;
+        var scoreContext = context(ownerState, ownerOpened);
+        scoreContext.saveResult = function (command) {
+          var applied = ownerState.applyResult(command.matchId, command.score1, command.score2, command.status);
+          savedCommand = applied.command;
+          return Promise.resolve({ status: 'synced' });
+        };
+        var scoreRoot = UIScreens.scoring.render(scoreContext);
+        var scoreFields = scoreRoot.querySelectorAll('.scoring__value');
+        scoreFields[1].value = '19';
+        scoreFields[1].dispatchEvent(new Event('input', { bubbles: true }));
+        scoreFields[1].dispatchEvent(new Event('blur', { bubbles: true }));
+        scoreRoot.querySelector('.scoring__save').click();
+        await Promise.resolve();
+        var corrected = ownerState.get().tournament.matches[0];
+        assert(savedCommand && savedCommand.expectedRevision === 1 && corrected.score2 === 19 && corrected.revision === 2,
+          'production scoring screen saves a completed-result correction as revision 2');
+
+        var scorerOpened = [];
+        var scorerRoot = renderedTournament(stateFor({ role: 'scorer' }), scorerOpened);
+        var scorerHit = scorerRoot.querySelector('.c-match__hit');
+        scorerHit.click();
+        assert(scorerHit.tagName === 'BUTTON' && scorerOpened[0] && scorerOpened[0].id === 'scoring',
+          'approved scorer can open a completed result');
+
+        var spectatorOpened = [];
+        var spectatorRoot = renderedTournament(stateFor({ role: 'spectator' }), spectatorOpened);
+        var spectatorHit = spectatorRoot.querySelector('.c-match__hit');
+        spectatorHit.click();
+        assert(spectatorHit.tagName === 'DIV' && spectatorOpened.length === 0,
+          'spectator cannot open a completed result');
+
+        var legacyOpened = [];
+        var legacyRoot = renderedTournament(stateFor({ role: 'owner', schemaVersion: 1, legacy: true }), legacyOpened);
+        var legacyHit = legacyRoot.querySelector('.c-match__hit');
+        legacyHit.click();
+        assert(legacyHit.tagName === 'DIV' && legacyOpened.length === 0,
+          'schema-v1 owner session remains read-only');
+
+        var bracketTeams = teams(4);
+        var bracketGroups = [{ id: 'A', teams: bracketTeams }];
+        var bracketFormat = presetFormat('groupsFinal', bracketGroups);
+        var unresolvedTournament = { teams: bracketTeams, groups: bracketGroups, format: bracketFormat, matches: generateStageMatches(bracketFormat, bracketGroups) };
+        var unresolvedProjection = tournamentDayProjection(unresolvedTournament);
+        var unresolvedView = unresolvedProjection.day.pending.filter(function (item) { return item.matchId === 'k-final-1'; })[0];
+        var unresolvedOpened = [];
+        var unresolvedContext = context({ get: function () { return { tournament: unresolvedTournament, session: null }; } }, unresolvedOpened);
+        var unresolvedRoot = UIScreens.allMatches.render(unresolvedContext);
+        var unresolvedHit = matchHit(unresolvedRoot, TournamentText.matchTitle(unresolvedTournament, unresolvedView));
+        unresolvedHit.click();
+        assert(unresolvedHit.tagName === 'DIV' && unresolvedOpened.length === 0,
+          'unresolved knockout final cannot open scoring from the production all-matches screen');
+
+        var invalidMatches = generateStageMatches(bracketFormat, bracketGroups).map(function (match) {
+          return match.id === 'k-final-1' ? Object.assign({}, match, { team1Id: 'slot:A9' }) : match;
+        });
+        var invalidTournament = { teams: bracketTeams, groups: bracketGroups, format: bracketFormat, matches: invalidMatches };
+        var invalidProjection = tournamentDayProjection(invalidTournament);
+        var invalidView = invalidProjection.day.pending.filter(function (item) { return item.matchId === 'k-final-1'; })[0];
+        var invalidOpened = [];
+        var invalidContext = context({ get: function () { return { tournament: invalidTournament, session: null }; } }, invalidOpened);
+        var invalidRoot = UIScreens.allMatches.render(invalidContext);
+        var invalidHit = matchHit(invalidRoot, TournamentText.matchTitle(invalidTournament, invalidView));
+        invalidHit.click();
+        assert(invalidHit.tagName === 'DIV' && invalidOpened.length === 0,
+          'invalid formatted stage cannot open scoring even when accessed from the schedule');
+      } catch (error) {
+        assert(false, 'Harness error: ' + error.message);
+      }
+
+      var total = passed + failed;
+      results.innerHTML += '<div class="summary ' + (failed ? 'summary--fail' : 'summary--pass') + '">' +
+        passed + '/' + total + ' tests passed' + (failed ? ' — FAILED' : ' — ALL PASSED') + '</div>';
+    })();
+  </script>
+</body>
+</html>
